@@ -4,6 +4,7 @@ import codex from "@otter-mail/extension-codex/ui";
 import hermes from "@otter-mail/extension-hermes/ui";
 import openclaw from "@otter-mail/extension-openclaw/ui";
 import openrouter from "@otter-mail/extension-openrouter/ui";
+import otterDrive from "@otter-mail/extension-otter-drive/ui";
 import signInCodes from "@otter-mail/extension-sign-in-codes/ui";
 import todoist from "@otter-mail/extension-todoist/ui";
 import translation from "@otter-mail/extension-translation/ui";
@@ -20,6 +21,7 @@ export const EXTENSIONS: readonly UiExtension[] = [
   calendarInvites,
   translation,
   todoist,
+  otterDrive,
   openrouter,
   hermes,
   openclaw,
@@ -52,6 +54,11 @@ export function hasIntegrations(): boolean {
 
 const DISABLED_KEY = "otter:extensions:disabled";
 const CHANGE_EVENT = "otter:extensions-changed";
+
+/** Whether it's turned on (Settings), read outside React. */
+export function extensionEnabled(id: string): boolean {
+  return !parseDisabled(readDisabled()).has(id);
+}
 
 function readDisabled(): string {
   return localStorage.getItem(DISABLED_KEY) ?? "[]";

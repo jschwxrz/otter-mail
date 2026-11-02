@@ -114,10 +114,10 @@ its folder. Deleting an Outlook folder moves it and its mail to Deleted Items.
 
 ## Extensions
 
-Sign-in codes, Calendar invites, Translation, Todoist and the agents (the Otter Mail agent, Hermes,
+Sign-in codes, Calendar invites, Translation, Todoist, Otter Drive and the agents (the Otter Mail agent, Hermes,
 OpenClaw, Claude, Codex) are built-in extensions (`extensions/`). Settings lists them by kind,
 under "Extensions": Agents (with chat's own settings above them), Integrations (hidden while it has
-none) and Features, each row with its switch; a service you sign in to (Todoist) is a connection,
+none) and Features, each row with its switch; a service you sign in to (Todoist, Otter Drive) is a connection,
 listed in Connections beside the mailboxes. One with something to set up opens to its page: its switch, where its data
 goes, and its settings. Turning a feature off hides it everywhere (the choice follows the Otter
 account); turning an agent off stops chats on it.
@@ -155,6 +155,33 @@ Reminders are delivered by Todoist using the user's notification settings and ac
 entitlements. Create the task first, then add a reminder in Edit. OAuth uses Todoist's public
 client registration, so no client secret is bundled. The web callback is shipped with the site;
 the Mac app receives its callback on a temporary localhost listener.
+
+## Otter Drive
+
+Implementation boundaries and removal steps: [Otter Drive feature guide](integrations/otter-drive.md).
+
+Drive is a workspace beside Mail, Calendar and Agent (its mark at the sidebar's foot, ⌘K's "Open
+Drive", `/drive/<folder>/<document>`), laid out like Otter Drive: the sidebar picks a drive (My
+Drive, your shared drives, Shared with me) with Mail's mailbox picker, filters it (Type, Updated
+this week, Archived), searches it, and lists its folders and documents; the main area shows the
+open document, or the drive's documents as a grid of thumbnails. Markdown, CSV/TSV and text are
+drawn in the app's style, images shown, a one-file page in a sandboxed frame; anything else (a site
+of several files, a PDF, a video, a workbook) opens in Otter Drive. A document renames in place,
+switches versions, copies its link, archives and restores; files upload by picking or dropping.
+
+Sign in from Drive or Settings → Connections (a code confirmed in the browser). Settings lists your
+drives with a switch each: a drive that's off is hidden in Drive, can't be saved to, and is refused
+to anything else asking (agents included). "Save to Otter Drive…" in a message's menu saves an
+attachment, or the email as a page, into the drive you pick. The sign-in and the switches stay on
+this device. Drive's API answers only the desktop app for now: the web app needs Drive's CORS
+change (otter-drive `otter-mail-cors`).
+
+| Feature                                             | Mac | Web | iPhone |
+| --------------------------------------------------- | --- | --- | ------ |
+| Drive workspace: drives, filters, search, documents | ✓   | —   | —      |
+| Previews, versions, rename, archive, upload         | ✓   | —   | —      |
+| Drives on or off (Settings)                         | ✓   | —   | —      |
+| Save an attachment or the email to a drive          | ✓   | —   | —      |
 
 ## Chats
 

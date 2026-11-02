@@ -1,0 +1,48 @@
+{
+  "name": "@otter-mail/extension-otter-drive",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Your drives' documents in a Drive workspace, and attachments saved from mail.",
+  "type": "module",
+  "exports": {
+    "./manifest": "./manifest.ts",
+    "./core": "./core/index.ts",
+    "./ui": "./ui/index.tsx"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vp test run --passWithNoTests"
+  },
+  "dependencies": {
+    "@otter-mail/contracts": "workspace:*",
+    "@otter-mail/core": "workspace:*",
+    "@tanstack/react-query": "^5.87.4",
+    "@tanstack/react-router": "^1.131.36",
+    "lucide-react": "^0.542.0",
+    "react": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.12",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "otterMail": {
+    "id": "otter-drive",
+    "name": "Otter Drive",
+    "description": "Your drives' documents in a Drive workspace, and attachments saved from mail.",
+    "category": "connection",
+    "platforms": [
+      "mac",
+      "linux"
+    ],
+    "dataUse": "Sends Otter Drive only what you upload or choose to save: the attachment or the email, with the title you give it, into the drive you pick. Everyone with access to that drive can see it. Your Otter Drive sign-in, and which drives are on, stay on this device.",
+    "contributes": {
+      "workspaces": [
+        {
+          "id": "drive",
+          "title": "Drive"
+        }
+      ]
+    }
+  }
+}
