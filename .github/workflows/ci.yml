@@ -19,6 +19,52 @@ env:
   ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
 
 jobs:
+  # The Swift jobs need macOS runners, which the Mac release waits on too: run
+  # them only when what they build changed (or this workflow did).
+  changes:
+    name: Changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      iphone: ${{ steps.filter.outputs.iphone }}
+      translator: ${{ steps.filter.outputs.translator }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Filter changed paths
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          # NUL-separated, so unusual names aren't quoted; no renames, so a move out of a
+          # watched folder counts as its deletion there.
+          list_changes() { git diff --name-only --no-renames -z "$@" > "$RUNNER_TEMP/changed.txt"; }
+          everything() { printf '.github/workflows/ci.yml\0' > "$RUNNER_TEMP/changed.txt"; }
+          changed() { grep -zqE "$1" "$RUNNER_TEMP/changed.txt" && echo true || echo false; }
+          case "$EVENT" in
+            pull_request) list_changes "$PR_BASE...$PR_HEAD" ;;
+            push)
+              if git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then
+                list_changes "$PUSH_BEFORE" "$GITHUB_SHA"
+              else
+                everything
+              fi
+              ;;
+            # A manual run checks everything.
+            *) everything ;;
+          esac
+          {
+            echo "iphone=$(changed '^(apps/ios/|packages/shared/|package\.json$|scripts/export-ios-resources\.ts$|\.github/workflows/ci\.yml$)')"
+            echo "translator=$(changed '^(native/translator/|\.github/actions/select-xcode/|\.github/workflows/ci\.yml$)')"
+          } | tee -a "$GITHUB_OUTPUT"
+
   check:
     name: Check
     runs-on: ubuntu-24.04
@@ -69,6 +115,8 @@ jobs:
   # needed: this only compiles the Swift package.
   translator:
     name: Translator (Swift)
+    needs: changes
+    if: needs.changes.outputs.translator == 'true'
     runs-on: macos-15
     timeout-minutes: 15
     steps:
@@ -86,6 +134,8 @@ jobs:
 
   iphone:
     name: iPhone (Swift)
+    needs: changes
+    if: needs.changes.outputs.iphone == 'true'
     runs-on: xcode-27
     timeout-minutes: 30
     steps:
