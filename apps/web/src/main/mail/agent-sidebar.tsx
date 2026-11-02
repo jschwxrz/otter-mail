@@ -3,7 +3,7 @@ import {
   AlarmClockIcon,
   ChevronDownIcon,
   LoaderCircleIcon,
-  MessageSquarePlusIcon,
+  PlusIcon,
   SearchIcon,
   XIcon,
 } from "lucide-react";
@@ -32,12 +32,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./menu";
-import { NewRow, Section, SidebarBody } from "./sidebar-ui";
-import { cn } from "./ui";
+import { ShelveActions } from "./chat-shelve-actions";
+import { Section, SidebarBody } from "./sidebar-ui";
+import { HintTooltip, cn } from "./ui";
 
 /** Settled chats show this many at first, then this many more at a time (Otter Code's). */
 const SETTLED_FIRST = 10;
 const SETTLED_PAGE = 25;
+
+const HEADER_BUTTON =
+  "flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-sidebar-muted-foreground outline-none hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring";
 
 const AGENT_FILTER_KEY = "gmail:chat-agent-filter";
 
@@ -59,7 +63,7 @@ function useNow(ms: number): number {
 
 /**
  * The Agent mode's sidebar, laid out like Otter Code's: a new chat, the chats
- * you're on, and at the bottom Working, Snoozed and Settled.
+ * you're on (running ones say so), and at the bottom Snoozed and Settled.
  */
 export function AgentSidebar({
   chatId,
@@ -123,7 +127,6 @@ export function AgentSidebar({
   );
   const shelves: Record<ChatShelf, Conversation[]> = {
     active: [],
-    working: [],
     snoozed: [],
     settled: [],
   };
@@ -139,7 +142,6 @@ export function AgentSidebar({
     );
   }
   shelves.active.sort((a, b) => chatReturnedAt(b, now) - chatReturnedAt(a, now));
-  shelves.working.sort((a, b) => b.updatedAt - a.updatedAt);
   shelves.snoozed.sort((a, b) => (a.snoozedUntil ?? 0) - (b.snoozedUntil ?? 0));
   shelves.settled.sort((a, b) => b.updatedAt - a.updatedAt);
   // The open chat stays in sight even past the settled ones shown.
@@ -150,7 +152,7 @@ export function AgentSidebar({
   const row = (c: Conversation, shelf: ChatShelf) => {
     const selected = c.id === chatId;
     let trailing: ReactNode;
-    if (shelf === "working") {
+    if (runs[c.id] && shelf === "active") {
       const since = c.turns.at(-1)?.startedAt ?? c.updatedAt;
       trailing = (
         <span className="flex shrink-0 items-center gap-1 text-xs text-info">
@@ -176,25 +178,35 @@ export function AgentSidebar({
     }
     return (
       <ChatRowMenu key={c.id} chat={c} shelf={shelf} now={now}>
-        <button
-          type="button"
-          onClick={() => onSelect(c.id)}
-          aria-current={selected ? "page" : undefined}
+        <div
           className={cn(
-            "group flex h-8 w-full min-w-0 cursor-pointer items-center gap-2.5 rounded-lg px-(--sidebar-row-content-inset) text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
+            "group/row flex h-8 w-full min-w-0 items-center rounded-lg pe-1 text-sm has-focus-visible:ring-2 has-focus-visible:ring-focus-ring",
             selected
               ? "bg-sidebar-row-selected text-sidebar-foreground"
               : "text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
           )}
         >
-          <AgentAvatar
-            kind={c.provider}
-            agent={openClawAgentId(c.sessionId)}
-            className="size-3.5 shrink-0"
-          />
-          <span className="min-w-0 flex-1 truncate">{c.title}</span>
-          {trailing}
-        </button>
+          <button
+            type="button"
+            onClick={() => onSelect(c.id)}
+            aria-current={selected ? "page" : undefined}
+            className="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2.5 ps-(--sidebar-row-content-inset) text-left outline-none"
+          >
+            <AgentAvatar
+              kind={c.provider}
+              agent={openClawAgentId(c.sessionId)}
+              className="size-3.5 shrink-0"
+            />
+            <span className="min-w-0 flex-1 truncate">{c.title}</span>
+            {/* At rest the time (or state); on hover, the row's actions in its place. */}
+            <span className="flex shrink-0 pe-(--sidebar-row-content-inset) group-hover/row:hidden group-has-[[data-state=open]]/row:hidden">
+              {trailing}
+            </span>
+          </button>
+          <div className="hidden shrink-0 group-hover/row:flex group-has-[[data-state=open]]/row:flex">
+            <ShelveActions chat={c} settled={shelf === "settled"} />
+          </div>
+        </div>
       </ChatRowMenu>
     );
   };
@@ -249,12 +261,26 @@ export function AgentSidebar({
             aria-label="Search chats"
             onClick={() => setQuery((q) => (q === null ? "" : null))}
             className={cn(
-              "flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-sidebar-muted-foreground outline-none hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring",
+              HEADER_BUTTON,
               query !== null && "bg-sidebar-row-hover text-sidebar-foreground",
             )}
           >
             <SearchIcon className="size-4" />
           </button>
+          <HintTooltip label="New chat" shortcut="agent.newChat" side="bottom">
+            <button
+              type="button"
+              aria-label="New chat"
+              aria-current={current && isBlank(current) ? "page" : undefined}
+              onClick={onNewChat}
+              className={cn(
+                HEADER_BUTTON,
+                current && isBlank(current) && "bg-sidebar-row-selected text-sidebar-foreground",
+              )}
+            >
+              <PlusIcon className="size-4" />
+            </button>
+          </HintTooltip>
         </div>
         {query !== null ? (
           <div className="relative px-(--sidebar-content-inset) pb-1">
@@ -280,14 +306,8 @@ export function AgentSidebar({
             </button>
           </div>
         ) : null}
-        <NewRow
-          icon={<MessageSquarePlusIcon />}
-          label="New chat"
-          selected={current ? isBlank(current) : false}
-          onClick={onNewChat}
-        />
       </div>
-      <SidebarBody contentClassName="flex flex-col">
+      <SidebarBody contentClassName="flex flex-col" flushBottom>
         {empty ? (
           <p className="px-(--sidebar-row-content-inset) py-1.5 text-[13px] text-sidebar-muted-foreground">
             {needle || filter ? "No chats match." : "Chats you start show up here."}
@@ -303,11 +323,6 @@ export function AgentSidebar({
             {shelves.active.map((c) => row(c, "active"))}
             {/* The shelves sit at the bottom, under the chats you're on (Otter Code's). */}
             <div className="mt-auto">
-              {shelves.working.length > 0 ? (
-                <Section title="Working" defaultOpen={false} count={shelves.working.length}>
-                  {shelves.working.map((c) => row(c, "working"))}
-                </Section>
-              ) : null}
               {shelves.snoozed.length > 0 ? (
                 <Section title="Snoozed" defaultOpen={false} count={shelves.snoozed.length}>
                   {shelves.snoozed.map((c) => row(c, "snoozed"))}
