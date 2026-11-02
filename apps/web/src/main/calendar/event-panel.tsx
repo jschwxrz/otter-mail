@@ -7,10 +7,12 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import { Dialog } from "~/components/ui/dialog";
 import {
   AlignLeftIcon,
   ArrowRightIcon,
   CalendarIcon,
+  CheckIcon,
   ClockIcon,
   ExternalLinkIcon,
   MapPinIcon,
@@ -35,6 +37,7 @@ import {
   hasGuests,
   type CalEvent,
   type EventInput,
+  type Repeat,
   type RsvpResponse,
   type useCalendarActions,
 } from "./api";
@@ -287,6 +290,23 @@ const withDate = (ms: number, value: string) => {
   return next.getTime();
 };
 
+/** Every day, Weekly on Monday, Monthly on day 12... from the day it starts. */
+function repeatLabel(repeat: Repeat, startMs: number): string {
+  const d = new Date(startMs);
+  switch (repeat) {
+    case "daily":
+      return "Every day";
+    case "weekdays":
+      return "Every weekday";
+    case "weekly":
+      return `Weekly on ${d.toLocaleDateString(undefined, { weekday: "long" })}`;
+    case "monthly":
+      return `Monthly on day ${d.getDate()}`;
+    case "yearly":
+      return `Yearly on ${d.toLocaleDateString(undefined, { month: "long", day: "numeric" })}`;
+  }
+}
+
 const dayLabel = (ms: number) =>
   new Date(ms).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 
@@ -330,11 +350,16 @@ function TimeRows({
   endMs,
   allDay,
   onChange,
+  repeat,
+  onRepeat,
 }: {
   startMs: number;
   endMs: number;
   allDay: boolean;
   onChange: (startMs: number, endMs: number, allDay: boolean) => void;
+  /** New events: how it repeats (Notion Calendar's Repeat). */
+  repeat?: Repeat | null;
+  onRepeat?: (repeat: Repeat | null) => void;
 }) {
   const length = endMs - startMs;
   // All-day events end the day after their last.
@@ -403,17 +428,48 @@ function TimeRows({
         />
         <span />
       </div>
-      <button
-        type="button"
-        aria-pressed={allDay}
-        onClick={toggleAllDay}
-        className={cn(
-          "-mx-1.5 mt-0.5 h-7 cursor-pointer rounded-md px-1.5 text-[13px] outline-none transition-colors hover:bg-foreground/[0.05]",
-          allDay ? "text-foreground" : "text-muted-foreground",
-        )}
-      >
-        All-day
-      </button>
+      <div className="mt-0.5 flex items-center gap-3">
+        <button
+          type="button"
+          aria-pressed={allDay}
+          onClick={toggleAllDay}
+          className={cn(
+            "-mx-1.5 h-7 cursor-pointer rounded-md px-1.5 text-[13px] outline-none transition-colors hover:bg-foreground/[0.05]",
+            allDay ? "text-foreground" : "text-muted-foreground",
+          )}
+        >
+          All-day
+        </button>
+        {onRepeat ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "flex h-7 min-w-0 cursor-pointer items-center gap-1.5 rounded-md px-1.5 text-[13px] outline-none transition-colors hover:bg-foreground/[0.05]",
+                  repeat ? "text-foreground" : "text-muted-foreground",
+                )}
+              >
+                <RepeatIcon className="size-3.5 shrink-0" />
+                <span className="truncate">{repeat ? repeatLabel(repeat, startMs) : "Repeat"}</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {([null, "daily", "weekdays", "weekly", "monthly", "yearly"] as const).map(
+                (option) => (
+                  <DropdownMenuItem
+                    key={option ?? "none"}
+                    icon={option === (repeat ?? null) ? <CheckIcon /> : <span className="size-4" />}
+                    onSelect={() => onRepeat(option)}
+                  >
+                    {option ? repeatLabel(option, startMs) : "Does not repeat"}
+                  </DropdownMenuItem>
+                ),
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+      </div>
     </Row>
   );
 }
@@ -605,6 +661,67 @@ function ReadOnlyEvent({
   );
 }
 
+/** Answering a repeating invitation: this event or all of them, and a note for the organizer. */
+function SeriesResponseDialog({
+  open,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSave: (allEvents: boolean, comment: string) => void;
+}) {
+  const [allEvents, setAllEvents] = useState(false);
+  const [note, setNote] = useState("");
+  // Each opening starts afresh.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setAllEvents(false);
+      setNote("");
+    }
+  }
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      size="small"
+      title="Save response status for repeat event"
+      confirmLabel="Save response"
+      onConfirm={() => onSave(allEvents, note.trim())}
+    >
+      <div className="flex flex-col gap-1" role="radiogroup">
+        {[
+          [false, "This event"],
+          [true, "All events"],
+        ].map(([value, label]) => (
+          <label
+            key={String(value)}
+            className="flex h-8 cursor-pointer items-center gap-3 text-[13px]"
+          >
+            <input
+              type="radio"
+              name="series-response"
+              checked={allEvents === value}
+              onChange={() => setAllEvents(value as boolean)}
+              className="size-4 accent-primary"
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+      <input
+        value={note}
+        placeholder="Leave a note (optional)"
+        aria-label="Note for the organizer"
+        onChange={(e) => setNote(e.target.value)}
+        className="h-9 w-full rounded-lg border border-border/70 bg-transparent px-3 text-[13px] outline-none placeholder:text-placeholder focus-visible:border-focus-ring/60"
+      />
+    </Dialog>
+  );
+}
+
 function EventDetails({
   event,
   color,
@@ -621,8 +738,17 @@ function EventDetails({
   const notify = hasGuests(event);
   const mine = !event.organizer || event.organizer.toLowerCase() === event.accountId.toLowerCase();
   const update = (patch: EventInput) => actions.update(event, patch, notify);
+  // A repeating invitation: this occurrence or all of them (Notion Calendar's question).
+  const [asking, setAsking] = useState<RsvpResponse | null>(null);
   return (
     <>
+      <SeriesResponseDialog
+        open={asking !== null}
+        onClose={() => setAsking(null)}
+        onSave={(allEvents, comment) => {
+          if (asking) actions.respond(event, asking, { allEvents, comment });
+        }}
+      />
       <Header title={event.recurring ? "Event · repeats" : "Event"} onClose={onClose}>
         {event.htmlLink ? (
           <HintTooltip label="Open in your calendar">
@@ -689,7 +815,10 @@ function EventDetails({
       </Row>
       <People event={event} />
       {event.response && !mine ? (
-        <Rsvp value={event.response} onChange={(r) => actions.respond(event, r)} />
+        <Rsvp
+          value={event.response}
+          onChange={(r) => (event.recurring ? setAsking(r) : actions.respond(event, r))}
+        />
       ) : null}
       <Divider />
       <Row icon={<AlignLeftIcon />}>
@@ -750,6 +879,7 @@ function NewEvent({
       ...eventTimes(draft.startMs, draft.endMs, draft.allDay),
       ...(location.trim() ? { location: location.trim() } : {}),
       ...(attendees.length ? { attendees } : {}),
+      ...(draft.repeat ? { repeat: draft.repeat } : {}),
     });
   };
   const enter = (e: ReactKeyboardEvent) => {
@@ -777,6 +907,8 @@ function NewEvent({
         endMs={draft.endMs}
         allDay={draft.allDay}
         onChange={(startMs, endMs, allDay) => onChange({ ...draft, startMs, endMs, allDay })}
+        repeat={draft.repeat ?? null}
+        onRepeat={(repeat) => onChange({ ...draft, repeat: repeat ?? undefined })}
       />
       <Row icon={<MapPinIcon />}>
         <input

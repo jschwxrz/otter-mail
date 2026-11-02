@@ -7,12 +7,15 @@
  * services/calendar-invites.ts replies by email instead.
  */
 
+import { wallClock } from "../wall-clock.js";
 import { platform } from "../../platform.js";
 import {
   NoCalendarAccess,
   type BusyBlock,
   type CalendarEvent,
   type CalendarInfo,
+  type Repeat,
+  type RespondOptions,
   type EventInput,
   type RsvpResponse,
 } from "../provider.js";
@@ -110,13 +113,15 @@ async function setResponse(
   event: ApiEvent,
   response: RsvpResponse,
   calendarId?: string,
+  comment?: string,
 ): Promise<ApiEvent> {
   const email = accountId.toLowerCase();
+  const note = comment ? { comment } : {};
   const attendees = (event.attendees ?? []).map((a) =>
-    isSelf(a, email) ? { ...a, responseStatus: response } : a,
+    isSelf(a, email) ? { ...a, responseStatus: response, ...note } : a,
   );
   if (!attendees.some((a) => isSelf(a, email))) {
-    attendees.push({ email, self: true, responseStatus: response });
+    attendees.push({ email, self: true, responseStatus: response, ...note });
   }
   return (await calendarFetch(
     accountId,
@@ -159,7 +164,27 @@ function toEvent(accountId: string, e: ApiEvent): CalendarEvent {
     meetingLink: video ?? e.hangoutLink ?? null,
     htmlLink: e.htmlLink ?? null,
     recurring: Boolean(e.recurringEventId || e.recurrence),
+    seriesId: e.recurringEventId ?? (e.recurrence ? e.id : null),
   };
+}
+
+const BYDAY = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+
+/** How it repeats, as Google's RRULE, from the day it starts in its time zone. */
+function repeatRule(repeat: Repeat, start: string, timeZone: string): string {
+  const day = wallClock(start, timeZone);
+  switch (repeat) {
+    case "daily":
+      return "RRULE:FREQ=DAILY";
+    case "weekdays":
+      return "RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR";
+    case "weekly":
+      return `RRULE:FREQ=WEEKLY;BYDAY=${BYDAY[day.weekday]}`;
+    case "monthly":
+      return `RRULE:FREQ=MONTHLY;BYMONTHDAY=${day.day}`;
+    case "yearly":
+      return "RRULE:FREQ=YEARLY";
+  }
 }
 
 const DAY_MS = 86_400_000;
@@ -186,6 +211,8 @@ function apiBody(input: EventInput, current?: ApiEvent): Record<string, unknown>
   if (input.location !== undefined) body.location = input.location;
   if (input.description !== undefined) body.description = input.description;
   if (input.attendees !== undefined) body.attendees = input.attendees.map((email) => ({ email }));
+  if (input.repeat && input.start)
+    body.recurrence = [repeatRule(input.repeat, input.start, timeZone)];
   if (input.start !== undefined) {
     body.start = apiTime(input.start, allDay, timeZone);
     // Without an end it keeps its length (new events: an hour, or the day).
@@ -338,9 +365,19 @@ export async function respondToEvent(
   eventId: string,
   response: RsvpResponse,
   calendarId?: string,
+  options: RespondOptions = {},
 ): Promise<CalendarEvent> {
   const event = await fetchEvent(accountId, eventId, calendarId);
-  return toEvent(accountId, await setResponse(accountId, event, response, calendarId));
+  // All of a series: answered on the series itself, which every occurrence follows.
+  if (options.allEvents && event.recurringEventId) {
+    const series = await fetchEvent(accountId, event.recurringEventId, calendarId);
+    await setResponse(accountId, series, response, calendarId, options.comment);
+    return getEvent(accountId, eventId, calendarId);
+  }
+  return toEvent(
+    accountId,
+    await setResponse(accountId, event, response, calendarId, options.comment),
+  );
 }
 
 /** Teammates' busy times: Google's free/busy (calendar.readonly covers it), no titles. */

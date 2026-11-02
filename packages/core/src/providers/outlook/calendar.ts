@@ -11,9 +11,12 @@ import {
   type BusyBlock,
   type CalendarEvent,
   type CalendarInfo,
+  type Repeat,
+  type RespondOptions,
   type EventInput,
   type RsvpResponse,
 } from "../provider.js";
+import { wallClock } from "../wall-clock.js";
 import { GraphError, graph, isNotFound, type GraphInit } from "./graph.js";
 
 const UTC = 'outlook.timezone="UTC"';
@@ -97,10 +100,15 @@ export async function findEvent(
   return { response: asResponse(found.responseStatus?.response), htmlLink: found.webLink ?? null };
 }
 
-async function answer(accountId: string, eventId: string, response: RsvpResponse) {
+async function answer(
+  accountId: string,
+  eventId: string,
+  response: RsvpResponse,
+  comment?: string,
+) {
   await calendarGraph(accountId, `${eventPath(eventId)}/${ACTION[response]}`, {
     method: "POST",
-    body: { sendResponse: true },
+    body: { sendResponse: true, ...(comment ? { comment } : {}) },
   });
 }
 
@@ -144,13 +152,16 @@ function toEvent(e: ApiEvent): CalendarEvent {
     meetingLink: e.onlineMeeting?.joinUrl ?? e.onlineMeetingUrl ?? null,
     htmlLink: e.webLink ?? null,
     recurring: e.type !== undefined ? e.type !== "singleInstance" : Boolean(e.seriesMasterId),
+    seriesId: e.seriesMasterId ?? (e.type === "seriesMaster" ? e.id : null),
   };
 }
 
 const DAY_MS = 86_400_000;
 
-function apiTime(value: string, allDay: boolean, timeZone: string): ApiTime {
+/** UTC, except a repeating event's times: its wall clock in its zone, so it keeps the hour over DST. */
+function apiTime(value: string, allDay: boolean, timeZone: string, repeats = false): ApiTime {
   if (allDay) return { dateTime: `${value.slice(0, 10)}T00:00:00`, timeZone };
+  if (repeats) return { dateTime: wallClock(value, timeZone).dateTime, timeZone };
   const time = new Date(value);
   if (Number.isNaN(time.getTime())) throw new Error(`Not a date-time: ${value}`);
   return { dateTime: time.toISOString().slice(0, 19), timeZone: "UTC" };
@@ -161,6 +172,21 @@ function duration(event: ApiEvent | undefined): number {
   const end = event?.end?.dateTime;
   const ms = start && end ? Date.parse(`${end}Z`) - Date.parse(`${start}Z`) : NaN;
   return ms > 0 ? ms : event?.isAllDay ? DAY_MS : 3_600_000;
+}
+
+const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+
+/** How it repeats, as Graph's recurrence, from the day it starts in its time zone, without end. */
+function repeatPattern(repeat: Repeat, start: string, timeZone: string) {
+  const day = wallClock(start, timeZone);
+  const pattern = {
+    daily: { type: "daily", interval: 1 },
+    weekdays: { type: "weekly", interval: 1, daysOfWeek: WEEKDAYS.slice(1, 6) },
+    weekly: { type: "weekly", interval: 1, daysOfWeek: [WEEKDAYS[day.weekday]] },
+    monthly: { type: "absoluteMonthly", interval: 1, dayOfMonth: day.day },
+    yearly: { type: "absoluteYearly", interval: 1, dayOfMonth: day.day, month: day.month },
+  }[repeat];
+  return { pattern, range: { type: "noEnd", startDate: day.date, recurrenceTimeZone: timeZone } };
 }
 
 function apiBody(input: EventInput, current?: ApiEvent): Record<string, unknown> {
@@ -179,8 +205,11 @@ function apiBody(input: EventInput, current?: ApiEvent): Record<string, unknown>
     }));
   }
   if (input.allDay !== undefined) body.isAllDay = input.allDay;
+  const repeats = Boolean(input.repeat && input.start);
+  if (input.repeat && input.start)
+    body.recurrence = repeatPattern(input.repeat, input.start, timeZone);
   if (input.start !== undefined) {
-    body.start = apiTime(input.start, allDay, timeZone);
+    body.start = apiTime(input.start, allDay, timeZone, repeats);
     const length = current ? duration(current) : allDay ? DAY_MS : 3_600_000;
     const end =
       input.end ??
@@ -189,9 +218,9 @@ function apiBody(input: EventInput, current?: ApiEvent): Record<string, unknown>
             .toISOString()
             .slice(0, 10)
         : new Date(new Date(input.start).getTime() + length).toISOString());
-    body.end = apiTime(end, allDay, timeZone);
+    body.end = apiTime(end, allDay, timeZone, repeats);
   } else if (input.end !== undefined) {
-    body.end = apiTime(input.end, allDay, timeZone);
+    body.end = apiTime(input.end, allDay, timeZone, repeats);
   }
   if (input.videoCall) {
     body.isOnlineMeeting = true;
@@ -335,9 +364,13 @@ export async function respondToEvent(
   accountId: string,
   eventId: string,
   response: RsvpResponse,
+  _calendarId?: string,
+  options: RespondOptions = {},
 ): Promise<CalendarEvent> {
   const before = await fetchEvent(accountId, eventId);
-  await answer(accountId, eventId, response);
+  // All of a series: answered on its master, which every occurrence follows.
+  const target = options.allEvents && before.seriesMasterId ? before.seriesMasterId : eventId;
+  await answer(accountId, target, response, options.comment);
   try {
     return await getEvent(accountId, eventId);
   } catch (err) {
