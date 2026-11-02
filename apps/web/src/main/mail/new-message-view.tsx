@@ -30,51 +30,67 @@ import {
 } from "./compose-attachments";
 import { useDraftAutosave } from "./use-draft-autosave";
 import { RecipientInput } from "./recipient-input";
+import { addressesOf, chosenAddress } from "./send-from";
 import type { ComposeAttachment, MailAccount } from "./types";
 
-function FromPicker({
+/** The From menu: every mailbox's addresses, its own first. Exported for the other composers. */
+export function FromPicker({
   accounts,
   value,
+  address,
+  unavailable = false,
   onChange,
 }: {
   accounts: MailAccount[];
   value: MailAccount;
-  onChange: (accountId: string) => void;
+  address: string;
+  /** No longer one of the mailbox's addresses: says so, until another is picked. */
+  unavailable?: boolean;
+  onChange: (accountId: string, address: string) => void;
 }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label="Send from"
-          className="-ml-1 flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md px-1 py-0.5 text-sm text-foreground outline-none hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring"
-        >
-          <span
-            className="size-2 shrink-0 rounded-full"
-            style={{ backgroundColor: getAccountColor(value) }}
-          />
-          <span className="truncate">{value.email}</span>
-          <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {accounts.map((account) => (
-          <DropdownMenuItem
-            key={account.id}
-            icon={
-              <span
-                className="size-2 shrink-0 rounded-full"
-                style={{ backgroundColor: getAccountColor(account) }}
-                aria-hidden
-              />
-            }
-            onSelect={() => onChange(account.id)}
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label="Send from"
+            className="-ml-1 flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md px-1 py-0.5 text-sm text-foreground outline-none hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring"
           >
-            {account.email}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+            <span
+              className="size-2 shrink-0 rounded-full"
+              style={{ backgroundColor: getAccountColor(value) }}
+            />
+            <span className="truncate">{address}</span>
+            <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          {accounts.flatMap((account) =>
+            addressesOf(account).map((each) => (
+              <DropdownMenuItem
+                key={`${account.id}:${each}`}
+                icon={
+                  <span
+                    className="size-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: getAccountColor(account) }}
+                    aria-hidden
+                  />
+                }
+                onSelect={() => onChange(account.id, each)}
+              >
+                {each}
+              </DropdownMenuItem>
+            )),
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {unavailable ? (
+        <span className="ml-2 truncate text-xs text-destructive">
+          No longer one of this mailbox's addresses. Pick another to send.
+        </span>
+      ) : null}
+    </>
   );
 }
 
@@ -90,6 +106,8 @@ export function NewMessageView({
   prefill?: { to?: string; cc?: string; subject?: string; body?: string };
 }) {
   const [fromId, setFromId] = useState(defaultAccountId);
+  // Which of the mailbox's addresses; its own unless picked.
+  const [pickedAddress, setPickedAddress] = useState<string>();
   const [to, setTo] = useState(prefill?.to ?? "");
   const [cc, setCc] = useState(prefill?.cc ?? "");
   const [ccVisible, setCcVisible] = useState(Boolean(prefill?.cc));
@@ -104,6 +122,14 @@ export function NewMessageView({
   const sendMessage = useSendMessage();
 
   const fromAccount = accounts.find((a) => a.id === fromId) ?? accounts[0];
+  const sender = fromAccount
+    ? chosenAddress(fromAccount, pickedAddress, fromAccount.email)
+    : undefined;
+  const fromAddress = sender?.address;
+  const pickFrom = (accountId: string, address: string) => {
+    setFromId(accountId);
+    setPickedAddress(address);
+  };
 
   const { isDragging, dropProps } = useComposeFileDrop((files) => {
     void filesToComposeAttachments(files, attachments).then((picked) => {
@@ -115,6 +141,7 @@ export function NewMessageView({
     accountId: fromAccount?.id ?? null,
     delayMs: autosaveDelayMs(attachments),
     onRemoteChange: async (detail) => {
+      setPickedAddress(detail.fromEmail);
       setTo(detail.to ?? "");
       setCc(detail.cc ?? "");
       setBcc(detail.bcc ?? "");
@@ -130,6 +157,7 @@ export function NewMessageView({
     },
     signal: JSON.stringify({
       fromId,
+      fromAddress,
       to,
       cc,
       bcc,
@@ -142,6 +170,7 @@ export function NewMessageView({
       const plain = editorRef.current?.getText() ?? text;
       const html = editorRef.current?.getHTML() ?? textToHtml(plain);
       return {
+        from: fromAddress,
         to: normalizeAddressList(to),
         cc: normalizeAddressList(cc) || undefined,
         bcc: normalizeAddressList(bcc) || undefined,
@@ -175,6 +204,7 @@ export function NewMessageView({
   const canSend =
     !sendMessage.isPending &&
     !!fromAccount &&
+    !sender?.unavailable &&
     hasRecipient &&
     (text.trim().length > 0 || subject.trim().length > 0);
 
@@ -183,6 +213,7 @@ export function NewMessageView({
     console.log("[NewMessageView:send]", { from: fromAccount.id, to });
     const payload = {
       accountId: fromAccount.id,
+      from: fromAddress,
       to: normalizeAddressList(to),
       cc: normalizeAddressList(cc) || undefined,
       bcc: normalizeAddressList(bcc) || undefined,
@@ -241,9 +272,17 @@ export function NewMessageView({
                 onKeepMine={draft.keepMine}
                 onSaveAsNew={draft.saveAsNew}
               />
-              {accounts.length > 1 && fromAccount ? (
+              {(accounts.flatMap(addressesOf).length > 1 || sender?.unavailable) &&
+              fromAccount &&
+              fromAddress ? (
                 <ComposerField label="From">
-                  <FromPicker accounts={accounts} value={fromAccount} onChange={setFromId} />
+                  <FromPicker
+                    accounts={accounts}
+                    value={fromAccount}
+                    address={fromAddress}
+                    unavailable={sender?.unavailable}
+                    onChange={pickFrom}
+                  />
                 </ComposerField>
               ) : null}
               <ComposerField

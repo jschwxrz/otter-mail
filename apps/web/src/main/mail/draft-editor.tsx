@@ -5,10 +5,12 @@ import { sendWithUndo } from "./undo-send";
 import { toast } from "./toast";
 import { useQuery } from "@tanstack/react-query";
 import { XIcon } from "lucide-react";
-import { useGetAttachment, usePruneThreadRows, useSendMessage } from "./hooks";
+import { useAccounts, useGetAttachment, usePruneThreadRows, useSendMessage } from "./hooks";
 import { mailApi } from "./api";
 import { RichTextArea, textToHtml, type RichTextRef } from "./rich-text";
 import { RecipientInput } from "./recipient-input";
+import { FromPicker } from "./new-message-view";
+import { addressesOf, chosenAddress } from "./send-from";
 import { useDraftAutosave } from "./use-draft-autosave";
 import { IconBtn, HintTooltip } from "./ui";
 import { normalizeAddressList, parseAddressEntry, splitAddressList } from "./address";
@@ -58,6 +60,13 @@ export function DraftEditor({
   titleTrailing?: ReactNode;
   titleLeading?: ReactNode;
 }) {
+  const account = useAccounts().data?.find((a) => a.id === accountId);
+  // The draft keeps the address it was written from. One the mailbox no longer sends from stays
+  // (sending refuses it) until another is picked: never quietly swapped for the mailbox's own.
+  const [pickedAddress, setPickedAddress] = useState(detail.fromEmail);
+  const sender = account ? chosenAddress(account, pickedAddress, account.email) : undefined;
+  const fromAddress = sender?.address;
+  const fromUnavailable = !!sender?.unavailable;
   const [to, setTo] = useState(detail.to ?? "");
   const [cc, setCc] = useState(detail.cc ?? "");
   const [ccVisible, setCcVisible] = useState(!!detail.cc);
@@ -157,12 +166,21 @@ export function DraftEditor({
     initialDraftId: draftIdQuery.data?.draftId ?? null,
     initialMessageId: detail.id,
     initialRevision: detail.draftRevision,
-    signal: JSON.stringify({ to, cc, bcc, subject, text, att: attachmentSignature(attachments) }),
+    signal: JSON.stringify({
+      fromAddress,
+      to,
+      cc,
+      bcc,
+      subject,
+      text,
+      att: attachmentSignature(attachments),
+    }),
     getPayload: () => {
       if (attachments == null) return null;
       const plain = editorRef.current?.getText() ?? text;
       const html = editorRef.current?.getHTML() ?? textToHtml(plain);
       return {
+        from: fromAddress,
         to: normalizeAddressList(to),
         cc: normalizeAddressList(cc) || undefined,
         bcc: normalizeAddressList(bcc) || undefined,
@@ -173,6 +191,7 @@ export function DraftEditor({
       };
     },
     onRemoteChange: async (next) => {
+      setPickedAddress(next.fromEmail);
       setTo(next.to ?? "");
       setCc(next.cc ?? "");
       setBcc(next.bcc ?? "");
@@ -206,6 +225,8 @@ export function DraftEditor({
   const canSend =
     !sending &&
     !sendMessage.isPending &&
+    !!fromAddress &&
+    !fromUnavailable &&
     hasRecipient &&
     attachments != null &&
     (text.trim().length > 0 || subject.trim().length > 0);
@@ -219,6 +240,7 @@ export function DraftEditor({
     console.log("[DraftEditor:send]", { draftId: draftIdQuery.data?.draftId, threaded: !!last });
     const payload = {
       accountId,
+      from: fromAddress,
       to: normalizeAddressList(to),
       cc: normalizeAddressList(cc) || undefined,
       bcc: normalizeAddressList(bcc) || undefined,
@@ -271,6 +293,17 @@ export function DraftEditor({
   const inThread = conversation.length > 0;
   const fields = (
     <>
+      {account && fromAddress && (addressesOf(account).length > 1 || fromUnavailable) ? (
+        <ComposerField label="From">
+          <FromPicker
+            accounts={[account]}
+            value={account}
+            address={fromAddress}
+            unavailable={fromUnavailable}
+            onChange={(_, address) => setPickedAddress(address)}
+          />
+        </ComposerField>
+      ) : null}
       <ComposerField
         label="To"
         trailing={

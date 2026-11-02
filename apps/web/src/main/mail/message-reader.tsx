@@ -113,6 +113,8 @@ import {
 } from "./menu";
 import { RichTextArea, textToHtml, type RichTextRef } from "./rich-text";
 import { RecipientInput } from "./recipient-input";
+import { FromPicker } from "./new-message-view";
+import { addressesOf, chosenAddress, replyAddress } from "./send-from";
 import {
   AttachmentChips,
   ComposeDropOverlay,
@@ -1551,11 +1553,11 @@ function RecipientList({
 
 function computeReplyAll(
   last: MessageSummary & { cc?: string },
-  ownEmail: string,
+  ownAddresses: string[],
 ): { to: string; cc: string | undefined } {
-  const own = ownEmail.toLowerCase();
-  const fromSelf = last.fromEmail.toLowerCase() === own;
-  const seen = new Set<string>([own]);
+  const own = ownAddresses.map((a) => a.toLowerCase());
+  const fromSelf = own.includes(last.fromEmail.toLowerCase());
+  const seen = new Set<string>(own);
   const to: string[] = [];
   const cc: string[] = [];
   if (!fromSelf) {
@@ -1593,9 +1595,9 @@ function senderAddress(m: MessageSummary): string {
 
 function computeReply(
   last: MessageSummary,
-  ownEmail: string,
+  ownAddresses: string[],
 ): { to: string; cc: string | undefined } {
-  const fromSelf = last.fromEmail.toLowerCase() === ownEmail.toLowerCase();
+  const fromSelf = ownAddresses.some((a) => a.toLowerCase() === last.fromEmail.toLowerCase());
   // Replying to your own message targets its recipients instead of yourself.
   return { to: fromSelf ? last.to : senderAddress(last), cc: undefined };
 }
@@ -1700,7 +1702,34 @@ function InlineComposer({
   const lastDetailQuery = useMessage(accountId, lastMessage.id);
   const lastDetail = lastDetailQuery.data;
 
-  const ownEmail = accountsQuery.data?.find((a) => a.id === accountId)?.email ?? "";
+  const account = accountsQuery.data?.find((a) => a.id === accountId);
+  const ownAddresses = useMemo(() => (account ? addressesOf(account) : []), [account]);
+  // Which of the mailbox's addresses it goes from: the one the mail was sent to, unless picked.
+  const [pickedAddress, setPickedAddress] = useState<string>();
+  // With other addresses, the default needs the detail: the summary lacks Cc, where the address
+  // contacted may be. If the detail can't load, the summary's To is the best guess.
+  const defaultAddress = !account
+    ? undefined
+    : ownAddresses.length === 1
+      ? account.email
+      : lastDetail
+        ? replyAddress(account, lastDetail)
+        : lastDetailQuery.isError
+          ? replyAddress(account, lastMessage)
+          : undefined;
+  const sender =
+    account && (pickedAddress || defaultAddress)
+      ? chosenAddress(account, pickedAddress, defaultAddress ?? account.email)
+      : undefined;
+  const fromAddress = sender?.address;
+  // The default, once known, is kept like a pick: an alias removed later is flagged, not swapped.
+  useEffect(() => {
+    if (pickedAddress || !defaultAddress) return;
+    // oxlint-disable-next-line react/set-state-in-effect -- Freezes the sender once it's resolved.
+    setPickedAddress(defaultAddress);
+  }, [pickedAddress, defaultAddress]);
+  // A sender the mailbox no longer has opens the fields, where its notice is.
+  const showFields = fieldsOpen || !!sender?.unavailable;
 
   const previousMode = useRef(mode);
   useEffect(() => {
@@ -1724,11 +1753,12 @@ function InlineComposer({
       setCcVisible(false);
       return;
     }
-    const r = mode === "reply" ? computeReply(source, ownEmail) : computeReplyAll(source, ownEmail);
+    const r =
+      mode === "reply" ? computeReply(source, ownAddresses) : computeReplyAll(source, ownAddresses);
     setTo(r.to);
     setCc(r.cc ?? "");
     setCcVisible(!!r.cc);
-  }, [mode, lastMessage, lastDetail, ownEmail]);
+  }, [mode, lastMessage, lastDetail, ownAddresses]);
 
   useEffect(() => {
     if (mode !== "forward") return;
@@ -1786,6 +1816,7 @@ function InlineComposer({
     delayMs: autosaveDelayMs(attachments),
     onRemoteChange: async (detail) => {
       recipientsDirty.current = true;
+      setPickedAddress(detail.fromEmail);
       setTo(detail.to ?? "");
       setCc(detail.cc ?? "");
       setBcc(detail.bcc ?? "");
@@ -1798,12 +1829,22 @@ function InlineComposer({
           : [],
       );
     },
-    signal: JSON.stringify({ to, cc, bcc, subject, text, att: attachmentSignature(attachments) }),
+    signal: JSON.stringify({
+      fromAddress,
+      to,
+      cc,
+      bcc,
+      subject,
+      text,
+      att: attachmentSignature(attachments),
+    }),
     getPayload: () => {
-      if (!text.trim() || attachments == null) return null;
+      // Until the sender is known, a save would go from whichever address the server picks.
+      if (!text.trim() || attachments == null || !fromAddress) return null;
       const plain = editorRef.current?.getText() ?? text;
       const html = editorRef.current?.getHTML() ?? textToHtml(plain);
       return {
+        from: fromAddress,
         to: normalizeAddressList(to),
         cc: normalizeAddressList(cc) || undefined,
         bcc: normalizeAddressList(bcc) || undefined,
@@ -1819,6 +1860,10 @@ function InlineComposer({
   const forwardReady = attachments != null && (mode !== "forward" || lastDetail != null);
   const canSend =
     !sendMessage.isPending &&
+    // Not before the sender is known (the mailbox's addresses, the message's Cc), nor from an
+    // address the mailbox no longer sends from.
+    !!fromAddress &&
+    !sender?.unavailable &&
     hasRecipient &&
     forwardReady &&
     (mode === "forward" || text.trim().length > 0);
@@ -1833,6 +1878,7 @@ function InlineComposer({
     console.log("[MessageReader:inlineSend]", { mode, threadId });
     const payload = {
       accountId,
+      from: fromAddress,
       to: normalizeAddressList(to),
       cc: normalizeAddressList(cc) || undefined,
       bcc: normalizeAddressList(bcc) || undefined,
@@ -1901,7 +1947,7 @@ function InlineComposer({
       <ComposerCard onSend={() => void handleSend()}>
         <div className="flex min-h-10 items-center gap-1 border-b border-border/50 pl-2 pr-1.5">
           <ModeSwitcher mode={mode} onChange={onModeChange} />
-          {!fieldsOpen ? (
+          {!showFields ? (
             <button
               type="button"
               onClick={() => setFieldsOpen(true)}
@@ -1916,6 +1962,7 @@ function InlineComposer({
               ) : (
                 "Add recipients"
               )}
+              {ownAddresses.length > 1 && fromAddress ? <> · from {fromAddress}</> : null}
             </button>
           ) : (
             <span className="flex-1" />
@@ -1933,8 +1980,19 @@ function InlineComposer({
           onKeepMine={draft.keepMine}
           onSaveAsNew={draft.saveAsNew}
         />
-        {fieldsOpen ? (
+        {showFields ? (
           <>
+            {account && fromAddress && (ownAddresses.length > 1 || sender?.unavailable) ? (
+              <ComposerField label="From">
+                <FromPicker
+                  accounts={[account]}
+                  value={account}
+                  address={fromAddress}
+                  unavailable={sender?.unavailable}
+                  onChange={(_, address) => setPickedAddress(address)}
+                />
+              </ComposerField>
+            ) : null}
             <ComposerField
               label="To"
               trailing={
@@ -1973,7 +2031,7 @@ function InlineComposer({
           showToolbar={formatting}
           minHeightClass="min-h-[120px]"
           maxHeightClass="max-h-[45vh]"
-          signatureHTML={accountsQuery.data?.find((a) => a.id === accountId)?.signature}
+          signatureHTML={account?.signature}
         />
         <AttachmentChips
           attachments={attachments}
