@@ -10,7 +10,15 @@ import { getMessageLabelIds } from "../../services/mail-store.js";
 import type { MessageDetail, MessageSummary } from "../../types.js";
 import { formatAddresses, snippetOf } from "../imap/messages.js";
 import { labelsFor } from "./folders.js";
-import { graph, graphBatch, graphBytes, isNotFound, ok, batchError } from "./graph.js";
+import {
+  batchError,
+  graph,
+  graphBatch,
+  graphBytes,
+  isAccessDenied,
+  isNotFound,
+  ok,
+} from "./graph.js";
 
 /** What a list row needs, asked of Graph. */
 export const SUMMARY_FIELDS = [
@@ -97,10 +105,16 @@ export function toSummary(accountId: string, message: ApiMessage): MessageSummar
 
 export const messagePath = (id: string) => `/me/messages/${encodeURIComponent(id)}`;
 
+/**
+ * Messages by id; those gone are left out. Sync (`readable`) leaves out those
+ * this sign-in may not read too (moved into a locked folder, say); a write
+ * must not, or it would seem done while Outlook kept the message as it was.
+ */
 export async function getApiMessages(
   accountId: string,
   ids: string[],
   fields = SUMMARY_FIELDS,
+  readable = false,
 ): Promise<ApiMessage[]> {
   const answers = await graphBatch(
     accountId,
@@ -109,7 +123,10 @@ export async function getApiMessages(
   const messages: ApiMessage[] = [];
   for (const answer of answers) {
     if (ok(answer)) messages.push(answer.body as ApiMessage);
-    else if (answer && answer.status !== 404) throw batchError(answer);
+    else if (answer && answer.status !== 404) {
+      const err = batchError(answer);
+      if (!readable || !isAccessDenied(err)) throw err;
+    }
   }
   return messages;
 }

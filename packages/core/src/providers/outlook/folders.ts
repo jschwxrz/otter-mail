@@ -2,7 +2,7 @@ import { ARCHIVE_LABEL_ID, SNOOZED_LABEL_ID } from "@otter-mail/contracts";
 
 import * as store from "../../services/mail-store.js";
 import type { MailLabel } from "../../types.js";
-import { graph, graphAll, graphBatch, ok } from "./graph.js";
+import { graph, graphAll, graphBatch, isAccessDenied, ok } from "./graph.js";
 
 export const FOLDER_PREFIX = "folder:";
 export const CATEGORY_PREFIX = "category:";
@@ -90,8 +90,34 @@ type ApiFolder = {
 const FOLDER_FIELDS =
   "id,displayName,parentFolderId,childFolderCount,unreadItemCount,totalItemCount";
 
+/**
+ * A folder's subfolders as last listed, standing in for a listing Outlook
+ * refused: their mail isn't taken for deleted, their labels and paths follow
+ * the parent, and their counts are the cache's, which sync keeps current
+ * (one in Trash or Junk shares the label's count, so it adds none).
+ */
+function lastListed(accountId: string, mailbox: Mailbox | null, parent: string): ApiFolder[] {
+  const parentName = mailbox?.folders.find((f) => f.id === parent)?.name;
+  return (mailbox?.folders ?? [])
+    .filter((f) => f.parentId === parent)
+    .map((f) => {
+      const own = f.labelId?.startsWith(FOLDER_PREFIX);
+      return {
+        id: f.id,
+        displayName:
+          parentName && f.name.startsWith(`${parentName}/`)
+            ? f.name.slice(parentName.length + 1)
+            : f.name,
+        childFolderCount: mailbox!.folders.filter((c) => c.parentId === f.id).length,
+        unreadItemCount: own ? store.countUnreadForLabel(accountId, f.labelId!) : 0,
+        totalItemCount: own ? store.countMessagesForLabel(accountId, f.labelId!) : 0,
+      };
+    });
+}
+
 export async function readMailbox(accountId: string): Promise<Mailbox> {
-  const known = mailboxOf(accountId)?.wellKnown;
+  const previous = mailboxOf(accountId);
+  const known = previous?.wellKnown;
   const wellKnown: Mailbox["wellKnown"] = {};
   if (known?.inbox) {
     Object.assign(wellKnown, known);
@@ -120,12 +146,18 @@ export async function readMailbox(accountId: string): Promise<Mailbox> {
 
   const folders: Folder[] = [];
   const visit = async (parent: string | null, parentPath: string, inherited: string | null) => {
-    const children = await graphAll<ApiFolder>(
-      accountId,
-      parent
-        ? `/me/mailFolders/${parent}/childFolders?$top=100&$select=${FOLDER_FIELDS}`
-        : `/me/mailFolders?$top=100&$select=${FOLDER_FIELDS}`,
-    );
+    let children: ApiFolder[];
+    try {
+      children = await graphAll<ApiFolder>(
+        accountId,
+        parent
+          ? `/me/mailFolders/${parent}/childFolders?$top=100&$select=${FOLDER_FIELDS}`
+          : `/me/mailFolders?$top=100&$select=${FOLDER_FIELDS}`,
+      );
+    } catch (err) {
+      if (!parent || !isAccessDenied(err)) throw err;
+      children = lastListed(accountId, previous, parent);
+    }
     for (const child of children) {
       const role = roleOf.get(child.id);
       if (role && SKIPPED.includes(role)) continue;
