@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import type { MeetingService } from "@otter-mail/contracts";
 import {
   keepPreviousData,
@@ -233,16 +233,32 @@ export function useCalendarEvents(refs: CalendarRef[], from: number, to: number)
 /** What core's `calendar:listEvents` returns at most, per calendar, the soonest first. */
 export const LIST_LIMIT = 500;
 
-/** An event in any range loaded, the grid's or the drawer's (one the grid filters out, too). */
-export function findCachedEvent(
+function findCachedEvent(
   qc: QueryClient,
   ref: Pick<CalEvent, "accountId" | "calendarId" | "id">,
 ): CalEvent | null {
-  for (const [, data] of qc.getQueriesData<Cached>({ queryKey: KEY })) {
-    const found = data?.events.find((e) => sameEvent(e, ref));
+  // The freshest copy: a range not refetched since may hold a change that failed.
+  const queries = qc
+    .getQueryCache()
+    .findAll({ queryKey: KEY })
+    .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt);
+  for (const query of queries) {
+    const found = (query.state.data as Cached | undefined)?.events.find((e) => sameEvent(e, ref));
     if (found) return found;
   }
   return null;
+}
+
+/** An event in any range loaded, the grid's or the drawer's (one the grid filters out, too), kept current. */
+export function useCachedEvent(
+  ref: Pick<CalEvent, "accountId" | "calendarId" | "id"> | null,
+): CalEvent | null {
+  const qc = useQueryClient();
+  const subscribe = useCallback(
+    (changed: () => void) => qc.getQueryCache().subscribe(changed),
+    [qc],
+  );
+  return useSyncExternalStore(subscribe, () => (ref ? findCachedEvent(qc, ref) : null));
 }
 
 /** A calendar's events from `from` through the year after: the drawer's list. */
