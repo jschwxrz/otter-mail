@@ -98,10 +98,10 @@ nonisolated struct Draft: Identifiable, Hashable, Codable {
     /**
      * The address a reply to `message` goes from (`addresses`: its mailbox's,
      * its own first): the message's From if it's one of them, else the first
-     * of them in To, then Cc, then the address it was delivered to.
+     * of them in To, then Cc, then the addresses it was delivered to.
      */
     static func replyAddress(_ message: Message, _ addresses: [String]) -> String? {
-        let candidates = [message.from.email] + message.to.map(\.email) + message.cc.map(\.email) + [message.deliveredTo].compactMap { $0 }
+        let candidates = [message.from.email] + message.to.map(\.email) + message.cc.map(\.email) + message.deliveredTo
         return candidates.map { $0.lowercased() }.first(where: addresses.contains) ?? addresses.first
     }
 

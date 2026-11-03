@@ -9,6 +9,8 @@ struct AliasMailboxTests {
     private let parent = "robin@icloud.example"
     private let me = "me@robin.example", studio = "mail@robin.example", accounts = "accounts@robin.example"
     private let ines = Person(name: "Inês", email: "ines@duarte.example")
+    /** The parent's other addresses (its Send from). */
+    private var others: Set<String> { [me, studio, accounts] }
 
     private func mailbox(_ email: String = "robin@icloud.example", imap: Bool = true) -> Mailbox {
         Mailbox(email: email, name: "Robin", displayName: email == parent ? "iCloud" : "Other", color: "#336699", signature: "<div>Robin</div>",
@@ -18,8 +20,9 @@ struct AliasMailboxTests {
     }
 
     private func message(_ id: String, from: Person? = nil, to: [String] = [], cc: [String] = [], deliveredTo: String? = nil,
-                         messageID: String? = nil, unread: Bool = true, draft: Bool = false, hoursAgo: Double = 1) -> Message {
-        var headers: [String: String] = [:]
+                         headers more: [String: String] = [:], messageID: String? = nil, unread: Bool = true, draft: Bool = false,
+                         hoursAgo: Double = 1) -> Message {
+        var headers = more
         if let deliveredTo { headers["Original-Recipient"] = "rfc822;\(deliveredTo)" }
         headers["Message-ID"] = messageID ?? "<\(id)@example.com>"
         return Message(id: id, from: from ?? ines, to: to.map { Person(name: "", email: $0) }, cc: cc.map { Person(name: "", email: $0) },
@@ -49,43 +52,61 @@ struct AliasMailboxTests {
         ])
     }
 
-    @Test func deliveredToIsTheTopmostOfItsHeadersInOrder() {
+    @Test func deliveredToIsTheTopmostOfEachHeader() {
         let block = "Delivered-To: robin@icloud.example\r\nOriginal-Recipient: rfc822;Me@Robin.example\r\nOriginal-Recipient: rfc822;robin@icloud.example\r\n\r\n"
-        #expect(AliasMailbox.deliveredTo { MailDecoding.header($0, in: block) } == me)
-        #expect(AliasMailbox.deliveredTo { ["Delivered-To": " <mail@robin.example> ", "X-Original-To": me][$0] } == studio)
-        #expect(AliasMailbox.deliveredTo { ["X-Original-To": "ME@robin.example"][$0] } == me)
-        #expect(AliasMailbox.deliveredTo { _ in nil } == nil)
-        #expect(message("a").deliveredTo == nil)
+        #expect(AliasMailbox.deliveredTo { MailDecoding.header($0, in: block) } == [me, parent])
+        #expect(AliasMailbox.deliveredTo { ["Delivered-To": " <mail@robin.example> ", "X-Original-To": me][$0] } == [studio, me])
+        #expect(AliasMailbox.deliveredTo { ["Delivered-To": me, "X-Original-To": "ME@robin.example"][$0] } == [me])
+        #expect(AliasMailbox.deliveredTo { _ in nil } == [])
+        #expect(message("a").deliveredTo == [])
     }
 
     @Test func eachCopyGoesToTheAliasItWasDeliveredTo() {
-        #expect(MailStore.belongs(copies, to: me, in: .inbox))
-        #expect(MailStore.belongs(copies, to: studio, in: .inbox))
+        #expect(MailStore.belongs(copies, to: me, in: .inbox, others: others))
+        #expect(MailStore.belongs(copies, to: studio, in: .inbox, others: others))
         let one = thread("one", ["INBOX"], [message("a", to: [studio], deliveredTo: me)])
-        #expect(MailStore.belongs(one, to: me, in: .inbox))
+        #expect(MailStore.belongs(one, to: me, in: .inbox, others: others))
         // The delivered-to address decides over To.
-        #expect(!MailStore.belongs(one, to: studio, in: .inbox))
-        #expect(!MailStore.belongs(one, to: studio, in: .junk))
+        #expect(!MailStore.belongs(one, to: studio, in: .inbox, others: others))
+        #expect(!MailStore.belongs(one, to: studio, in: .junk, others: others))
+    }
+
+    @Test func postfixDeliversToTheMailboxAndNamesTheAliasInXOriginalTo() {
+        let postfix = thread("postfix", ["INBOX"], [message("a", to: [studio], headers: ["Delivered-To": parent, "X-Original-To": me])])
+        #expect(MailStore.belongs(postfix, to: me, in: .inbox, others: others))
+        #expect(!MailStore.belongs(postfix, to: studio, in: .inbox, others: others))
+        #expect(MailStore.belongs(postfix, to: me, in: .trash, others: others))
+    }
+
+    @Test func mailToTheMailboxItselfIsNoAliasesUnlessToOrCcSaysSo() {
+        let primary = thread("primary", ["INBOX"], [message("a", to: [parent], deliveredTo: parent)])
+        #expect(!MailStore.belongs(primary, to: me, in: .inbox, others: others))
+        #expect(!MailStore.belongs(primary, to: studio, in: .inbox, others: others))
+        let delivered = thread("delivered", ["INBOX"], [message("b", to: [me], headers: ["Delivered-To": parent])])
+        #expect(MailStore.belongs(delivered, to: me, in: .inbox, others: others))
+        // Delivered to one of the mailbox's addresses that has no mailbox of its own: no alias's.
+        let accountsMail = thread("accounts", ["INBOX"], [message("c", to: [me], deliveredTo: accounts)])
+        #expect(!MailStore.belongs(accountsMail, to: me, in: .inbox, others: others))
     }
 
     @Test func mailWithoutDeliveredToFallsBackToToAndCc() {
-        #expect(MailStore.belongs(thread("to", ["INBOX"], [message("a", to: [me])]), to: me, in: .inbox))
-        #expect(MailStore.belongs(thread("cc", ["INBOX"], [message("a", to: ["kai@example.com"], cc: [me])]), to: me, in: .inbox))
-        #expect(!MailStore.belongs(thread("other", ["INBOX"], [message("a", to: [parent])]), to: me, in: .inbox))
+        #expect(MailStore.belongs(thread("to", ["INBOX"], [message("a", to: [me])]), to: me, in: .inbox, others: others))
+        #expect(MailStore.belongs(thread("cc", ["INBOX"], [message("a", to: ["kai@example.com"], cc: [me])]), to: me, in: .inbox, others: others))
+        #expect(!MailStore.belongs(thread("other", ["INBOX"], [message("a", to: [parent])]), to: me, in: .inbox, others: others))
     }
 
     @Test func sentAndDraftsAreWhatTheAliasWrote() {
         let sent = thread("sent", ["SENT"], [message("a", from: Person(name: "Robin", email: me), to: [ines.email], unread: false)])
-        #expect(MailStore.belongs(sent, to: me, in: .sent))
-        #expect(!MailStore.belongs(sent, to: studio, in: .sent))
-        #expect(!MailStore.belongs(sent, to: me, in: .drafts))
+        #expect(MailStore.belongs(sent, to: me, in: .sent, others: others))
+        #expect(!MailStore.belongs(sent, to: studio, in: .sent, others: others))
+        #expect(!MailStore.belongs(sent, to: me, in: .drafts, others: others))
         let draft = thread("draft", [], [message("d", from: Person(name: "Robin", email: studio), to: [ines.email], draft: true)])
-        #expect(MailStore.belongs(draft, to: studio, in: .drafts))
-        #expect(!MailStore.belongs(draft, to: studio, in: .sent))
+        #expect(MailStore.belongs(draft, to: studio, in: .drafts, others: others))
+        #expect(!MailStore.belongs(draft, to: studio, in: .sent, others: others))
         // Archive, Trash and Flagged take either.
         let archived = thread("archived", ["ARCHIVE"], [message("r", to: [me], deliveredTo: me)])
-        #expect(MailStore.belongs(archived, to: me, in: .archive))
-        #expect(MailStore.belongs(sent, to: me, in: .archive))
+        #expect(MailStore.belongs(archived, to: me, in: .archive, others: others))
+        #expect(MailStore.belongs(sent, to: me, in: .archive, others: others))
     }
 
     @Test func aliasPlacesFilterTheParentWhichStaysWhole() {
@@ -130,18 +151,43 @@ struct AliasMailboxTests {
         #expect(store.alias(me)?.displayName == "Me")
         #expect(store.alias(me)?.color == Session.defaultColor(me))
         #expect(store.alias(me)?.signature == "<div>Robin</div>")
-        // mail:mailboxes orders them like any mailbox; one it doesn't list stays by its parent.
+        // mail:mailboxes orders the mailboxes, and alias mailboxes only among their parent's: always right after it.
         store.preferences.arrangement.order = [gmail.email, studio, parent]
-        #expect(store.shownScopes.map(\.email) == [gmail.email, studio, parent, me])
+        #expect(store.shownScopes.map(\.email) == [gmail.email, parent, studio, me])
         store.setOn(false, store.alias(studio)!)
         #expect(store.shownScopes.map(\.email) == [gmail.email, parent, me])
         store.setOn(false, mailbox())
         #expect(store.shownScopes.map(\.email) == [gmail.email])
-        #expect(store.preferences.arrangement.off == [studio, parent])
+        #expect(store.preferences.arrangement.off == [parent, studio])
         // Gmail's Send mail as comes later: only IMAP mailboxes have alias mailboxes for now.
         store.otherAddresses.sendAs[gmail.email] = ["alias@gmail.example"]
         store.otherAddresses.aliasMailboxes[gmail.email] = [AliasMailbox(address: "alias@gmail.example")]
         #expect(store.aliases(of: gmail).isEmpty)
+    }
+
+    @Test func reorderingKeepsAliasMailboxesWithTheirParent() {
+        let gmail = mailbox("robin@gmail.example", imap: false)
+        let store = store([], mailboxes: [mailbox(), gmail])
+        #expect(store.arrangedScopes.map(\.email) == [parent, me, studio, gmail.email])
+        // Studio above Me: among its parent's.
+        store.move(from: [2], to: 1)
+        #expect(store.arrangedScopes.map(\.email) == [parent, studio, me, gmail.email])
+        // Dragged past the Gmail mailbox, it goes back after its parent.
+        store.move(from: [1], to: 4)
+        #expect(store.arrangedScopes.map(\.email) == [parent, me, studio, gmail.email])
+        // A mailbox takes its alias mailboxes along.
+        store.move(from: [3], to: 0)
+        #expect(store.arrangedScopes.map(\.email) == [gmail.email, parent, me, studio])
+    }
+
+    @Test func flaggingFlagsEveryCopy() {
+        let store = store([copies])
+        store.toggleStar(copies.id)
+        #expect(store.thread(copies.id)?.messages.allSatisfy(\.starred) == true)
+        #expect(store.threads(in: .starred, scope: me).map(\.id) == [copies.id])
+        #expect(store.threads(in: .starred, scope: studio).map(\.id) == [copies.id])
+        store.toggleStar(copies.id)
+        #expect(store.thread(copies.id)?.messages.contains(where: \.starred) == false)
     }
 
     @Test func anAliasMailboxIsOneOfTheAddressesItSendsFrom() {
@@ -224,10 +270,10 @@ struct AliasMailboxTests {
 
     @Test func newMailIsAnnouncedAsItsAlias() throws {
         let aliases = [AliasMailbox(address: me), AliasMailbox(address: studio, name: "Studio")]
-        #expect(AliasMailbox.announced(to: [studio], cc: [me], deliveredTo: me, among: aliases)?.id == studio)
-        #expect(AliasMailbox.announced(to: ["kai@example.com"], cc: [me], deliveredTo: studio, among: aliases)?.id == me)
-        #expect(AliasMailbox.announced(to: [parent], cc: [], deliveredTo: "Mail@Robin.example", among: aliases)?.id == studio)
-        #expect(AliasMailbox.announced(to: [parent], cc: [], deliveredTo: parent, among: aliases) == nil)
+        #expect(AliasMailbox.announced(to: [studio], cc: [me], deliveredTo: [me], among: aliases)?.id == studio)
+        #expect(AliasMailbox.announced(to: ["kai@example.com"], cc: [me], deliveredTo: [studio], among: aliases)?.id == me)
+        #expect(AliasMailbox.announced(to: [parent], cc: [], deliveredTo: [parent, "Mail@Robin.example"], among: aliases)?.id == studio)
+        #expect(AliasMailbox.announced(to: [parent], cc: [], deliveredTo: [parent], among: aliases) == nil)
 
         let store = store([copies])
         let sync = MailSync(store: store, google: GoogleAuth(), cache: MailCache(folder: URL.temporaryDirectory.appending(path: "AliasAlerts-\(UUID())")))

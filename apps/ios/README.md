@@ -85,10 +85,13 @@ add limited server grants (or an encrypted IMAP password), while mail content st
 - Alias mailboxes (`NotificationShared/AliasMailbox.swift`, `MailStore.aliases`): an IMAP
   mailbox's address with a mailbox of its own, made on the Mac and the web (the account's
   `aliasMailboxes`; `sendAs` lists the mailbox's other addresses, which compose's From offers).
-  Each is a place over its parent's cached mail, not a mailbox: received mail is its when it was
-  delivered to it (the topmost Original-Recipient, else Delivered-To, else X-Original-To; mail
-  cached before those were fetched: To or Cc), Sent and Drafts what it wrote. Its list pages the
-  parent until it has a page of its own. New mail there and replies go from the alias, signed
+  Each is a place over its parent's cached mail, not a mailbox, right after its parent (ordered
+  among its others). A received copy is its when one of the addresses it was delivered to (the
+  topmost Original-Recipient, Delivered-To and X-Original-To) is one of the parent's Send from
+  addresses: it's those aliases' alone. Otherwise (delivered to the mailbox's own address, as
+  Postfix's Delivered-To says, or to none; mail cached before those were fetched) To and Cc
+  decide. Sent and Drafts are what it wrote. Its list pages the parent until it has a page of
+  its own. New mail there and replies go from the alias, signed
   with its signature (else the parent's); alerts are named after it and open it. The parent
   shows everything, as before.
 - `Reports/`: error reports to Sentry (`otter-mail-ios`), scrubbed by the shared rules

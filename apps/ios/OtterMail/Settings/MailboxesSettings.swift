@@ -13,10 +13,11 @@ struct MailboxesSettings: View {
                 let mailboxes = store.shownMailboxes.count
                 ForEach(store.arrangedScopes) { mailbox in
                     if let parent = mailbox.parent {
-                        // Made on the Mac and the web (Send from › Own mailbox); shown and arranged here like any mailbox.
+                        // Made on the Mac and the web (Send from › Own mailbox); under its parent, in order among its others.
                         row(mailbox, on: shown.contains(mailbox), locked: shown.allSatisfy { $0.email != parent }) {
-                            Text("\(Text(mailbox.displayName).foregroundStyle(palette.text)) \(Text("in \(store.mailbox(parent)?.displayName ?? parent)").foregroundStyle(palette.muted))")
+                            Text(mailbox.displayName).foregroundStyle(palette.text)
                         }
+                        .padding(.leading, 24)
                     } else {
                         NavigationLink {
                             MailboxSettings(email: mailbox.email)

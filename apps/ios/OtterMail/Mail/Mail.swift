@@ -145,8 +145,8 @@ nonisolated struct Message: Identifiable, Hashable, Codable {
      */
     var headers: [String: String]
 
-    /** The address this copy was delivered to (`AliasMailbox.deliveredTo`), lower-cased. */
-    var deliveredTo: String? { AliasMailbox.deliveredTo { headers[$0] } }
+    /** The addresses this copy was delivered to (`AliasMailbox.deliveredTo`), lower-cased. */
+    var deliveredTo: [String] { AliasMailbox.deliveredTo { headers[$0] } }
 
     var snippet: String {
         // A one-line preview must not scan megabytes of newsletter or quoted history while scrolling.
@@ -182,7 +182,7 @@ nonisolated struct MailThread: Identifiable, Hashable, Codable {
         for message in messages {
             guard !message.draft, let id = message.headers["Message-ID"] else { distinct.append(message); continue }
             if let i = kept[id] {
-                if let address, message.deliveredTo == address, distinct[i].deliveredTo != address { distinct[i] = message }
+                if let address, message.deliveredTo.contains(address), !distinct[i].deliveredTo.contains(address) { distinct[i] = message }
             } else {
                 kept[id] = distinct.count
                 distinct.append(message)

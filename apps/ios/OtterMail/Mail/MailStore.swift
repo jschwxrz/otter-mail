@@ -66,21 +66,18 @@ final class MailStore {
     }
 
     /**
-     * Every mailbox, each followed by its alias mailboxes (unless `mail:mailboxes`
-     * puts one elsewhere), in that order: the mailbox switcher's.
+     * Every mailbox, each followed by its alias mailboxes: the mailbox
+     * switcher's order. `mail:mailboxes` orders the mailboxes, and an alias
+     * mailbox (by its id) only among its parent's others, as on the Mac and the web.
      */
     var arrangedScopes: [Mailbox] {
         let order = preferences.arrangement.order
         let rank = Dictionary(order.enumerated().map { ($1, $0) }) { a, _ in a }
-        var keyed: [(key: (Int, Int), mailbox: Mailbox)] = []
-        for (offset, mailbox) in mailboxes.enumerated() {
-            let base = rank[mailbox.email] ?? order.count + offset
-            keyed.append(((base, 0), mailbox))
-            for (i, alias) in aliases(of: mailbox).enumerated() {
-                keyed.append((rank[alias.email].map { ($0, 0) } ?? (base, i + 1), alias))
-            }
+        return arrangedMailboxes.flatMap { mailbox in
+            [mailbox] + aliases(of: mailbox).enumerated()
+                .sorted { (rank[$0.element.email] ?? order.count, $0.offset) < (rank[$1.element.email] ?? order.count, $1.offset) }
+                .map(\.element)
         }
-        return keyed.sorted { $0.key < $1.key }.map(\.mailbox)
     }
 
     /** The arranged scopes turned on; an alias mailbox is hidden with its parent. */
@@ -247,10 +244,13 @@ final class MailStore {
         preferences.arrangement.off = arrangedScopes.map(\.email).filter(off.contains)
     }
 
+    /** Mailboxes move among mailboxes, an alias mailbox among its parent's: dropped elsewhere, it goes back after its parent. */
     func move(from source: IndexSet, to destination: Int) {
-        var order = arrangedScopes.map(\.email)
-        order.move(fromOffsets: source, toOffset: destination)
-        preferences.arrangement.order = order
+        var moved = arrangedScopes
+        moved.move(fromOffsets: source, toOffset: destination)
+        preferences.arrangement.order = moved.filter { $0.parent == nil }
+            .flatMap { mailbox in [mailbox] + moved.filter { $0.parent == mailbox.email } }
+            .map(\.email)
     }
 
     func threads(in folder: Folder, scope: String) -> [MailThread] {
@@ -278,22 +278,22 @@ final class MailStore {
     private func threads(of scope: String, in folder: Folder) -> [MailThread] {
         let alias = aliasScope(scope)
         let source = alias?.source ?? scope
-        let mine = Set(addresses(of: source))
+        let addresses = self.addresses(of: source)
+        let (mine, others) = (Set(addresses), Set(addresses.dropFirst()))
         return allThreads(of: source).filter { thread in
-            matches(thread, folder, mine: mine) && alias.map { Self.belongs(thread, to: $0.email, in: folder) } != false
+            matches(thread, folder, mine: mine) && alias.map { Self.belongs(thread, to: $0.email, in: folder, others: others) } != false
         }
     }
 
     /**
      * Whether a thread is the alias mailbox `address`'s in `folder`. Received
-     * mail (Inbox, Junk) is when a message was delivered to it, or (without
-     * the headers that say so) has it in To or Cc; Sent and Drafts when it
-     * wrote one; anywhere else either.
+     * mail (Inbox, Junk) is when a copy is the alias's (AliasMailbox.receives:
+     * delivered to it among the mailbox's `others` addresses, else To or Cc);
+     * Sent and Drafts when it wrote one; anywhere else either.
      */
-    static func belongs(_ thread: MailThread, to address: String, in folder: Folder) -> Bool {
+    static func belongs(_ thread: MailThread, to address: String, in folder: Folder, others: Set<String>) -> Bool {
         let received = { (message: Message) in
-            if let delivered = message.deliveredTo { return delivered == address }
-            return (message.to + message.cc).contains { $0.isAddress(address) }
+            AliasMailbox.receives(address, deliveredTo: message.deliveredTo, recipients: (message.to + message.cc).map(\.email), others: others)
         }
         let wrote = { (message: Message) in message.from.isAddress(address) }
         switch folder {
@@ -307,7 +307,8 @@ final class MailStore {
     /** Whether threads are in a place's scope: its mailbox's, or an alias mailbox's. */
     func belonging(to scope: String) -> (MailThread) -> Bool {
         guard let alias = aliasScope(scope) else { return { $0.mailbox == scope } }
-        return { $0.mailbox == alias.source && Self.belongs($0, to: alias.email, in: .allMail) }
+        let others = Set(addresses(of: alias.source).dropFirst())
+        return { $0.mailbox == alias.source && Self.belongs($0, to: alias.email, in: .allMail, others: others) }
     }
 
     /** The drafts kept on this iPhone for a scope: its mailbox's, or those from the alias mailbox's address. */
@@ -443,8 +444,11 @@ final class MailStore {
         guard let thread = thread(id) else { return }
         let starred = !thread.starred
         let latest = thread.sent.last ?? thread.latest
-        edit(id, [starred ? .star(message: latest.id) : .modify(add: [], remove: ["STARRED"])]) { t in
-            for i in t.messages.indices { t.messages[i].starred = starred && t.messages[i].id == latest.id }
+        // Each copy of it (iCloud files one per address it was delivered to), so every alias mailbox has it flagged.
+        let messageID = latest.headers["Message-ID"]
+        let copies = Set(thread.messages.filter { $0.id == latest.id || messageID != nil && $0.headers["Message-ID"] == messageID }.map(\.id))
+        edit(id, starred ? copies.sorted().map { .star(message: $0) } : [.modify(add: [], remove: ["STARRED"])]) { t in
+            for i in t.messages.indices { t.messages[i].starred = starred && copies.contains(t.messages[i].id) }
         }
     }
 
