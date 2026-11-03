@@ -141,6 +141,8 @@ export function TimeGrid({
     if (!el || !colW) return;
     let timer: ReturnType<typeof setTimeout>;
     let peeked = 0;
+    // Re-centred (a new width, a drawer opening): at rest on the first day shown.
+    onPeekRef.current(0);
     // Where a glide is headed: steps taken mid-glide add up from there.
     let aim: number | null = null;
     const scroll = () => {

@@ -225,6 +225,17 @@ export function useCalendarEvents(refs: CalendarRef[], from: number, to: number)
   return query;
 }
 
+/** A calendar's events from `from` through the year after: the drawer's list. */
+export function useUpcomingEvents(ref: CalendarRef | null, from: number) {
+  const to = addDays(new Date(from), 365).getTime();
+  return useQuery({
+    queryKey: ref ? rangeKey([ref], from, to) : [...KEY, "none"],
+    queryFn: () => fetchRange([ref!], from, to),
+    enabled: !!ref,
+    staleTime: 30_000,
+  });
+}
+
 /** Changes land in every cached range at once, then the calendar catches up. */
 export function useCalendarActions() {
   const qc = useQueryClient();

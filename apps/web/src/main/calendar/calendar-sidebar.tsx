@@ -208,6 +208,8 @@ export function CalendarSidebar({
 }) {
   const shown = useCalendar((s) => s.shown);
   const setShown = useCalendar((s) => s.setShown);
+  const agenda = useCalendar((s) => s.agenda);
+  const setAgenda = useCalendar((s) => s.setAgenda);
   const mailboxes = calendarAccounts(accounts);
   const lists = useCalendarLists(mailboxes.map((a) => a.id)).data;
   const listed = listedCalendars(mailboxes, lists);
@@ -229,6 +231,8 @@ export function CalendarSidebar({
                     key={calendar.key}
                     calendar={calendar}
                     on={on}
+                    open={agenda === calendar.key}
+                    onOpen={() => setAgenda(agenda === calendar.key ? null : calendar.key)}
                     onToggle={() => setShown(calendar.key, !on)}
                   />
                 );
@@ -241,51 +245,73 @@ export function CalendarSidebar({
   );
 }
 
-/** A calendar: its color (a followed one's with a feed mark), its name, and whether it shows. */
+/**
+ * A calendar: its color (a followed one's with a feed mark), its name, and whether it shows.
+ * The row opens its coming events in the drawer; the eye shows or hides it.
+ */
 function CalendarRow({
   calendar,
   on,
+  open,
+  onOpen,
   onToggle,
 }: {
   calendar: ListedCalendar;
   on: boolean;
+  open: boolean;
+  onOpen: () => void;
   onToggle: () => void;
 }) {
-  const { info, color } = calendar;
+  const { info } = calendar;
   return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onToggle}
-      title={on ? "Hide this calendar" : "Show this calendar"}
-      className="group flex h-7 w-full cursor-pointer items-center gap-2 rounded-md px-(--sidebar-row-content-inset) text-left text-[13px] font-medium outline-none hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-focus-ring"
-    >
-      <span
-        aria-hidden
-        className={cn(
-          "flex size-3.5 shrink-0 items-center justify-center rounded-[4px] transition-opacity duration-150",
-          !on && "opacity-40",
-        )}
-        style={{ background: color }}
-      >
-        {info.writable ? null : <RssIcon className="size-2.5 text-white" strokeWidth={3} />}
-      </span>
-      <span
-        className={cn(
-          "min-w-0 flex-1 truncate transition-colors",
-          on ? "text-sidebar-foreground" : "text-sidebar-muted-foreground/70",
-        )}
-      >
-        {info.name}
-        {info.primary ? (
-          <span className="ml-1.5 font-normal text-sidebar-muted-foreground">Default</span>
-        ) : null}
-      </span>
-      {on ? (
-        <EyeIcon className="size-3.5 shrink-0 text-sidebar-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-      ) : (
-        <EyeOffIcon className="size-3.5 shrink-0 text-sidebar-muted-foreground" />
+    <div
+      className={cn(
+        "group flex h-7 w-full items-center rounded-md",
+        open ? "bg-sidebar-row-selected" : "hover:bg-sidebar-row-hover",
       )}
-    </button>
+    >
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onOpen}
+        className="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md pl-(--sidebar-row-content-inset) text-left text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+      >
+        <span
+          aria-hidden
+          className={cn(
+            "flex size-3.5 shrink-0 items-center justify-center rounded-[4px] transition-opacity duration-150",
+            !on && "opacity-40",
+          )}
+          style={{ background: calendar.color }}
+        >
+          {info.writable ? null : <RssIcon className="size-2.5 text-white" strokeWidth={3} />}
+        </span>
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate transition-colors",
+            on ? "text-sidebar-foreground" : "text-sidebar-muted-foreground/70",
+          )}
+        >
+          {info.name}
+          {info.primary ? (
+            <span className="ml-1.5 font-normal text-sidebar-muted-foreground">Default</span>
+          ) : null}
+        </span>
+      </button>
+      <HintTooltip label={on ? "Hide calendar" : "Show calendar"}>
+        <button
+          type="button"
+          aria-pressed={on}
+          aria-label={on ? "Hide calendar" : "Show calendar"}
+          onClick={onToggle}
+          className={cn(
+            "mr-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-sidebar-muted-foreground outline-none transition-[color,opacity] hover:text-sidebar-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-focus-ring",
+            on && "opacity-0 group-hover:opacity-100",
+          )}
+        >
+          {on ? <EyeIcon className="size-3.5" /> : <EyeOffIcon className="size-3.5" />}
+        </button>
+      </HintTooltip>
+    </div>
   );
 }

@@ -268,7 +268,7 @@ color, the others their color in Google or Outlook. IMAP mailboxes have none.
 | Feature                                                                                                                                      | Mac | Web | iPhone |
 | -------------------------------------------------------------------------------------------------------------------------------------------- | --- | --- | ------ |
 | Day, week and month views; mini month and calendars in sidebar                                                                               | ✓   | ✓   | —      |
-| Show or hide each calendar (Google's unchecked ones start hidden)                                                                            | ✓   | ✓   | —      |
+| Show or hide each calendar with its eye (Google's unchecked ones start hidden); click one for its coming events in a drawer                  | ✓   | ✓   | —      |
 | Followed and read-only calendars: looked at, not changed (no drag, read-only card)                                                           | ✓   | ✓   | —      |
 | New events on any calendar that takes them (picked in the card; the default first)                                                           | ✓   | ✓   | —      |
 | Event panel: title, time, place, notes edit in place; guests                                                                                 | ✓   | ✓   | —      |
