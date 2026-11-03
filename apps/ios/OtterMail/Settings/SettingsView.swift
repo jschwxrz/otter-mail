@@ -115,7 +115,16 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Toggle("Group by day", isOn: $preferences.groupMessagesByDay)
+                    Toggle(isOn: $preferences.groupMessagesByDay) {
+                        Text("Group messages by day")
+                        Text("Separate messages by day. Tap a day's heading to collapse or expand it.")
+                            .font(.inter(.footnote)).foregroundStyle(palette.muted)
+                    }
+                    Toggle(isOn: $preferences.fullWidthRows) {
+                        Text("Full-width rows")
+                        Text("Run each message edge to edge with a line between them, instead of cards.")
+                            .font(.inter(.footnote)).foregroundStyle(palette.muted)
+                    }
                 } header: {
                     Text("Message list").sectionHeader()
                 }

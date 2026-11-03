@@ -104,7 +104,7 @@ account offers each kind.
 | Label colors                             | edit (Gmail; Outlook: its preset colors)                           | edit (Gmail, Outlook)           | shown (Gmail, Outlook)                                   |
 | Nested labels                            | ✓                                                                  | ✓                               | —                                                        |
 | Drag conversations onto labels           | ✓                                                                  | ✓                               | —                                                        |
-| Swipe actions                            | —                                                                  | —                               | ✓ (fixed)                                                |
+| Swipe actions                            | —                                                                  | —                               | ✓ (archive right, trash left)                            |
 | After archive: next / previous           | ✓                                                                  | ✓                               | ✓                                                        |
 | Snooze                                   | ✓ (on this device, while open)                                     | ✓ (on this browser, while open) | —                                                        |
 
@@ -379,6 +379,7 @@ On iPhone, a glass bar under the list holds the mailbox's picture (tap to switch
 | Contrast, glass opacity, font size, reading width                                                                | ✓   | ✓   | —                                                                          |
 | Full-width messages: content edge to edge, without the side inset (off by default)                               | —   | —   | ✓                                                                          |
 | Collapsible day separators, on by default in every mail layout                                                   | ✓   | ✓   | ✓                                                                          |
+| Full-width rows: the message list edge to edge with a line between, instead of cards (off by default)            | ✓   | ✓   | ✓                                                                          |
 | Overlay scrollbars in the mail panes and Settings, hidden when idle                                              | ✓   | ✓   | native                                                                     |
 | Unread messages on a soft background, in every mail layout                                                       | ✓   | ✓   | ✓                                                                          |
 | Keyboard navigation highlights rows; Enter opens (optional open with arrows)                                     | ✓   | ✓   | —                                                                          |

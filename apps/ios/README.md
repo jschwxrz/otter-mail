@@ -13,9 +13,9 @@ their code.
   its own round button beside the bar and opens as a sheet; so does Search. Settings is ChatGPT's grouped sheet.
   Gmail's folders include All Mail and Important; Outlook's and IMAP's an Archive of their own,
   and their Starred is Flagged (a flag, not a star).
-- **The desktop's rows.** Who and when, the subject, a line of the latest message; unread mail on
-  a soft card, read mail flat. Swipe for read,
-  archive and trash; long-press for the rest. Archive takes a conversation out of the inbox, or
+- **The desktop's rows.** The sender's picture, who and when, the subject, a line of the latest
+  message; unread mail on a soft card, read mail flat (or full-width rows, as the desktop's
+  setting). Swipe right to archive, left to trash; long-press for the rest. Archive takes a conversation out of the inbox, or
   (Outlook, IMAP) out of a folder into the Archive; in the Archive it's Move to Inbox.
 - **The reader's bars.** The reader
   hides the bar for compact glass buttons: Archive and Trash on the left, Reply on the right.

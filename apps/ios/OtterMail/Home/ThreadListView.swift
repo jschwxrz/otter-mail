@@ -5,6 +5,7 @@ struct ThreadListView: View {
     @Environment(Preferences.self) private var preferences
     @Environment(\.palette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.displayScale) private var displayScale
 
     let place: Place
     let messageTransition: Namespace.ID
@@ -19,7 +20,6 @@ struct ThreadListView: View {
     @State private var collapsedDays: Set<Date> = []
     @State private var unreadOnly = false
     @State private var selected: Set<String> = []
-    @State private var swipedThread: String?
     @State private var found: (query: String, ids: [String]) = ("", [])
 
     var body: some View {
@@ -102,15 +102,9 @@ struct ThreadListView: View {
         .listSectionSeparator(.hidden, edges: .top)
         .scrollContentBackground(.hidden)
         .background(palette.canvas)
-        .onScrollPhaseChange { _, phase in
-            if phase != .idle { swipedThread = nil }
-        }
-        .onChange(of: selecting) { _, _ in swipedThread = nil }
-        .onChange(of: query) { _, _ in swipedThread = nil }
         .contentMargins(.bottom, 24, for: .scrollContent)
         .safeAreaInset(edge: .top, spacing: 0) { SignedOutBanners() }
         .task(id: place) {
-            swipedThread = nil
             collapsedDays.removeAll()
             selected.removeAll()
             selecting = false
@@ -129,7 +123,7 @@ struct ThreadListView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button { swipedThread = nil; onTitle() } label: {
+                Button(action: onTitle) {
                     Header(title: searching || searchTab ? "Search" : place.folder.title(in: mailbox), scope: scopeName)
                 }
                 .buttonStyle(.plain)
@@ -287,12 +281,15 @@ struct ThreadListView: View {
     private func dayHeader(_ day: ThreadDay) -> some View {
         let collapsed = collapsedDays.contains(day.id)
         return Button {
-            if collapsed { collapsedDays.remove(day.id) }
-            else { collapsedDays.insert(day.id) }
+            withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
+                if collapsed { collapsedDays.remove(day.id) }
+                else { collapsedDays.insert(day.id) }
+            }
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: collapsed ? "chevron.right" : "chevron.down")
+                Image(systemName: "chevron.down")
                     .font(.inter(.caption2))
+                    .rotationEffect(.degrees(collapsed ? -90 : 0))
                 Text(day.title).fontWeight(.medium).foregroundStyle(palette.text)
                 Spacer()
                 Text(day.unread > 0 ? "\(day.threads.count) · \(day.unread) unread" : "\(day.threads.count)")
@@ -335,59 +332,62 @@ struct ThreadListView: View {
                     .matchedTransitionSource(id: thread.id, in: messageTransition)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 9)
-        .background(
-            palette.canvas.overlay {
-                if thread.unread && !thread.isDraft {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(palette.text.opacity(0.04))
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                }
-            }
-        )
+        .padding(.leading, 24)
+        .padding(.trailing, 16)
+        .padding(.vertical, 10)
+        .background(rowBackground(unread: thread.unread && !thread.isDraft))
         .contextMenu {
             if !selecting { ThreadActions(thread: thread) }
         }
         .modifier(MailSwipeActions(
-            id: thread.id, activeRow: $swipedThread,
-            leading: selecting ? [] : [
-                MailSwipeAction(title: thread.unread ? "Read" : "Unread", symbol: thread.unread ? "envelope.open" : "envelope.badge", tint: palette.focus) {
-                    withAnimation(actionAnimation) { store.setRead(thread.unread, thread.id) }
-                },
-            ],
-            trailing: selecting ? [] : trailingActions(thread)
+            leading: selecting ? nil : leadingAction(thread),
+            trailing: selecting ? nil : trailingAction(thread),
+            square: preferences.fullWidthRows
         ))
         .listRowBackground(palette.canvas)
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets())
     }
 
-    private func trailingActions(_ thread: MailThread) -> [MailSwipeAction] {
-        if place.folder == .trash || place.folder == .junk {
-            return [
-                MailSwipeAction(title: "Delete", symbol: "trash", tint: .red) {
-                    withAnimation(actionAnimation) { store.deleteForever(thread.id) }
-                },
-                MailSwipeAction(title: "Inbox", symbol: "tray.and.arrow.down", tint: palette.focus) {
-                    withAnimation(actionAnimation) { store.moveToInbox(thread.id) }
-                },
-            ]
+    /** The desktop's rows (styles.css): unread mail on a raised card, or edge to edge with a hairline between. */
+    private func rowBackground(unread: Bool) -> some View {
+        let fill = palette.text.opacity(unread ? 0.04 : 0)
+        return palette.canvas.overlay {
+            if preferences.fullWidthRows {
+                Rectangle().fill(fill)
+                    .overlay(alignment: .bottom) { Rectangle().fill(palette.border).frame(height: 1 / displayScale) }
+            } else {
+                RoundedRectangle(cornerRadius: 8).fill(fill)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+            }
         }
-        var actions = [MailSwipeAction(title: "Trash", symbol: "trash", tint: .red) {
-            withAnimation(actionAnimation) { store.trash(thread.id) }
-        }]
-        if store.canArchive(thread) {
-            actions.append(MailSwipeAction(title: "Archive", symbol: "archivebox", tint: .indigo) {
+    }
+
+    /** Linear's: one action a side. Away to the right, out of the folder; to the left, into the trash. */
+    private func leadingAction(_ thread: MailThread) -> MailSwipeAction? {
+        if store.canArchive(thread) && place.folder != .trash && place.folder != .junk {
+            return MailSwipeAction(title: "Archive", symbol: "archivebox", tint: .indigo) {
                 withAnimation(actionAnimation) { store.archive(thread.id) }
-            })
-        } else if thread.labels.contains("ARCHIVE") {
-            actions.append(MailSwipeAction(title: "Inbox", symbol: "tray.and.arrow.down", tint: palette.focus) {
-                withAnimation(actionAnimation) { store.moveToInbox(thread.id) }
-            })
+            }
         }
-        return actions
+        if [.trash, .junk].contains(place.folder) || thread.labels.contains("ARCHIVE") {
+            return MailSwipeAction(title: "Inbox", symbol: "tray.and.arrow.down", tint: palette.focus) {
+                withAnimation(actionAnimation) { store.moveToInbox(thread.id) }
+            }
+        }
+        return nil
+    }
+
+    private func trailingAction(_ thread: MailThread) -> MailSwipeAction {
+        if place.folder == .trash || place.folder == .junk {
+            return MailSwipeAction(title: "Delete", symbol: "trash", tint: .red) {
+                withAnimation(actionAnimation) { store.deleteForever(thread.id) }
+            }
+        }
+        return MailSwipeAction(title: "Trash", symbol: "trash", tint: .red) {
+            withAnimation(actionAnimation) { store.trash(thread.id) }
+        }
     }
 
     private struct Header: View {

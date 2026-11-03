@@ -1,10 +1,10 @@
 import SwiftUI
 
 /**
- * One thread, three lines, as the desktop lists them: who (the unread dot
- * before) and when, the subject, then a line of the latest message. Unread
- * is the dot and a brighter, medium-weight name; read mail recedes to grey
- * (message-list.tsx). Its card behind unread mail lives in ThreadListView.
+ * One thread as the desktop lists it: the sender's picture (new mail's dot
+ * in the gutter before it), then who and when, the subject, and a line of the
+ * latest message. Unread is the dot and a brighter, medium-weight name; read
+ * mail recedes to grey (message-list.tsx). Its card lives in ThreadListView.
  */
 struct ThreadRow: View {
     @Environment(\.palette) private var palette
@@ -12,13 +12,38 @@ struct ThreadRow: View {
     var mark = "star"
 
     var body: some View {
+        let unread = thread.unread
+        HStack(alignment: .top, spacing: 12) {
+            avatar
+                .overlay(alignment: .leading) {
+                    if unread {
+                        Circle().fill(palette.action).frame(width: 6, height: 6).offset(x: -13)
+                    }
+                }
+                .padding(.top, 2)
+            lines
+        }
+        .contentShape(.rect)
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder private var avatar: some View {
+        if let from = thread.messages.last(where: { !$0.draft })?.from {
+            SenderAvatar(person: from, size: 36)
+        } else {
+            Image(systemName: "square.and.pencil")
+                .font(.inter(.subheadline))
+                .foregroundStyle(palette.muted)
+                .frame(width: 36, height: 36)
+                .background(palette.text.opacity(0.06), in: .rect(cornerRadius: 8))
+        }
+    }
+
+    private var lines: some View {
         let latest = thread.latest
         let unread = thread.unread
-        VStack(alignment: .leading, spacing: 2) {
+        return VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
-                if unread {
-                    Circle().fill(palette.action).frame(width: 7, height: 7)
-                }
                 Text(senders)
                     .font(.inter(.subheadline).weight(unread ? .medium : .regular))
                     .foregroundStyle(unread ? palette.text : palette.text.opacity(0.7))
@@ -56,8 +81,6 @@ struct ThreadRow: View {
                 .foregroundStyle(palette.muted.opacity(0.8))
                 .lineLimit(1)
         }
-        .contentShape(.rect)
-        .accessibilityElement(children: .combine)
     }
 
     private var senders: String {
@@ -92,14 +115,28 @@ struct MailboxMark: View {
 struct SenderAvatar: View {
     let person: Person
     var size: CGFloat = 32
+    @State private var photo: UIImage?
 
     var body: some View {
-        Text(person.label.prefix(1).uppercased())
-            .font(.inter(size: size * 0.42, weight: .medium))
-            .foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(color, in: .rect(cornerRadius: size * 0.22))
-            .accessibilityHidden(true)
+        Group {
+            if let photo {
+                // Transparent logos need a white backing; inset 1pt so it doesn't fringe the corners.
+                Image(uiImage: photo)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .background(.white, in: .rect(cornerRadius: size * 0.22).inset(by: 1))
+            } else {
+                Text(person.label.prefix(1).uppercased())
+                    .font(.inter(size: size * 0.42, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: size, height: size)
+                    .background(color)
+            }
+        }
+        .clipShape(.rect(cornerRadius: size * 0.22))
+        .accessibilityHidden(true)
+        .task(id: person.email) { photo = await SenderPhotos.shared.photo(for: person.email) }
     }
 
     private var color: Color {

@@ -61,6 +61,8 @@ final class Preferences {
     var lightTheme: String { didSet { ui("otter:theme:light", lightTheme) } }
     var darkTheme: String { didSet { ui("otter:theme:dark", darkTheme) } }
     var groupMessagesByDay: Bool { didSet { ui("otter:group-messages-by-day", String(groupMessagesByDay)) } }
+    /** The list's rows edge to edge with a hairline between them, instead of cards (the desktop's). */
+    var fullWidthRows: Bool { didSet { ui("otter:full-width-rows", String(fullWidthRows)) } }
     /** Messages' content edge to edge, without the reader's side inset (the iPhone's own). */
     var fullWidthMessages: Bool { didSet { ui("otter:full-width-messages", String(fullWidthMessages)) } }
     var advance: Advance { didSet { ui("gmail:advance-direction", advance.rawValue) } }
@@ -97,6 +99,7 @@ final class Preferences {
             "otter:theme:light": lightTheme,
             "otter:theme:dark": darkTheme,
             "otter:group-messages-by-day": String(groupMessagesByDay),
+            "otter:full-width-rows": String(fullWidthRows),
             "otter:full-width-messages": String(fullWidthMessages),
             "gmail:advance-direction": advance.rawValue,
             "mail:mailboxes": Self.json(arrangement),
@@ -120,6 +123,7 @@ final class Preferences {
         if let value = ui["otter:theme:light"] as? String, value != lightTheme { lightTheme = value }
         if let value = ui["otter:theme:dark"] as? String, value != darkTheme { darkTheme = value }
         if let value = (ui["otter:group-messages-by-day"] as? String).flatMap(Bool.init), value != groupMessagesByDay { groupMessagesByDay = value }
+        if let value = (ui["otter:full-width-rows"] as? String).flatMap(Bool.init), value != fullWidthRows { fullWidthRows = value }
         if let value = (ui["otter:full-width-messages"] as? String).flatMap(Bool.init), value != fullWidthMessages {
             fullWidthMessages = value
         }
@@ -141,6 +145,7 @@ final class Preferences {
         lightTheme = defaults.string(forKey: "otter:theme:light") ?? Self.initialTheme
         darkTheme = defaults.string(forKey: "otter:theme:dark") ?? Self.initialTheme
         groupMessagesByDay = defaults.string(forKey: "otter:group-messages-by-day").flatMap(Bool.init) ?? true
+        fullWidthRows = defaults.string(forKey: "otter:full-width-rows").flatMap(Bool.init) ?? false
         fullWidthMessages = defaults.string(forKey: "otter:full-width-messages").flatMap(Bool.init) ?? false
         advance = defaults.string(forKey: "gmail:advance-direction").flatMap(Advance.init) ?? .next
         arrangement = defaults.string(forKey: "mail:mailboxes")?.data(using: .utf8)

@@ -10,17 +10,20 @@ struct MessageListTests {
         let preferences = Preferences(defaults: defaults)
         #expect(preferences.groupMessagesByDay)
         #expect(!preferences.fullWidthMessages)
+        #expect(!preferences.fullWidthRows)
         var changed: [String] = []
         preferences.onChange = { changed.append($0) }
         let remote = [
             "otter:group-messages-by-day": "false",
             "otter:full-width-messages": "true",
+            "otter:full-width-rows": "true",
         ]
         preferences.apply(ui: remote, settings: [:])
         #expect(changed.isEmpty)
         let restored = Preferences(defaults: defaults)
         #expect(!restored.groupMessagesByDay)
         #expect(restored.fullWidthMessages)
+        #expect(restored.fullWidthRows)
         for (key, value) in remote { #expect(restored.uiSection[key] == value) }
         preferences.groupMessagesByDay = true
         #expect(changed == ["ui"])
