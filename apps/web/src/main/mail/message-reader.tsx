@@ -26,7 +26,7 @@ import { Dialog } from "~/components/ui/dialog";
 import { EmptyState } from "~/components/ui/empty-state";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { Text } from "~/components/ui/text";
-import { sendWithUndo } from "./undo-send";
+import { MAY_HAVE_BEEN_SENT, sendWithUndo } from "./undo-send";
 import { toast } from "./toast";
 import {
   ArchiveIcon,
@@ -1867,18 +1867,29 @@ function InlineComposer({
       ...(mode === "forward" ? {} : { threadId, replyToMessageId: lastMessage.id }),
     };
     if (scheduledAt !== undefined) {
-      await sendMessage.mutateAsync({ ...payload, scheduledAt });
-      await draft.finalize({ deleteDraft: true });
-      toast.success("Send scheduled", { description: new Date(scheduledAt).toLocaleString() });
+      await draft.finalize();
+      let scheduled: { uncertain?: boolean };
+      try {
+        scheduled = await sendMessage.mutateAsync({
+          ...payload,
+          scheduledAt,
+          ...draft.sending(payload.accountId),
+        });
+      } catch (err) {
+        draft.reopen();
+        throw err;
+      }
+      if (scheduled.uncertain) toast.warning(MAY_HAVE_BEEN_SENT, { timeout: 0 });
+      else toast.success("Send scheduled", { description: new Date(scheduledAt).toLocaleString() });
       onClose();
       return;
     }
-    // Close now; the unmount flush keeps a draft backup until sending succeeds.
+    // Close now: the unmount flush saves the draft during the undo window, and that draft is sent.
     onClose();
     sendWithUndo({
       subject,
-      send: () => sendMessage.mutateAsync(payload),
-      onSent: () => draft.finalize({ deleteDraft: true }),
+      send: () => sendMessage.mutateAsync({ ...payload, ...draft.sending(payload.accountId) }),
+      onSent: () => draft.finalize(),
       savedDraft: draft.savedDraft,
     });
   };

@@ -60,6 +60,20 @@ export type DraftSave = OutgoingMail & {
 
 export class DraftChanged extends Error {}
 
+/** A send that may have gone out: the request was made, its answer never came. */
+export class SendUncertain extends Error {
+  /** The draft that may have gone, when the send made one (Outlook). */
+  readonly draftId?: string;
+
+  constructor(options?: { cause?: unknown; draftId?: string }) {
+    super("May have been sent — check Sent before sending again.", { cause: options?.cause });
+    this.name = "SendUncertain";
+    this.draftId = options?.draftId;
+  }
+}
+
+export type ScheduleOutcome = "cancelled" | "sent";
+
 export type RsvpResponse = "accepted" | "declined" | "tentative";
 
 export type CalendarEvent = {
@@ -190,12 +204,20 @@ export interface MailProvider {
   deleteLabel(accountId: string, labelId: string): Promise<void>;
 
   send(accountId: string, mail: OutgoingMail): Promise<{ messageId?: string }>;
+  /** Sends a saved draft as `mail`, leaving no draft behind. Throws SendUncertain when it can't tell. */
+  sendDraft(
+    accountId: string,
+    draftId: string,
+    mail: OutgoingMail,
+  ): Promise<{ messageId?: string }>;
+  /** With a `draftId`, that draft becomes the held message. */
   scheduleSend?(
     accountId: string,
     mail: OutgoingMail,
     sendAt: number,
+    draftId?: string,
   ): Promise<{ messageId: string }>;
-  cancelScheduledSend?(accountId: string, messageId: string): Promise<boolean>;
+  cancelScheduledSend?(accountId: string, messageId: string): Promise<ScheduleOutcome>;
   sendRaw(accountId: string, raw: string, threadId?: string): Promise<void>;
 
   saveDraft(

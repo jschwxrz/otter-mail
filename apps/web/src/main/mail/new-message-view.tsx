@@ -1,6 +1,6 @@
 import { toast } from "./toast";
 import { useEffect, useRef, useState } from "react";
-import { sendWithUndo } from "./undo-send";
+import { MAY_HAVE_BEEN_SENT, sendWithUndo } from "./undo-send";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "./menu";
 import { ChevronDownIcon, XIcon } from "lucide-react";
 import { useSendMessage } from "./hooks";
@@ -220,18 +220,29 @@ export function NewMessageView({
       attachments: attachments.length > 0 ? attachments : undefined,
     };
     if (scheduledAt !== undefined) {
-      await sendMessage.mutateAsync({ ...payload, scheduledAt });
-      await draft.finalize({ deleteDraft: true });
-      toast.success("Send scheduled", { description: new Date(scheduledAt).toLocaleString() });
+      await draft.finalize();
+      let scheduled: { uncertain?: boolean };
+      try {
+        scheduled = await sendMessage.mutateAsync({
+          ...payload,
+          scheduledAt,
+          ...draft.sending(payload.accountId),
+        });
+      } catch (err) {
+        draft.reopen();
+        throw err;
+      }
+      if (scheduled.uncertain) toast.warning(MAY_HAVE_BEEN_SENT, { timeout: 0 });
+      else toast.success("Send scheduled", { description: new Date(scheduledAt).toLocaleString() });
       onClose();
       return;
     }
-    // Close now; the unmount flush keeps a draft backup until sending succeeds.
+    // Close now: the unmount flush saves the draft during the undo window, and that draft is sent.
     onClose();
     sendWithUndo({
       subject: payload.subject,
-      send: () => sendMessage.mutateAsync(payload),
-      onSent: () => draft.finalize({ deleteDraft: true }),
+      send: () => sendMessage.mutateAsync({ ...payload, ...draft.sending(payload.accountId) }),
+      onSent: () => draft.finalize(),
       savedDraft: draft.savedDraft,
     });
   };
