@@ -840,6 +840,8 @@ export async function saveDraft(
     subject: params.subject,
     body: params.body,
     bodyHtml: params.bodyHtml,
+    inReplyTo: params.inReplyTo,
+    references: params.references,
     attachments: params.attachments,
   });
   const message: { raw: string; threadId?: string } = { raw: encodeBase64url(raw) };
@@ -905,10 +907,10 @@ export async function findDraftIdByMessageId(
   threadId?: string,
 ): Promise<string | null> {
   const drafts = await listDraftIds(accountId);
-  return (
-    drafts.find((d) => d.messageId === messageId)?.draftId ??
-    (threadId ? (drafts.find((d) => d.threadId === threadId)?.draftId ?? null) : null)
-  );
+  const own = drafts.find((d) => d.messageId === messageId);
+  if (own) return own.draftId;
+  const inThread = threadId ? drafts.filter((d) => d.threadId === threadId) : [];
+  return inThread.length === 1 ? inThread[0]!.draftId : null;
 }
 
 export async function deleteDraft(

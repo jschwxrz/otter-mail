@@ -70,6 +70,33 @@ export async function removeLocalAccount(accountId: string): Promise<void> {
   updateDockBadge();
 }
 
+async function replyHeaders(
+  accountId: string,
+  messageId: string,
+): Promise<{ inReplyTo?: string; references?: string }> {
+  let headers = mailStore.getStoredReplyHeaders(accountId, messageId);
+  if (!headers.messageIdHeader) {
+    try {
+      headers = await providerFor(accountId).getReplyHeaders(accountId, messageId);
+      mailStore.setReplyHeaders(
+        accountId,
+        messageId,
+        headers.messageIdHeader,
+        headers.referencesHeader,
+      );
+    } catch (err) {
+      console.log("[gmail:replyHeaders] fetch failed", { error: String(err) });
+    }
+  }
+  if (!headers.messageIdHeader) return {};
+  return {
+    inReplyTo: headers.messageIdHeader,
+    references: headers.referencesHeader
+      ? `${headers.referencesHeader} ${headers.messageIdHeader}`
+      : headers.messageIdHeader,
+  };
+}
+
 async function refreshLabels(accountId: string): Promise<void> {
   mailStore.upsertLabels(accountId, await providerFor(accountId).listLabels(accountId));
 }
@@ -850,13 +877,21 @@ export function registerMailHandlers(): void {
             : current;
           if (revision !== (expectRevision ?? expectMessageId)) return conflict();
         }
+        const threadId = asString(p?.threadId);
+        const answered = threadId
+          ? mailStore
+              .getThreadMessages(accountId, threadId)
+              .filter((m) => !m.labelIds.includes("DRAFT"))
+              .at(-1)
+          : undefined;
         let res: Awaited<ReturnType<typeof provider.saveDraft>>;
         try {
           res = await provider.saveDraft(accountId, {
             ...content,
+            ...(answered ? await replyHeaders(accountId, answered.id) : {}),
             draftId,
             expectRevision,
-            threadId: asString(p?.threadId),
+            threadId,
           });
         } catch (error) {
           if (error instanceof DraftChanged && draftId) return conflict();
@@ -927,6 +962,10 @@ export function registerMailHandlers(): void {
       const draftId = await providerFor(accountId).findDraftId(accountId, messageId, threadId);
       if (draftId) mailStore.setDraftId(accountId, messageId, draftId);
       console.log("[gmail:getDraftForMessage]", { accountId, messageId, found: draftId != null });
+      // A draft row whose draft can't be told apart: never save over a guess, or as a copy.
+      if (!draftId && mailStore.getMessageLabelIds(accountId, messageId)?.includes("DRAFT")) {
+        return { draftId, gone: true as const };
+      }
       return { draftId };
     } catch (err) {
       console.log("[gmail:getDraftForMessage] error", { error: String(err) });
@@ -980,32 +1019,9 @@ export function registerMailHandlers(): void {
         throw new Error("Attachments can total at most 25 MB.");
       }
 
-      let inReplyTo: string | undefined;
-      let references: string | undefined;
-      if (replyToMessageId) {
-        let headers = mailStore.getStoredReplyHeaders(accountId, replyToMessageId);
-        if (!headers.messageIdHeader) {
-          try {
-            headers = await providerFor(accountId).getReplyHeaders(accountId, replyToMessageId);
-            mailStore.setReplyHeaders(
-              accountId,
-              replyToMessageId,
-              headers.messageIdHeader,
-              headers.referencesHeader,
-            );
-          } catch (headerErr) {
-            console.log("[gmail:sendMessage] reply-header fetch failed", {
-              error: String(headerErr),
-            });
-          }
-        }
-        if (headers.messageIdHeader) {
-          inReplyTo = headers.messageIdHeader;
-          references = headers.referencesHeader
-            ? `${headers.referencesHeader} ${headers.messageIdHeader}`
-            : headers.messageIdHeader;
-        }
-      }
+      const { inReplyTo, references } = replyToMessageId
+        ? await replyHeaders(accountId, replyToMessageId)
+        : {};
 
       const message = {
         from: asString(p?.from),
@@ -1063,7 +1079,7 @@ export function registerMailHandlers(): void {
           console.log("[gmail:sendMessage] background send failed", { error: String(error) });
           let savedToDrafts = false;
           try {
-            await provider.saveDraft(accountId, message);
+            await provider.saveDraft(accountId, { ...message, inReplyTo, references });
             savedToDrafts = true;
           } catch (draftErr) {
             console.log("[gmail:sendMessage] could not save a draft copy", {

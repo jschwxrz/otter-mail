@@ -473,6 +473,13 @@ export function renameMessage(
   recomputeLabelCounts(accountId, prior);
 }
 
+export function getMessageIdsByHeader(accountId: string, messageIdHeader: string): string[] {
+  const rows = getDb()
+    .prepare("SELECT id FROM messages WHERE accountId = ? AND messageIdHeader = ?")
+    .all(accountId, messageIdHeader) as unknown as { id: string }[];
+  return rows.map((r) => r.id);
+}
+
 export function getMessageIdsWithPrefix(accountId: string, prefix: string): string[] {
   const rows = getDb()
     .prepare("SELECT id FROM messages WHERE accountId = ? AND id >= ? AND id < ?")
@@ -854,10 +861,13 @@ export function getDraftId(accountId: string, messageId: string, threadId?: stri
   if (!threadId) return null;
   const inThread = d
     .prepare(
-      "SELECT draftId FROM messages WHERE accountId = ? AND threadId = ? AND draftId IS NOT NULL ORDER BY date DESC LIMIT 1",
+      `SELECT m.draftId AS draftId FROM messages m
+         JOIN message_labels l ON l.accountId = m.accountId AND l.messageId = m.id AND l.labelId = 'DRAFT'
+        WHERE m.accountId = ? AND m.threadId = ?`,
     )
-    .get(accountId, threadId) as unknown as { draftId: string } | undefined;
-  return inThread?.draftId ?? null;
+    .all(accountId, threadId) as unknown as { draftId: string | null }[];
+  // Another draft in the thread is never taken for this one.
+  return inThread.length === 1 ? inThread[0]!.draftId : null;
 }
 
 export function filterUnknownIds(accountId: string, ids: string[]): string[] {
