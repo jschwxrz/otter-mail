@@ -32,13 +32,18 @@ final class MailSync {
     private var waiting: [String: [CheckedContinuation<Void, Never>]] = [:]
     /** Folder pages being fetched ("email key"), so the same page isn't asked for twice at once. */
     private var paging: Set<String> = []
+    /** Alias mailboxes' lists paging their parents ("scope key"), run apart from the list that asked. */
+    @ObservationIgnored private var aliasPaging: [String: Task<Void, Never>] = [:]
 
-    init(store: MailStore, google: GoogleAuth, microsoft: MicrosoftAuth = MicrosoftAuth(), relay: Relay? = nil, cache: MailCache = .live) {
+    /** `providers`: ready-made ones by mailbox (tests' pretend servers). */
+    init(store: MailStore, google: GoogleAuth, microsoft: MicrosoftAuth = MicrosoftAuth(), relay: Relay? = nil, cache: MailCache = .live,
+         providers: [String: any MailProvider] = [:]) {
         self.store = store
         self.google = google
         self.microsoft = microsoft
         self.relay = relay
         self.cache = cache
+        self.providers = providers
     }
 
     private func provider(_ email: String) -> any MailProvider {
@@ -264,8 +269,42 @@ final class MailSync {
         return threads.filter { !paged.contains($0.mailbox) || states[$0.mailbox]?.lists($0, in: key) != false }
     }
 
+    /** The matching threads a "load more" in an alias mailbox wants before it stops paging the parent. */
+    static let aliasPage = 20
+    /** The parent's pages one "load more" in an alias mailbox looks through at most. */
+    static let aliasPageLimit = 10
+    /** Alias mailboxes' lists ("scope key") whose last load reached the limit short of a page: the list asks before paging on. */
+    private(set) var aliasPaused: Set<String> = []
+
+    func paused(_ folder: Folder, scope: String) -> Bool { aliasPaused.contains("\(scope) \(Self.key(folder))") }
+
     func loadMore(_ folder: Folder, scope: String) async {
-        await loadMore(folder, in: mailboxes(scope))
+        guard store.mailbox(scope) == nil, store.alias(scope) != nil else { return await loadMore(folder, in: mailboxes(scope)) }
+        let key = "\(scope) \(Self.key(folder))"
+        if let running = aliasPaging[key] { return await running.value }
+        aliasPaused.remove(key)
+        let task = Task { await pageAlias(folder, scope: scope) }
+        aliasPaging[key] = task
+        await task.value
+        aliasPaging[key] = nil
+    }
+
+    /**
+     * An alias mailbox lists some of its parent's mail, which may be far
+     * between: the parent pages on until a page's worth of the alias's is in,
+     * its pages end (or one fails), or it has looked through `aliasPageLimit`
+     * of them; then the list waits to be asked.
+     */
+    private func pageAlias(_ folder: Folder, scope: String) async {
+        let count = { self.listed(self.store.threads(in: folder, scope: scope), in: folder).count }
+        let wanted = count() + Self.aliasPage
+        for _ in 0..<Self.aliasPageLimit {
+            guard !stopped, hasMore(folder, scope: scope), count() < wanted else { return }
+            let cursor = cursor(folder, scope: scope)
+            await loadMore(folder, in: mailboxes(scope))
+            guard cursor != self.cursor(folder, scope: scope) else { return }
+        }
+        if hasMore(folder, scope: scope), count() < wanted { aliasPaused.insert("\(scope) \(Self.key(folder))") }
     }
 
     /** A page on opening the folder where none yet says where its list ends, before the list gets there (not before a first sync). */
@@ -295,8 +334,10 @@ final class MailSync {
         return found
     }
 
+    /** The mailbox a place's mail comes from: its own, or an alias mailbox's parent. */
     private func mailboxes(_ scope: String) -> [String] {
-        store.shownMailboxes.filter { !$0.signedOut && $0.email == scope }.map(\.email)
+        let source = store.mailbox(for: scope)?.source ?? scope
+        return store.shownMailboxes.filter { !$0.signedOut && $0.email == source }.map(\.email)
     }
 
     /** Writes a change the store already shows; if the server refuses, the thread is reloaded as it has it. */
@@ -327,9 +368,10 @@ final class MailSync {
             guard size <= DraftFile.limit else { throw DraftFile.Failure.tooLarge }
             files.append(MIME.File(filename: file.filename, mimeType: file.mimeType, data: data))
         }
-        let html = Compose.html(draft.body, signature: mailbox.signature)
+        let html = Compose.html(draft.body, signature: store.signature(of: draft))
+        // From the address it picked; the server (and SMTP's envelope) stay the mailbox's.
         let raw = MIME.message(
-            from: mailbox.me,
+            from: Person(name: mailbox.name, email: store.sendingAddress(draft, of: mailbox)),
             to: to,
             cc: cc,
             bcc: asDraft || mailbox.imap == nil ? bcc : [],
@@ -385,25 +427,45 @@ final class MailSync {
     private func announce(_ threads: [MailThread], before: [String: MailThread]) async {
         let mode = store.preferences.notifications
         guard mode != .off, !stopped, !Task.isCancelled else { return }
+        // One alert per Message-ID: a copy delivered to each of two aliases is one message.
+        var announced: Set<String> = []
         for thread in threads {
             guard !stopped, !Task.isCancelled, store.preferences.notifications != .off else { return }
             guard !forgotten.contains(thread.mailbox), store.mailbox(thread.mailbox) != nil else { continue }
             if pushMailboxes.contains(thread.mailbox.lowercased()) { continue }
-            let known = Set(before[thread.id]?.messages.map(\.id) ?? [])
-            let arrived = thread.messages.filter { !known.contains($0.id) && $0.unread && !$0.draft }
+            let earlier = before[thread.id]?.messages ?? []
+            let known = Set(earlier.map(\.id)), seen = Set(earlier.compactMap { $0.headers["Message-ID"] })
+            let arrived = thread.messages.filter { message in
+                !known.contains(message.id) && message.unread && !message.draft && !seen.contains(message.headers["Message-ID"] ?? "")
+            }
             guard let message = arrived.last else { continue }
             if mode == .inbox && !thread.labels.contains("INBOX") { continue }
-            let content = UNMutableNotificationContent()
-            content.title = message.from.label
-            content.subtitle = thread.subject
-            content.body = message.snippet
-            content.sound = .default
-            content.threadIdentifier = thread.id
-            content.userInfo = ["thread": thread.id, "mailbox": thread.mailbox]
+            if let id = message.headers["Message-ID"], !announced.insert(id).inserted { continue }
+            let content = alert(message, in: thread)
             try? await UNUserNotificationCenter.current().add(
                 UNNotificationRequest(identifier: message.id, content: content, trigger: nil)
             )
         }
+    }
+}
+
+extension MailSync {
+    /**
+     * A local alert for new mail: named (when there's more than one mailbox)
+     * and opened as the alias mailbox it's for (AliasMailbox.announced), else its mailbox.
+     */
+    func alert(_ message: Message, in thread: MailThread) -> UNMutableNotificationContent {
+        let alias = AliasMailbox.announced(to: message.to.map(\.email), cc: message.cc.map(\.email), deliveredTo: message.deliveredTo,
+                                           among: store.shownAliases(of: thread.mailbox))
+        let name = store.shownScopes.count > 1 ? alias?.title ?? store.mailbox(thread.mailbox)?.displayName : nil
+        let content = UNMutableNotificationContent()
+        content.title = message.from.label
+        content.subtitle = PushState.subtitle(thread.subject, mailbox: name)
+        content.body = message.snippet
+        content.sound = .default
+        content.threadIdentifier = thread.id
+        content.userInfo = ["thread": thread.id, "mailbox": alias?.id ?? thread.mailbox]
+        return content
     }
 }
 

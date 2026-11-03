@@ -66,11 +66,21 @@ struct ThreadListView: View {
             }
 
             if !searching && !searchTab, let sync = store.sync, sync.hasMore(place.folder, scope: place.scope) {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                    .task(id: "\(place)-\(sync.cursor(place.folder, scope: place.scope))") { await sync.loadMore(place.folder, scope: place.scope) }
+                if sync.paused(place.folder, scope: place.scope) {
+                    // An alias mailbox whose parent's last pages had little of its mail: further on a tap.
+                    Button("Load more") { Task { await sync.loadMore(place.folder, scope: place.scope) } }
+                        .font(.inter(.subheadline))
+                        .foregroundStyle(palette.muted)
+                        .frame(maxWidth: .infinity)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                } else {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .task(id: "\(place)-\(sync.cursor(place.folder, scope: place.scope))") { await sync.loadMore(place.folder, scope: place.scope) }
+                }
             }
 
             if store.sync?.loadingCache == true && threads.isEmpty {
@@ -211,13 +221,13 @@ struct ThreadListView: View {
         let local = store.search(query, scope: place.scope)
         guard found.query == query else { return local }
         let known = Set(local.map(\.id))
-        let remote = found.ids.filter { !known.contains($0) }.compactMap(store.thread)
+        let remote = found.ids.filter { !known.contains($0) }.compactMap(store.thread).filter(store.belonging(to: place.scope))
         return (local + remote).sorted { $0.latest.date > $1.latest.date }
     }
 
     private var recoveries: [RecoveredDraft] {
         guard place.folder == .drafts else { return [] }
-        return store.recoveredDrafts.filter { $0.draft.from == place.scope }
+        return store.recoveries(in: place.scope)
     }
 
     private var actionAnimation: Animation? { reduceMotion ? nil : .smooth(duration: 0.18) }
@@ -247,7 +257,7 @@ struct ThreadListView: View {
         }
     }
 
-    private var mailbox: Mailbox? { store.mailbox(place.scope) }
+    private var mailbox: Mailbox? { store.mailbox(for: place.scope) }
 
     private var scopeName: String { mailbox?.displayName ?? "" }
 
@@ -312,7 +322,7 @@ struct ThreadListView: View {
 
     private func row(_ thread: MailThread) -> some View {
         Group {
-            let content = ThreadRow(thread: thread, mark: mailbox?.mark ?? "star")
+            let content = ThreadRow(thread: thread, mark: mailbox?.mark ?? "star", mine: Set(store.addresses(of: thread.mailbox)))
             if selecting {
                 Button {
                     if selected.contains(thread.id) { selected.remove(thread.id) }

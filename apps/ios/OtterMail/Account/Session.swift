@@ -43,6 +43,8 @@ final class Session {
 
     private static let userKey = "otter:user"
     private static let demoKey = "otter:demo"
+    /** The account's `sendAs` and `aliasMailboxes`, as last pulled (MailAddresses). */
+    private static let addressesKey = "otter:addresses"
 
     init(preferences: Preferences) {
         self.preferences = preferences
@@ -101,6 +103,7 @@ final class Session {
         store.sync = sync
         let cached = (try? JSONDecoder().decode([Mailbox].self, from: UserDefaults.standard.data(forKey: "otter:mailboxes") ?? Data())) ?? []
         for mailbox in cached { store.upsert(mailbox: mailbox) }
+        store.otherAddresses = (try? JSONDecoder().decode(MailAddresses.self, from: UserDefaults.standard.data(forKey: Self.addressesKey) ?? Data())) ?? MailAddresses()
         sync.loadCache(for: cached.map(\.email))
         if let user { sync.pushMailboxes = Set(UserDefaults.standard.stringArray(forKey: "push:mailboxes:" + user.id) ?? []) }
         configurePush()
@@ -401,6 +404,7 @@ final class Session {
         var appliedSettings = settings ?? [:]
         if let pendingMode { appliedSettings["notificationsMode"] = pendingMode }
         preferences.apply(ui: ui ?? [:], settings: appliedSettings)
+        applyAddresses(sendAs: sections["sendAs"], aliasMailboxes: sections["aliasMailboxes"])
         configurePush()
         if let pendingMode {
             let remoteMode = settings?["notificationsMode"] as? String
@@ -416,6 +420,14 @@ final class Session {
         if ui == nil { preferenceChanged("ui") }
         if settings == nil { preferenceChanged("settings") }
         if signatures == nil { preferenceChanged("signatures") }
+    }
+
+    /** The account's other addresses and alias mailboxes (set on the Mac and the web): read, never written. */
+    private func applyAddresses(sendAs: Any?, aliasMailboxes: Any?) {
+        let addresses = MailAddresses(sendAs: sendAs, aliasMailboxes: aliasMailboxes)
+        guard addresses != store.otherAddresses else { return }
+        store.otherAddresses = addresses
+        UserDefaults.standard.set(try? JSONEncoder().encode(addresses), forKey: Self.addressesKey)
     }
 
     /** The account's IMAP signatures (by lower-cased address), as last pulled or written. */
@@ -521,6 +533,7 @@ final class Session {
         }
         UserDefaults.standard.removeObject(forKey: Self.userKey)
         UserDefaults.standard.removeObject(forKey: "otter:mailboxes")
+        UserDefaults.standard.removeObject(forKey: Self.addressesKey)
         UserDefaults.standard.set(false, forKey: Self.demoKey)
         store = MailStore(preferences: preferences)
         state = .welcome
@@ -540,8 +553,7 @@ final class Session {
 
     private func updateBadge() async {
         guard preferences.notifications != .off else { return }
-        let unread = store.shownMailboxes.reduce(0) { $0 + store.unreadCount(in: .inbox, scope: $1.email) }
-        try? await UNUserNotificationCenter.current().setBadgeCount(unread)
+        try? await UNUserNotificationCenter.current().setBadgeCount(store.appBadge)
     }
 
     /** Asks once to show notifications (when they're on in Settings). */
@@ -571,7 +583,13 @@ final class Session {
         }
         let emails = available.map { $0.email.lowercased() }
         let settings = Dictionary(uniqueKeysWithValues: available.compactMap { mailbox in mailbox.imap.map { (mailbox.email.lowercased(), $0) } })
-        PushState.configure(.init(userId: user.id, mode: preferences.notifications.rawValue, mailboxes: emails, imapSettings: settings))
+        let aliases = Dictionary(uniqueKeysWithValues: available.compactMap { mailbox in
+            let shown = store.shownAliases(of: mailbox.email).map { AliasMailbox(address: $0.address, name: $0.title) }
+            return shown.isEmpty ? nil : (mailbox.email.lowercased(), shown)
+        })
+        let names = store.shownScopes.count > 1 ? Dictionary(available.map { ($0.email.lowercased(), $0.displayName) }) { a, _ in a } : nil
+        PushState.configure(.init(userId: user.id, mode: preferences.notifications.rawValue, mailboxes: emails, imapSettings: settings,
+                                  aliases: aliases.isEmpty ? nil : aliases, names: names))
         if pushingRegistration == nil {
             pushingRegistration = Task {
                 await updatePushRegistration()
@@ -607,8 +625,11 @@ final class Session {
         let originalUser = user?.id
         guard destination.userId == nil || destination.userId == user?.id else { opening = nil; return }
         await sync?.waitForCache()
+        // An alias mailbox's mail is its parent's.
         let known = { [store] (email: String?) in
-            email.flatMap { email in store.mailboxes.first { $0.email.lowercased() == email.lowercased() } }
+            email.flatMap { email in
+                store.mailboxes.first { $0.email.lowercased() == email.lowercased() } ?? store.alias(email).flatMap { store.mailbox($0.source) }
+            }
         }
         if known(destination.email) == nil { await refreshAccount() } else { Task { await refreshAccount() } }
         guard user?.id == originalUser else { opening = nil; return }

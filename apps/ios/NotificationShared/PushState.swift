@@ -11,6 +11,22 @@ nonisolated enum PushState {
         var mode: String
         var mailboxes: [String]
         var imapSettings: [String: ImapSettings]? = nil
+        /** Alias mailboxes by their parent's lower-cased address, so new mail is named and opened as its alias. */
+        var aliases: [String: [AliasMailbox]]? = nil
+        /** Mailbox names by lower-cased address, when this iPhone shows more than one: alerts then say which. */
+        var names: [String: String]? = nil
+
+        /** What an alert for `email`'s mail names it, if anything. */
+        func name(_ email: String, alias: AliasMailbox?) -> String? {
+            guard let names else { return nil }
+            return alias?.title ?? names[email.lowercased()]
+        }
+    }
+
+    /** An alert's subtitle: the subject, after the mailbox's name when there's one to say. */
+    static func subtitle(_ subject: String, mailbox: String?) -> String {
+        guard let mailbox, !mailbox.isEmpty else { return subject }
+        return subject.isEmpty ? mailbox : "\(mailbox) · \(subject)"
     }
 
     static func configuration() -> Configuration? { read("configuration") }

@@ -347,7 +347,7 @@ final class ImapProvider: MailProvider {
         guard !uids.isEmpty else { return [] }
         let responses = try await client.fetch(
             imapSet(uids),
-            "(UID FLAGS INTERNALDATE ENVELOPE BODYSTRUCTURE BODY.PEEK[HEADER.FIELDS (REFERENCES LIST-UNSUBSCRIBE LIST-UNSUBSCRIBE-POST)])"
+            "(UID FLAGS INTERNALDATE ENVELOPE BODYSTRUCTURE BODY.PEEK[HEADER.FIELDS (REFERENCES LIST-UNSUBSCRIBE LIST-UNSUBSCRIBE-POST \(VerifiedNotification.deliveredToFields))])"
         )
         let drafts = role(path) == .drafts
         var fetched = responses.compactMap { Self.fetched($0.values.first?.pairs ?? [:], path: path, validity: validity, inDrafts: drafts) }
@@ -402,7 +402,7 @@ final class ImapProvider: MailProvider {
         if let messageID { headers["Message-ID"] = messageID }
         let bcc = imapAddresses(field(7))
         if !bcc.isEmpty { headers["Bcc"] = bcc.map(Draft.format).joined(separator: ", ") }
-        for name in ["References", "List-Unsubscribe", "List-Unsubscribe-Post"] {
+        for name in ["References", "List-Unsubscribe", "List-Unsubscribe-Post", "Original-Recipient", "Delivered-To", "X-Original-To"] {
             if let value = MailDecoding.header(name, in: block) { headers[name] = value }
         }
         let inline = files.filter(isInline).map(attachment)

@@ -32,7 +32,7 @@ struct SettingsView: View {
                         MailboxesSettings()
                     } label: {
                         LabeledContent {
-                            Text("\(store.shownMailboxes.count) on")
+                            Text("\(store.shownScopes.count) on")
                         } label: {
                             Label("Mailboxes", systemImage: "tray.2")
                         }

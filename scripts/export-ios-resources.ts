@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { DEMO_ACCOUNTS } from "../packages/shared/src/demo-mailboxes.ts";
+import { DEMO_ACCOUNTS, DEMO_ALIAS_ACCOUNT } from "../packages/shared/src/demo-mailboxes.ts";
 import {
   APP_THEMES,
   OTTER_DARK_THEME_COLORS,
@@ -24,7 +24,7 @@ const themes = APP_THEMES.map((theme) => ({
 }));
 
 const seededAt = Date.now();
-const demo = DEMO_ACCOUNTS.map(({ threads, ...account }) => ({
+const demo = [...DEMO_ACCOUNTS, DEMO_ALIAS_ACCOUNT].map(({ threads, ...account }) => ({
   ...account,
   threads: threads(seededAt).map((thread) => ({
     ...thread,

@@ -16,7 +16,7 @@ struct PlacesBar: View {
     static let pinned: [Folder] = [.inbox, .drafts]
 
     var body: some View {
-        let mailbox = store.mailbox(place.scope)
+        let mailbox = store.mailbox(for: place.scope)
         HStack(spacing: 12) {
             HStack(spacing: 0) {
                 Menu {
@@ -97,7 +97,7 @@ struct PlacesPanel: View {
     let onSettings: () -> Void
 
     var body: some View {
-        let mailbox = store.mailbox(place.scope)
+        let mailbox = store.mailbox(for: place.scope)
         VStack(alignment: .leading, spacing: 0) {
             header(mailbox)
                 .padding(.horizontal, 16)
@@ -105,7 +105,7 @@ struct PlacesPanel: View {
             Divider().overlay(palette.border).padding(.horizontal, 12)
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
-                    if let mailbox, mailbox.signedOut {
+                    if let mailbox = mailbox.flatMap({ store.mailbox($0.source) }), mailbox.signedOut {
                         HStack(spacing: 10) {
                             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(palette.warning)
                             Text(signedOutTitle(mailbox)).font(.inter(.subheadline)).lineLimit(1)
@@ -125,7 +125,7 @@ struct PlacesPanel: View {
                     labels(mailbox)
                     row("Search", symbol: "magnifyingglass", action: onSearch)
                     row("Settings", symbol: "gearshape", action: onSettings)
-                    SyncStatusLine(scope: place.scope)
+                    SyncStatusLine(scope: mailbox?.source ?? place.scope)
                         .padding(.horizontal, 12)
                         .padding(.top, 8)
                 }
@@ -207,7 +207,7 @@ struct MailboxChoices: View {
     let onPick: (Mailbox) -> Void
 
     var body: some View {
-        ForEach(store.shownMailboxes) { mailbox in
+        ForEach(store.shownScopes) { mailbox in
             let unread = store.badge(in: .inbox, scope: mailbox.email)
             Button { onPick(mailbox) } label: {
                 if mailbox.email == current {

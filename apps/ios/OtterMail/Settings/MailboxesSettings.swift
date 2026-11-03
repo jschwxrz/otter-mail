@@ -9,30 +9,24 @@ struct MailboxesSettings: View {
     var body: some View {
         SettingsForm {
             Section {
-                let shown = store.shownMailboxes
-                ForEach(store.arrangedMailboxes) { mailbox in
-                    let on = shown.contains(mailbox)
-                    NavigationLink {
-                        MailboxSettings(email: mailbox.email)
-                    } label: {
-                        HStack(spacing: 12) {
-                            MailboxMark(mailbox: mailbox, size: 30)
-                            VStack(alignment: .leading, spacing: 2) {
+                let shown = store.shownScopes
+                let mailboxes = store.shownMailboxes.count
+                ForEach(store.arrangedScopes) { mailbox in
+                    if let parent = mailbox.parent {
+                        // Made on the Mac and the web (Send from › Own mailbox); shown and arranged here like any mailbox.
+                        row(mailbox, on: shown.contains(mailbox), locked: shown.allSatisfy { $0.email != parent }) {
+                            Text("\(Text(mailbox.displayName).foregroundStyle(palette.text)) \(Text("in \(store.mailbox(parent)?.displayName ?? parent)").foregroundStyle(palette.muted))")
+                        }
+                    } else {
+                        NavigationLink {
+                            MailboxSettings(email: mailbox.email)
+                        } label: {
+                            row(mailbox, on: shown.contains(mailbox), locked: shown.contains(mailbox) && mailboxes == 1) {
                                 HStack(spacing: 6) {
                                     ProviderMark(provider: mailbox.provider, size: 14)
                                     Text(mailbox.displayName).foregroundStyle(palette.text)
                                 }
-                                Text(mailbox.signedOut ? "Sign in on this iPhone" : mailbox.email)
-                                    .font(.inter(.subheadline))
-                                    .foregroundStyle(mailbox.signedOut ? palette.warning : palette.muted)
                             }
-                            Spacer()
-                            Toggle("Show \(mailbox.displayName)", isOn: Binding(
-                                get: { on },
-                                set: { store.setOn($0, mailbox) }
-                            ))
-                            .labelsHidden()
-                            .disabled(on && shown.count == 1)
                         }
                     }
                 }
@@ -69,7 +63,9 @@ struct MailboxesSettings: View {
                     .disabled(session.busy != nil)
                 }
             } footer: {
-                Text("Turned-off mailboxes stay signed in but aren't shown or synced, on every device.").sectionFooter()
+                Text(store.arrangedScopes.contains { $0.parent != nil }
+                    ? "Turned-off mailboxes stay signed in but aren't shown or synced, on every device. An alias mailbox is its mailbox's mail for one of its addresses."
+                    : "Turned-off mailboxes stay signed in but aren't shown or synced, on every device.").sectionFooter()
             }
         }
         .navigationTitle("Mailboxes")
@@ -79,6 +75,26 @@ struct MailboxesSettings: View {
             Button("OK") { error = nil }
         } message: {
             Text(error ?? "")
+        }
+    }
+
+    /** A mailbox's row: its mark, title and address, and its switch (`locked`: not to be switched now). */
+    private func row(_ mailbox: Mailbox, on: Bool, locked: Bool, @ViewBuilder title: () -> some View) -> some View {
+        HStack(spacing: 12) {
+            MailboxMark(mailbox: mailbox, size: 30)
+            VStack(alignment: .leading, spacing: 2) {
+                title()
+                Text(mailbox.signedOut ? "Sign in on this iPhone" : mailbox.email)
+                    .font(.inter(.subheadline))
+                    .foregroundStyle(mailbox.signedOut ? palette.warning : palette.muted)
+            }
+            Spacer()
+            Toggle("Show \(mailbox.displayName)", isOn: Binding(
+                get: { on },
+                set: { store.setOn($0, mailbox) }
+            ))
+            .labelsHidden()
+            .disabled(locked)
         }
     }
 }
