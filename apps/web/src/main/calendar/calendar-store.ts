@@ -63,17 +63,26 @@ type CalendarState = {
   team: Teammate[];
   selection: Selection | null;
   draft: DraftEvent | null;
+  /** The calendar whose coming events show in the drawer (by calendarKey). */
+  agenda: string | null;
+  /** An event to open once the view has glided to it. */
+  reveal: Selection | null;
   setDate: (date: Date) => void;
   /** Scrolled to: the week starts on this day, not the locale's first. */
   setStart: (date: Date) => void;
   setPeek: (date: Date | null) => void;
   goTo: (date: Date) => void;
   setShown: (key: string, show: boolean) => void;
+  /** Shows only this calendar of those listed. */
+  showOnly: (key: string, keys: string[]) => void;
   addTeammate: (teammate: Teammate) => void;
   removeTeammate: (email: string) => void;
   clearTeam: () => void;
   select: (selection: Selection | null) => void;
   setDraft: (draft: DraftEvent | null) => void;
+  setAgenda: (key: string | null) => void;
+  /** Glides to an event's day and opens it. */
+  show: (event: { accountId: string; calendarId: string; id: string; startMs: number }) => void;
 };
 
 export const useCalendar = create<CalendarState>((set) => ({
@@ -85,6 +94,8 @@ export const useCalendar = create<CalendarState>((set) => ({
   team: readTeam(),
   selection: null,
   draft: null,
+  agenda: null,
+  reveal: null,
   setDate: (date) => set({ date: startOfDay(date), free: false, peek: null, target: null }),
   setStart: (date) => set({ date: startOfDay(date), free: true, peek: null }),
   setPeek: (peek) => set({ peek }),
@@ -92,6 +103,12 @@ export const useCalendar = create<CalendarState>((set) => ({
   setShown: (key, show) =>
     set((s) => {
       const shown = { ...s.shown, [key]: show };
+      localStorage.setItem(SHOWN_KEY, JSON.stringify(shown));
+      return { shown };
+    }),
+  showOnly: (key, keys) =>
+    set((s) => {
+      const shown = { ...s.shown, ...Object.fromEntries(keys.map((k) => [k, k === key])) };
       localStorage.setItem(SHOWN_KEY, JSON.stringify(shown));
       return { shown };
     }),
@@ -106,4 +123,11 @@ export const useCalendar = create<CalendarState>((set) => ({
   select: (selection) =>
     set((s) => ({ selection, draft: selection && "draft" in selection ? s.draft : null })),
   setDraft: (draft) => set({ draft, selection: draft ? { draft: true } : null }),
+  setAgenda: (agenda) => set({ agenda }),
+  show: ({ accountId, calendarId, id, startMs }) =>
+    set({
+      target: startOfDay(new Date(startMs)),
+      reveal: { accountId, calendarId, id },
+      draft: null,
+    }),
 }));

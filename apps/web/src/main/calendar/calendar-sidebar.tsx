@@ -1,23 +1,34 @@
 import { useState, type ReactNode } from "react";
 import {
+  CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   EyeIcon,
   EyeOffIcon,
   RssIcon,
+  SquareDotIcon,
   Undo2Icon,
   XIcon,
 } from "lucide-react";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuTrigger,
+} from "../mail/menu";
 import { getAccountDisplayName } from "../mail/account-style";
 import { Section, SidebarBody } from "../mail/sidebar-ui";
 import type { MailAccount } from "../mail/types";
 import { HintTooltip, cn } from "../mail/ui";
 import { isShown, useCalendar } from "./calendar-store";
-import { useCalendarPreferences } from "./preferences";
+import { setCalendarPreference, useCalendarPreferences } from "./preferences";
 import { useCalendarLists } from "./api";
 import {
   TEAM_COLORS,
   calendarAccounts,
+  defaultCalendarOf,
   listedCalendars,
   type ListedCalendar,
 } from "./calendar-view";
@@ -29,6 +40,27 @@ import {
   visibleDays,
   type CalendarMode,
 } from "./dates";
+
+/** The colors a calendar can wear, as Notion Calendar names them. */
+const CALENDAR_COLORS: { name: string; hex: string }[] = [
+  { name: "Red", hex: "#e5484d" },
+  { name: "Coral", hex: "#d9776f" },
+  { name: "Orange", hex: "#f2834d" },
+  { name: "Yellow", hex: "#f0c24d" },
+  { name: "Lime", hex: "#bddb6e" },
+  { name: "Grass", hex: "#8fd165" },
+  { name: "Green", hex: "#6cc78f" },
+  { name: "Mint", hex: "#94dcc4" },
+  { name: "Blue", hex: "#5ea8e0" },
+  { name: "Sapphire", hex: "#4f80e8" },
+  { name: "Indigo", hex: "#8e8cf0" },
+  { name: "Violet", hex: "#b48ef0" },
+  { name: "Purple", hex: "#9b5cf0" },
+  { name: "Pink", hex: "#ec8fb5" },
+  { name: "Blush", hex: "#d4a5ae" },
+  { name: "Brown", hex: "#b07a62" },
+  { name: "Gray", hex: "#a3a3a3" },
+];
 
 /** The month at a glance: the days in view are marked, a click goes to one. */
 function MiniMonth({ mode }: { mode: CalendarMode }) {
@@ -208,9 +240,17 @@ export function CalendarSidebar({
 }) {
   const shown = useCalendar((s) => s.shown);
   const setShown = useCalendar((s) => s.setShown);
+  const agenda = useCalendar((s) => s.agenda);
+  const setAgenda = useCalendar((s) => s.setAgenda);
   const mailboxes = calendarAccounts(accounts);
   const lists = useCalendarLists(mailboxes.map((a) => a.id)).data;
-  const listed = listedCalendars(mailboxes, lists);
+  const { defaultCalendar: chosen, colors } = useCalendarPreferences();
+  const listed = listedCalendars(mailboxes, lists, colors);
+  const showOnly = useCalendar((s) => s.showOnly);
+  const defaultKey = defaultCalendarOf(
+    listed.filter((c) => isShown(shown, c.key, c.info.hiddenByDefault)),
+    chosen,
+  )?.key;
   return (
     <div className="flex min-h-0 flex-1 flex-col pt-2">
       <MiniMonth mode={mode} />
@@ -229,7 +269,28 @@ export function CalendarSidebar({
                     key={calendar.key}
                     calendar={calendar}
                     on={on}
+                    open={agenda === calendar.key}
+                    isDefault={calendar.key === defaultKey}
+                    onMakeDefault={() => {
+                      setCalendarPreference("defaultCalendar", calendar.key);
+                      if (!on) setShown(calendar.key, true);
+                    }}
+                    onOpen={() => setAgenda(agenda === calendar.key ? null : calendar.key)}
                     onToggle={() => setShown(calendar.key, !on)}
+                    picked={colors[calendar.key] ?? null}
+                    onColor={(hex) => {
+                      const { [calendar.key]: _, ...rest } = colors;
+                      setCalendarPreference(
+                        "colors",
+                        hex ? { ...rest, [calendar.key]: hex } : rest,
+                      );
+                    }}
+                    onShowOnly={() =>
+                      showOnly(
+                        calendar.key,
+                        listed.map((c) => c.key),
+                      )
+                    }
                   />
                 );
               })}
@@ -241,51 +302,152 @@ export function CalendarSidebar({
   );
 }
 
-/** A calendar: its color (a followed one's with a feed mark), its name, and whether it shows. */
+/**
+ * A calendar: its color (a followed one's with a feed mark), its name, and whether it shows.
+ * The row opens its coming events in the drawer; the eye shows or hides it.
+ */
 function CalendarRow({
   calendar,
   on,
+  open,
+  isDefault,
+  onOpen,
+  onMakeDefault,
   onToggle,
+  picked,
+  onColor,
+  onShowOnly,
 }: {
   calendar: ListedCalendar;
   on: boolean;
+  open: boolean;
+  isDefault: boolean;
+  onOpen: () => void;
+  onMakeDefault: () => void;
   onToggle: () => void;
+  /** The color picked for it, if any (else its own). */
+  picked: string | null;
+  onColor: (hex: string | null) => void;
+  onShowOnly: () => void;
 }) {
-  const { info, color } = calendar;
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onToggle}
-      title={on ? "Hide this calendar" : "Show this calendar"}
-      className="group flex h-7 w-full cursor-pointer items-center gap-2 rounded-md px-(--sidebar-row-content-inset) text-left text-[13px] font-medium outline-none hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-focus-ring"
-    >
-      <span
-        aria-hidden
-        className={cn(
-          "flex size-3.5 shrink-0 items-center justify-center rounded-[4px] transition-opacity duration-150",
-          !on && "opacity-40",
-        )}
-        style={{ background: color }}
-      >
-        {info.writable ? null : <RssIcon className="size-2.5 text-white" strokeWidth={3} />}
-      </span>
-      <span
-        className={cn(
-          "min-w-0 flex-1 truncate transition-colors",
-          on ? "text-sidebar-foreground" : "text-sidebar-muted-foreground/70",
-        )}
-      >
-        {info.name}
-        {info.primary ? (
-          <span className="ml-1.5 font-normal text-sidebar-muted-foreground">Default</span>
-        ) : null}
-      </span>
-      {on ? (
-        <EyeIcon className="size-3.5 shrink-0 text-sidebar-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-      ) : (
-        <EyeOffIcon className="size-3.5 shrink-0 text-sidebar-muted-foreground" />
+  const named = CALENDAR_COLORS.find((c) => c.hex === picked);
+  const dot = (color: string) => (
+    <span className="size-3.5 shrink-0 rounded-[4px]" style={{ background: color }} />
+  );
+  const swatch = (
+    <span
+      aria-hidden
+      className={cn(
+        "flex size-3.5 shrink-0 items-center justify-center rounded-[4px] transition-[opacity,outline-color] duration-150",
+        !on && "opacity-40",
       )}
-    </button>
+      style={{
+        background: calendar.color,
+        // The default wears a ring, as in Notion Calendar.
+        outline: `1.5px solid ${isDefault ? calendar.color : "transparent"}`,
+        outlineOffset: 1.5,
+      }}
+    >
+      {calendar.info.writable ? null : <RssIcon className="size-2.5 text-white" strokeWidth={3} />}
+    </span>
+  );
+  const { info } = calendar;
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          className={cn(
+            "group flex h-7 w-full items-center rounded-md data-[state=open]:bg-sidebar-row-hover",
+            open ? "bg-sidebar-row-selected" : "hover:bg-sidebar-row-hover",
+          )}
+        >
+          {/* The square makes it the default, where it can take events. */}
+          {info.writable ? (
+            <HintTooltip label={isDefault ? "Default calendar" : "Make default"}>
+              <button
+                type="button"
+                aria-label="Make default"
+                aria-pressed={isDefault}
+                onClick={onMakeDefault}
+                className="ml-[calc(var(--sidebar-row-content-inset)-5px)] flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+              >
+                {swatch}
+              </button>
+            </HintTooltip>
+          ) : (
+            <span className="ml-[calc(var(--sidebar-row-content-inset)-5px)] flex size-6 shrink-0 items-center justify-center">
+              {swatch}
+            </span>
+          )}
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={onOpen}
+            className="flex h-full min-w-0 flex-1 cursor-pointer items-center rounded-md pl-0.5 text-left text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+          >
+            <span
+              className={cn(
+                "min-w-0 flex-1 truncate transition-colors",
+                on ? "text-sidebar-foreground" : "text-sidebar-muted-foreground/70",
+              )}
+            >
+              {info.name}
+              {isDefault ? (
+                <span className="ml-1.5 font-normal text-sidebar-muted-foreground">Default</span>
+              ) : null}
+            </span>
+          </button>
+          <HintTooltip label={on ? "Hide calendar" : "Show calendar"}>
+            <button
+              type="button"
+              aria-pressed={on}
+              aria-label={on ? "Hide calendar" : "Show calendar"}
+              onClick={onToggle}
+              className={cn(
+                "mr-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-sidebar-muted-foreground outline-none transition-[color,opacity] hover:text-sidebar-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-focus-ring",
+                on && "opacity-0 group-hover:opacity-100",
+              )}
+            >
+              {on ? <EyeIcon className="size-3.5" /> : <EyeOffIcon className="size-3.5" />}
+            </button>
+          </HintTooltip>
+        </div>
+      </ContextMenuTrigger>
+      {/* Notion Calendar's menu, for what Otter Mail does. */}
+      <ContextMenuContent className="min-w-56">
+        <ContextMenuSub label="Color" icon={dot(calendar.color)} detail={named?.name}>
+          {CALENDAR_COLORS.map((c) => (
+            <ContextMenuItem key={c.hex} icon={dot(c.hex)} onSelect={() => onColor(c.hex)}>
+              <span className="flex items-center justify-between gap-4">
+                {c.name}
+                {c.hex === picked ? <CheckIcon className="size-3.5 text-foreground" /> : null}
+              </span>
+            </ContextMenuItem>
+          ))}
+          {picked ? (
+            <>
+              <ContextMenuSeparator />
+              <ContextMenuItem icon={<Undo2Icon />} onSelect={() => onColor(null)}>
+                Its own color
+              </ContextMenuItem>
+            </>
+          ) : null}
+        </ContextMenuSub>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          icon={<SquareDotIcon />}
+          disabled={!info.writable || isDefault}
+          onSelect={onMakeDefault}
+        >
+          Make default calendar
+        </ContextMenuItem>
+        <ContextMenuItem icon={<EyeIcon />} onSelect={onShowOnly}>
+          Show only this calendar
+        </ContextMenuItem>
+        <ContextMenuItem icon={on ? <EyeOffIcon /> : <EyeIcon />} onSelect={onToggle}>
+          {on ? "Hide calendar" : "Show calendar"}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }

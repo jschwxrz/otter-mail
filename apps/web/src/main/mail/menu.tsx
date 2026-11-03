@@ -230,11 +230,15 @@ export function ContextMenuSeparator({ className }: { className?: string }) {
 
 export function ContextMenuSub({
   label,
+  icon,
+  detail,
   inset,
   children,
 }: {
   label: string;
-  icon?: string;
+  icon?: ReactNode;
+  /** The current choice, beside the chevron. */
+  detail?: string;
   inset?: boolean;
   children: ReactNode;
 }) {
@@ -243,7 +247,9 @@ export function ContextMenuSub({
       <ContextPrimitive.SubTrigger
         className={cn(ROW, inset && "ps-8", "data-[state=open]:bg-foreground/[0.07]")}
       >
+        {icon}
         <span className="min-w-0 flex-1 truncate">{label}</span>
+        {detail ? <span className="text-[13px] text-muted-foreground">{detail}</span> : null}
         <ChevronRightIcon className="ms-auto size-3.5 text-muted-foreground" />
       </ContextPrimitive.SubTrigger>
       <ContextPrimitive.Portal>

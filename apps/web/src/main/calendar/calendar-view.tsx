@@ -15,6 +15,7 @@ import type { MailAccount } from "../mail/types";
 import { HintTooltip, IconBtn, buttonClass } from "../mail/ui";
 import {
   calendarKey,
+  useCachedEvent,
   hasGuests,
   useCalendarActions,
   useCalendarEvents,
@@ -36,6 +37,7 @@ import {
   visibleDays,
   type CalendarMode,
 } from "./dates";
+import { AgendaDrawer } from "./agenda";
 import { EventPanel } from "./event-panel";
 import { TeamPicker } from "./team-picker";
 import { MonthGrid } from "./month-grid";
@@ -72,6 +74,17 @@ function CalendarTitle({
   return <h1 className="shrink-0 text-sm font-semibold text-foreground">{monthTitle(middle)}</h1>;
 }
 
+/** Where new events go: the calendar picked in the sidebar, else the first primary one that takes them. */
+export function defaultCalendarOf(
+  calendars: ListedCalendar[],
+  chosen: string,
+): ListedCalendar | undefined {
+  const writable = calendars.filter((c) => c.info.writable);
+  return (
+    writable.find((c) => c.key === chosen) ?? writable.find((c) => c.info.primary) ?? writable[0]
+  );
+}
+
 /** A near-black calendar color (a mailbox colored black) lifted toward the text, so it reads on a dark canvas. */
 function legible(hex: string): string {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
@@ -97,14 +110,19 @@ export type ListedCalendar = {
 export function listedCalendars(
   accounts: MailAccount[],
   lists: AccountCalendars[] | undefined,
+  /** Picked in the sidebar, over the rest. */
+  colors: Record<string, string> = {},
 ): ListedCalendar[] {
   return accounts.flatMap((account) =>
-    (lists?.find((l) => l.accountId === account.id)?.calendars ?? []).map((info) => ({
-      account,
-      info,
-      key: calendarKey({ accountId: account.id, calendarId: info.id }),
-      color: info.primary || !info.color ? getAccountColor(account) : info.color,
-    })),
+    (lists?.find((l) => l.accountId === account.id)?.calendars ?? []).map((info) => {
+      const key = calendarKey({ accountId: account.id, calendarId: info.id });
+      return {
+        account,
+        info,
+        key,
+        color: colors[key] ?? (info.primary || !info.color ? getAccountColor(account) : info.color),
+      };
+    }),
   );
 }
 
@@ -159,10 +177,17 @@ export function CalendarView({
   const actions = useCalendarActions();
   const bodyRef = useRef<HTMLDivElement>(null);
 
+  // Re-renders on any calendar setting: the week's first day and the time format reach every label.
+  const {
+    showWeekends,
+    showDeclined,
+    defaultCalendar: chosenDefault,
+    colors: chosenColors,
+  } = useCalendarPreferences();
   const calendars = calendarAccounts(accounts);
   // Every calendar of every mailbox, and those shown.
   const lists = useCalendarLists(calendars.map((a) => a.id)).data;
-  const listed = listedCalendars(calendars, lists);
+  const listed = listedCalendars(calendars, lists, chosenColors);
   const visible = listed.filter((c) => isShown(shown, c.key, c.info.hiddenByDefault));
   const refs = visible.map((c) => ({
     accountId: c.account.id,
@@ -173,8 +198,6 @@ export function CalendarView({
   const free = useCalendar((s) => s.free);
   const setStart = useCalendar((s) => s.setStart);
   const setPeek = useCalendar((s) => s.setPeek);
-  // Re-renders on any calendar setting: the week's first day and the time format reach every label.
-  const { showWeekends, showDeclined } = useCalendarPreferences();
   // Without weekends, the week and month show weekdays; a day is a day.
   const weekends = showWeekends || mode === "day";
   const days = visibleDays(mode, date, free, weekends);
@@ -212,13 +235,14 @@ export function CalendarView({
     ]),
   ]);
   const colorOf = (key: string) => legible(colors.get(key) ?? "#8a8a8a");
-  // New events go to the first shown calendar that takes them, primary first.
-  const defaultTarget =
-    visible.find((c) => c.info.primary && c.info.writable) ?? visible.find((c) => c.info.writable);
+  // New events go to the default calendar, among those shown.
+  const defaultTarget = defaultCalendarOf(visible, chosenDefault);
   const defaultCalendar = defaultTarget
     ? { accountId: defaultTarget.account.id, calendarId: defaultTarget.info.id }
     : null;
 
+  // From the drawer, an event the grid doesn't show (a hidden calendar's, a declined one) opens too.
+  const cached = useCachedEvent(selection && !("draft" in selection) ? selection : null);
   const selected =
     selection && !("draft" in selection)
       ? (events.find(
@@ -226,7 +250,7 @@ export function CalendarView({
             e.accountId === selection.accountId &&
             e.calendarId === selection.calendarId &&
             e.id === selection.id,
-        ) ?? null)
+        ) ?? cached)
       : null;
 
   const go = (by: number) => {
@@ -245,14 +269,17 @@ export function CalendarView({
   // from far off, starts a step short of it and scrolls the last step.
   const target = useCalendar((s) => s.target);
   const glide = useLatest((to: Date) => {
-    select(null);
+    // From the drawer: the event opens as the view goes there.
+    const reveal = useCalendar.getState().reveal;
+    select(reveal);
     const step = stepGrid.current;
     if (mode === "month" || !step) {
       setDate(to);
+      useCalendar.setState({ reveal: null });
       return;
     }
     const aligned = stepDays(mode === "week" ? startOfWeek(to) : startOfDay(to), 0, weekends);
-    useCalendar.setState({ target: null });
+    useCalendar.setState({ target: null, reveal: null });
     // Within the strip, glide there; from far off, start a step short of it.
     const at = strip.findIndex((d) => sameDay(d, aligned));
     if (at >= 0) {
@@ -338,122 +365,136 @@ export function CalendarView({
   );
   const modeLabel = CALENDAR_MODES.find((m) => m.mode === mode)!.label;
 
-  return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-calendar="">
-      <div
-        data-toolbar=""
-        className="drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-3 px-4"
-      >
-        {titleLeading}
-        <CalendarTitle mode={mode} date={date} first={days[0]} />
-        {failed.length ? (
-          <span className="min-w-0 truncate text-xs text-muted-foreground">
-            Couldn&apos;t load {failed.join(", ")}
-          </span>
-        ) : null}
-        {needsAccess.length ? <AllowCalendarAccess accounts={needsAccess} /> : null}
-        <span className="min-w-0 flex-1" />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button type="button" className={buttonClass("ghost", "sm", "no-drag gap-1 px-2")}>
-              {modeLabel}
-              <ChevronDownIcon className="size-3.5 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-36">
-            {CALENDAR_MODES.map((m) => (
-              <DropdownMenuItem
-                key={m.mode}
-                accelerator={m.key}
-                icon={m.mode === mode ? <CheckIcon /> : <span className="size-4" />}
-                onSelect={() => onMode(m.mode)}
-              >
-                {m.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <HintTooltip label="Today" hint="T">
-          <button
-            type="button"
-            onClick={() => {
-              goToday();
-            }}
-            className={buttonClass("outline", "sm", "no-drag")}
-          >
-            Today
-          </button>
-        </HintTooltip>
-        <div className="no-drag flex items-center">
-          <HintTooltip label="Previous" hint="K">
-            <IconBtn label="Previous" onClick={() => go(-1)}>
-              <ChevronLeftIcon />
-            </IconBtn>
-          </HintTooltip>
-          <HintTooltip label="Next" hint="J">
-            <IconBtn label="Next" onClick={() => go(1)}>
-              <ChevronRightIcon />
-            </IconBtn>
-          </HintTooltip>
-        </div>
-        {titleTrailing}
-      </div>
+  const agenda = useCalendar((s) => s.agenda);
+  const agendaCalendar = listed.find((c) => c.key === agenda);
 
-      <div
-        ref={bodyRef}
-        // Within the card's rounded corners: the grid's sticky parts are opaque.
-        className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl"
-        onPointerDown={(e) => {
-          if (!(e.target as HTMLElement).closest("[data-event]")) select(null);
-        }}
-      >
-        {calendars.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
-            None of your mailboxes has a calendar Otter Mail can open. Gmail and Outlook do.
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1">
+      {/* Beside the sidebar, as in Notion Calendar. */}
+      {agendaCalendar ? (
+        <AgendaDrawer
+          key={agendaCalendar.key}
+          calendar={agendaCalendar}
+          color={colorOf(agendaCalendar.key)}
+          titleLeading={titleLeading}
+        />
+      ) : null}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-calendar="">
+        <div
+          data-toolbar=""
+          className="drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-3 px-4"
+        >
+          {agendaCalendar ? null : titleLeading}
+          <CalendarTitle mode={mode} date={date} first={days[0]} />
+          {failed.length ? (
+            <span className="min-w-0 truncate text-xs text-muted-foreground">
+              Couldn&apos;t load {failed.join(", ")}
+            </span>
+          ) : null}
+          {needsAccess.length ? <AllowCalendarAccess accounts={needsAccess} /> : null}
+          <span className="min-w-0 flex-1" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className={buttonClass("ghost", "sm", "no-drag gap-1 px-2")}>
+                {modeLabel}
+                <ChevronDownIcon className="size-3.5 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-36">
+              {CALENDAR_MODES.map((m) => (
+                <DropdownMenuItem
+                  key={m.mode}
+                  accelerator={m.key}
+                  icon={m.mode === mode ? <CheckIcon /> : <span className="size-4" />}
+                  onSelect={() => onMode(m.mode)}
+                >
+                  {m.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <HintTooltip label="Today" hint="T">
+            <button
+              type="button"
+              onClick={() => {
+                goToday();
+              }}
+              className={buttonClass("outline", "sm", "no-drag")}
+            >
+              Today
+            </button>
+          </HintTooltip>
+          <div className="no-drag flex items-center">
+            <HintTooltip label="Previous" hint="K">
+              <IconBtn label="Previous" onClick={() => go(-1)}>
+                <ChevronLeftIcon />
+              </IconBtn>
+            </HintTooltip>
+            <HintTooltip label="Next" hint="J">
+              <IconBtn label="Next" onClick={() => go(1)}>
+                <ChevronRightIcon />
+              </IconBtn>
+            </HintTooltip>
           </div>
-        ) : (
-          <div
-            key={mode === "month" ? `${mode}:${from}` : mode}
-            className="flex min-h-0 flex-1 flex-col animate-calendar-in motion-reduce:animate-none"
-          >
-            {mode === "month" ? (
-              <MonthGrid
-                days={days}
-                columns={weekends ? 7 : 5}
-                month={date.getMonth()}
-                events={events}
-                colorOf={colorOf}
-                defaultCalendar={defaultCalendar}
-                onOpenDay={openDay}
-              />
-            ) : (
-              <TimeGrid
-                days={strip}
-                visible={days.length}
-                buffer={buffer}
-                stepRef={stepGrid}
-                onSettle={(shift) => setStart(strip[buffer + shift]!)}
-                onPeek={(shift) => setPeek(shift ? strip[buffer + shift]! : null)}
-                events={events}
-                colorOf={colorOf}
-                defaultCalendar={defaultCalendar}
-                actions={actions}
-                onOpenDay={openDay}
-              />
-            )}
-          </div>
-        )}
-        {selected || (draft && selection && "draft" in selection) ? (
-          <EventPanel
-            containerRef={bodyRef}
-            event={selected}
-            draft={selected ? null : draft}
-            calendars={listed}
-            colorOf={colorOf}
-            actions={actions}
-          />
-        ) : null}
-        {picking ? <TeamPicker onClose={() => setPicking(false)} /> : null}
+          {titleTrailing}
+        </div>
+
+        <div
+          ref={bodyRef}
+          // Within the card's rounded corners: the grid's sticky parts are opaque.
+          className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl"
+          onPointerDown={(e) => {
+            if (!(e.target as HTMLElement).closest("[data-event]")) select(null);
+          }}
+        >
+          {calendars.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
+              None of your mailboxes has a calendar Otter Mail can open. Gmail and Outlook do.
+            </div>
+          ) : (
+            <div
+              key={mode === "month" ? `${mode}:${from}` : mode}
+              className="flex min-h-0 flex-1 flex-col animate-calendar-in motion-reduce:animate-none"
+            >
+              {mode === "month" ? (
+                <MonthGrid
+                  days={days}
+                  columns={weekends ? 7 : 5}
+                  month={date.getMonth()}
+                  events={events}
+                  colorOf={colorOf}
+                  defaultCalendar={defaultCalendar}
+                  onOpenDay={openDay}
+                />
+              ) : (
+                <TimeGrid
+                  days={strip}
+                  visible={days.length}
+                  buffer={buffer}
+                  stepRef={stepGrid}
+                  onSettle={(shift) => setStart(strip[buffer + shift]!)}
+                  onPeek={(shift) => setPeek(shift ? strip[buffer + shift]! : null)}
+                  events={events}
+                  colorOf={colorOf}
+                  defaultCalendar={defaultCalendar}
+                  actions={actions}
+                  onOpenDay={openDay}
+                />
+              )}
+            </div>
+          )}
+          {selected || (draft && selection && "draft" in selection) ? (
+            <EventPanel
+              containerRef={bodyRef}
+              event={selected}
+              draft={selected ? null : draft}
+              calendars={listed}
+              colorOf={colorOf}
+              actions={actions}
+            />
+          ) : null}
+          {picking ? <TeamPicker onClose={() => setPicking(false)} /> : null}
+        </div>
       </div>
     </div>
   );
