@@ -18,6 +18,9 @@ const WELL_KNOWN = [
   "conversationhistory",
   "syncissues",
   "scheduled",
+  "recoverableitemsdeletions",
+  "recoverableitemspurges",
+  "recoverableitemsversions",
 ] as const;
 type WellKnown = (typeof WELL_KNOWN)[number];
 
@@ -31,7 +34,14 @@ const SYSTEM_LABEL: Partial<Record<WellKnown, string>> = {
   scheduled: SNOOZED_LABEL_ID,
 };
 
-const SKIPPED: WellKnown[] = ["outbox", "conversationhistory", "syncissues"];
+const RECOVERABLE: WellKnown[] = [
+  "recoverableitemsdeletions",
+  "recoverableitemspurges",
+  "recoverableitemsversions",
+];
+
+// Deleted mail Graph can still read: a message found there was deleted, not moved.
+const SKIPPED: WellKnown[] = ["outbox", "conversationhistory", "syncissues", ...RECOVERABLE];
 
 export const FLAG_LABELS = ["UNREAD", "STARRED", "IMPORTANT"];
 
@@ -115,6 +125,8 @@ function lastListed(accountId: string, mailbox: Mailbox | null, parent: string):
     });
 }
 
+const recoverableRetry = new Map<string, number>();
+
 export async function readMailbox(accountId: string): Promise<Mailbox> {
   const previous = mailboxOf(accountId);
   const known = previous?.wellKnown;
@@ -128,6 +140,18 @@ export async function readMailbox(accountId: string): Promise<Mailbox> {
         "/me/mailFolders/archive?$select=id",
       ).catch(() => null);
       if (archive?.id) wellKnown.archive = archive.id;
+    }
+    const missing = RECOVERABLE.filter((name) => !known[name]);
+    if (missing.length > 0 && Date.now() >= (recoverableRetry.get(accountId) ?? 0)) {
+      recoverableRetry.set(accountId, Date.now() + 60 * 60_000);
+      const answers = await graphBatch(
+        accountId,
+        missing.map((name) => ({ method: "GET", url: `/me/mailFolders/${name}?$select=id` })),
+      ).catch(() => []);
+      missing.forEach((name, i) => {
+        const id = ok(answers[i]) ? (answers[i]!.body as { id?: string }).id : undefined;
+        if (id) wellKnown[name] = id;
+      });
     }
   } else {
     const answers = await graphBatch(
@@ -357,4 +381,9 @@ export function labelsFor(
   if (message.importance === "high") labels.push("IMPORTANT");
   for (const category of message.categories ?? []) labels.push(categoryLabel(category));
   return labels;
+}
+
+export function skippedFolderIds(accountId: string): string[] {
+  const mailbox = mailboxOf(accountId);
+  return SKIPPED.flatMap((name) => mailbox?.wellKnown[name] ?? []);
 }
