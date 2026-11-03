@@ -8,7 +8,7 @@ import { appPasswordUrl, discoverImap, mxHosts, servesImap } from "../services/i
 import { setImapPassword } from "../services/imap-passwords.js";
 import { accountAdded } from "../services/linked-accounts.js";
 import * as mailSync from "../services/mail-sync.js";
-import { syncedSignature } from "../services/preferences.js";
+import { syncedAliasMailboxes, syncedSendAs, syncedSignature } from "../services/preferences.js";
 import type { MailAccount } from "../types.js";
 
 const VERIFY_TIMEOUT_MS = 20_000;
@@ -114,6 +114,8 @@ export async function addImapAccount(params: unknown): Promise<MailAccount> {
     provider: "imap",
     imap,
     signature: existing?.signature ?? syncedSignature(email),
+    sendAs: existing?.sendAs ?? syncedSendAs(email),
+    aliasMailboxes: existing?.aliasMailboxes ?? syncedAliasMailboxes(email),
   };
   await accountStore.addAccount(account);
   await accountAdded(account);

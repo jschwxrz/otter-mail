@@ -334,6 +334,18 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["alias aliases addresses from custom domain icloud send mail as"],
   },
   {
+    id: "own-mailbox",
+    title: "Own mailbox",
+    pane: "accounts",
+    searchTerms: ["alias mailbox address tab inbox separate custom domain icloud filter"],
+  },
+  {
+    id: "alias-mailbox",
+    title: "Address with its own mailbox",
+    pane: "accounts",
+    searchTerms: ["alias mailbox name color signature stop"],
+  },
+  {
     id: "remove-mailbox",
     title: "Remove account",
     pane: "accounts",

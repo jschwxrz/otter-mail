@@ -1,4 +1,4 @@
-export type OpenMessageTarget = { accountId: string; messageId: string };
+export type OpenMessageTarget = { accountId: string; messageId: string; mailbox?: string };
 
 let pending: OpenMessageTarget | null = null;
 

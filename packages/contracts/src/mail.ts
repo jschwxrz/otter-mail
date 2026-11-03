@@ -44,6 +44,37 @@ export interface MailCapabilities {
   sendAs?: "server" | "device";
 }
 
+/**
+ * One of an IMAP mailbox's `sendAs` addresses with a mailbox of its own. Its id (routes,
+ * `mail:mailboxes`, notifications) is its address lower-cased. Synced as the `aliasMailboxes`
+ * preference: `{ [parent address, lower-cased]: AliasMailbox[] }`.
+ */
+export interface AliasMailbox {
+  address: string;
+  name?: string;
+  color?: string;
+  signature?: string;
+}
+
+/** Stored entries can outlive their address in `sendAs`, or be added as a mailbox since. */
+export function validAliasMailboxes(
+  account: { sendAs?: string[]; aliasMailboxes?: AliasMailbox[] },
+  mailboxes: string[],
+): AliasMailbox[] {
+  const sendAs = new Set((account.sendAs ?? []).map((a) => a.toLowerCase()));
+  const own = new Set(mailboxes.map((a) => a.toLowerCase()));
+  return (account.aliasMailboxes ?? []).filter((alias) => {
+    const address = alias.address.toLowerCase();
+    return sendAs.has(address) && !own.has(address);
+  });
+}
+
+/** Defaults to the local part, capitalized: me@ → "Me". */
+export function aliasMailboxName(alias: Pick<AliasMailbox, "address" | "name">): string {
+  const local = alias.address.split("@")[0] ?? alias.address;
+  return alias.name?.trim() || local.charAt(0).toUpperCase() + local.slice(1);
+}
+
 export const GMAIL_CAPABILITIES: MailCapabilities = {
   stars: true,
   categories: true,

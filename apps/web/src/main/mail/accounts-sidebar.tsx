@@ -330,18 +330,20 @@ function LabelNode({
 
 export function MailboxFolders({
   mailboxId,
+  alias,
   selectedLabelId,
   onSelectLabel,
   searchRows,
   depth = 0,
 }: {
   mailboxId: string;
+  alias?: string;
   selectedLabelId: string;
   onSelectLabel: (labelId: string) => void;
   searchRows?: (parent: string, depth: number) => ReactNode;
   depth?: number;
 }) {
-  const labelsQuery = useLabels(mailboxId);
+  const labelsQuery = useLabels(mailboxId, alias);
   const capabilities = useCapabilities(mailboxId);
   const labelNoun = capabilities.foldersAndCategories
     ? "Category"
@@ -382,20 +384,22 @@ export function MailboxFolders({
       : [];
   });
   const userLabels = labels.filter((l) => l.type === "user");
-  const labelSections = capabilities.foldersAndCategories
-    ? [
-        {
-          title: "Folders",
-          labels: userLabels.filter((l) => l.id.startsWith("folder:")),
-          create: false,
-        },
-        {
-          title: "Categories",
-          labels: userLabels.filter((l) => !l.id.startsWith("folder:")),
-          create: true,
-        },
-      ]
-    : [{ title: `${labelNoun}s`, labels: userLabels, create: true }];
+  const labelSections = alias
+    ? []
+    : capabilities.foldersAndCategories
+      ? [
+          {
+            title: "Folders",
+            labels: userLabels.filter((l) => l.id.startsWith("folder:")),
+            create: false,
+          },
+          {
+            title: "Categories",
+            labels: userLabels.filter((l) => !l.id.startsWith("folder:")),
+            create: true,
+          },
+        ]
+      : [{ title: `${labelNoun}s`, labels: userLabels, create: true }];
 
   const handleCreateLabel = async () => {
     const name = newLabelName.trim();
@@ -516,7 +520,8 @@ export function MailboxFolders({
   };
 
   const withEmptyMenu = (row: ReactNode, labelId: string) => {
-    if (labelId !== "SPAM" && labelId !== "TRASH") return row;
+    // Emptying the account's Junk or Trash takes every alias mailbox's with it.
+    if ((labelId !== "SPAM" && labelId !== "TRASH") || alias) return row;
     return (
       <ContextMenu>
         <ContextMenuTrigger>{row}</ContextMenuTrigger>

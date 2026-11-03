@@ -19,7 +19,7 @@ export type MainEffect =
       title: string;
       subtitle?: string;
       body?: string;
-      open?: { accountId: string; messageId: string };
+      open?: { accountId: string; messageId: string; mailbox?: string };
       code?: string;
     }
   | { kind: "unread"; count: number }

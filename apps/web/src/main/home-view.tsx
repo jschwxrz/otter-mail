@@ -97,6 +97,7 @@ import { capabilitiesOf } from "./mail/capabilities";
 import { useMonochromeTheme } from "./theme/apply-theme";
 import { features } from "./features";
 import { useMailboxes } from "./mailboxes";
+import type { AliasMailboxEntry } from "./mail/alias-mailboxes";
 import {
   CALENDAR_SPACE,
   CHATS_SPACE,
@@ -181,11 +182,16 @@ function savedLoc(): MailLoc {
   return { mailbox, label, messageId: null, account: null, focusId: null };
 }
 
-function placeFor(loc: MailLoc, accounts: MailAccount[], views: MailView[] | null): MailLoc {
+function placeFor(
+  loc: MailLoc,
+  accounts: MailAccount[],
+  aliases: AliasMailboxEntry[],
+  views: MailView[] | null,
+): MailLoc {
   const there =
     views === null && isViewSpaceId(loc.mailbox)
       ? true
-      : spaceOf(loc.mailbox, { accounts, views: views ?? [] }) !== null;
+      : spaceOf(loc.mailbox, { accounts, views: views ?? [], aliases }) !== null;
   if (there) return loc;
   const mailbox = accounts[0]?.id ?? loc.mailbox;
   return { mailbox, label: firstLabelOf(mailbox), messageId: null, account: null, focusId: null };
@@ -352,6 +358,7 @@ function MailHome() {
 
   const mailboxes = useMailboxes();
   const accounts = mailboxes.accounts;
+  const aliases = mailboxes.aliases;
   const accountIds = accounts.map((a) => a.id);
   const firstRealAccountId = accounts[0]?.id ?? null;
   const ready = !accountsQuery.isLoading && accounts.length > 0;
@@ -364,7 +371,7 @@ function MailHome() {
   // route up), so nothing shows a place only to leave it at once.
   const placed = routeLoc ?? lastMail;
   const mailLoc = ready
-    ? placeFor(placed ?? savedLoc(), accounts, viewsLoaded ? views : null)
+    ? placeFor(placed ?? savedLoc(), accounts, aliases, viewsLoaded ? views : null)
     : placed;
   const initialized = ready && mailLoc !== null;
   const selectedAccountId = mailLoc?.mailbox ?? null;
@@ -509,7 +516,8 @@ function MailHome() {
     return () => window.removeEventListener("keydown", down, true);
   }, [leaveSettingsRef, settingsRouteRef]);
 
-  const space = selectedAccountId ? spaceOf(selectedAccountId, { accounts, views }) : null;
+  const space = selectedAccountId ? spaceOf(selectedAccountId, { accounts, views, aliases }) : null;
+  const aliasSpace = space?.kind === "alias" ? space.alias : null;
   const isChats = space?.kind === "chats";
   const isCalendar = space?.kind === "calendar";
   const workspace = space?.kind === "workspace" ? workspaceOf(space.id) : undefined;
@@ -929,10 +937,10 @@ function MailHome() {
   useKeybindingContext("messageOpen", selectedMessageId !== null);
   const goTo = (labelId: string | ((account: MailAccount) => string)) => {
     const mailbox = isChats || viewSpace ? firstRealAccountId : selectedAccountId;
-    const account = accounts.find((a) => a.id === mailbox);
+    const account = aliasSpace?.parent ?? accounts.find((a) => a.id === mailbox);
     if (!account) return;
     go({
-      mailbox: account.id,
+      mailbox: aliasSpace?.id ?? account.id,
       label: typeof labelId === "string" ? labelId : labelId(account),
       messageId: null,
     });
@@ -1059,6 +1067,7 @@ function MailHome() {
   const [openFromNotification, setOpenFromNotification] = useState<{
     accountId: string;
     messageId: string;
+    mailbox?: string;
   } | null>(null);
   useEffect(() => {
     const pull = async () => {
@@ -1071,7 +1080,9 @@ function MailHome() {
     return window.desktopBridge.on("mail:open", () => void pull());
   }, []);
 
-  const effectiveAccountId = space?.id ?? firstRealAccountId;
+  // An alias mailbox shows, and acts on, its parent's mail.
+  const effectiveAccountId = (aliasSpace ? aliasSpace.parent.id : space?.id) ?? firstRealAccountId;
+  const effectiveSpaceId = space?.id ?? firstRealAccountId;
 
   const correctForEffect = useLatest(correct);
   /* oxlint-disable react/exhaustive-effect-dependencies -- Explicit DOM and reset triggers must re-run this lifecycle. */
@@ -1111,7 +1122,9 @@ function MailHome() {
   // inline properties win over the injected theme rule.
   const brandAccount = accounts.find((a) => a.id === effectiveAccountId) ?? null;
   const monochrome = useMonochromeTheme();
-  const brand = brandAccount && !monochrome ? getAccountColor(brandAccount) : null;
+  const brand = monochrome
+    ? null
+    : (aliasSpace?.color ?? (brandAccount ? getAccountColor(brandAccount) : null));
   useEffect(() => {
     const root = document.documentElement.style;
     const props = ["--accent", "--accent-contrast", "--primary", "--primary-foreground", "--ring"];
@@ -1136,7 +1149,10 @@ function MailHome() {
     go({ mailbox: accountId, label: firstLabelOf(accountId), messageId: null });
   };
   useLayoutEffect(() => {
-    accountSwitchRef.current = { ids: accountIds, select: handleSelectAccount };
+    accountSwitchRef.current = {
+      ids: mailboxes.tabs.map((tab) => tab.id),
+      select: handleSelectAccount,
+    };
   });
 
   const misplaced = ready && !!routeLoc && routeLoc.mailbox !== mailLoc?.mailbox;
@@ -1232,7 +1248,7 @@ function MailHome() {
       ? combined && selectedLabelId !== SEARCH_MAILBOX
         ? [...new Set(combined.rules.map((r) => r.accountId))]
         : accountIds
-      : [effectiveAccountId];
+      : [aliasSpace?.id ?? effectiveAccountId];
   const focusSearchEnd = () =>
     setTimeout(() => {
       const input = searchRef.current;
@@ -1339,12 +1355,18 @@ function MailHome() {
     openMessage(owner, message.id);
   };
 
-  const openMessage = (owner: string, messageId: string) => {
-    // A workspace's item isn't a message: mail opens in its own mailbox.
-    const switching = (!spansMailboxes && owner !== effectiveAccountId) || workspace !== undefined;
+  const openMessage = (owner: string, messageId: string, alias?: string) => {
+    // A workspace's item isn't a message: mail opens in its own mailbox. An alias mailbox lists
+    // only its own mail, so other mail leaves it.
+    const mailbox = alias && aliases.some((a) => a.id === alias) ? alias : owner;
+    const switching = alias
+      ? mailbox !== space?.id
+      : (!spansMailboxes && owner !== effectiveAccountId) ||
+        workspace !== undefined ||
+        aliasSpace !== null;
     setAutoFocusDraft(true);
     go({
-      ...(switching ? { mailbox: owner, label: "INBOX" } : {}),
+      ...(switching ? { mailbox, label: "INBOX" } : {}),
       messageId,
       account: owner,
       focusId: null,
@@ -1355,7 +1377,11 @@ function MailHome() {
     if (!openFromNotification || !hasMail) return;
     // oxlint-disable-next-line react/set-state-in-effect -- Synchronize pane and composer state with route, notification and navigation events.
     setOpenFromNotification(null);
-    openMessageForEffect.current(openFromNotification.accountId, openFromNotification.messageId);
+    openMessageForEffect.current(
+      openFromNotification.accountId,
+      openFromNotification.messageId,
+      openFromNotification.mailbox,
+    );
   }, [openFromNotification, hasMail, openMessageForEffect]);
 
   // Manual refresh: spin from the click until every account's sync settles
@@ -1423,6 +1449,7 @@ function MailHome() {
     messageId: selectedMessageId,
     readerAccount,
     accounts,
+    aliases,
     views,
   });
   const routed = routeLoc !== null || settingsRoute !== null || composeOpen;
@@ -1440,7 +1467,8 @@ function MailHome() {
     void navigate({ href, replace: true });
   };
   const newWindowTab = () => {
-    const mailbox = space?.kind === "mailbox" ? space.id : firstRealAccountId;
+    const mailbox =
+      space?.kind === "mailbox" || space?.kind === "alias" ? space.id : firstRealAccountId;
     if (!mailbox) return;
     const { href } = router.buildLocation({
       to: "/$mailbox/$label",
@@ -1483,6 +1511,7 @@ function MailHome() {
       accountId={readerAccount ?? ""}
       messageId={focusedMessageId ?? selectedMessageId}
       listLabelId={spansMailboxes || selectedLabelId === SEARCH_MAILBOX ? null : selectedLabelId}
+      alias={aliasSpace ?? undefined}
       autoFocusDraft={autoFocusDraft}
       single={focusedMessageId != null}
       onShowConversation={() => go({ focusId: null })}
@@ -1511,9 +1540,10 @@ function MailHome() {
   const sidebar = (
     <AppSidebar
       accounts={accounts}
+      tabs={mailboxes.tabs}
       views={views}
       mode={mode}
-      spaceId={effectiveAccountId}
+      spaceId={effectiveSpaceId}
       labelId={selectedLabelId}
       workspace={
         workspace
@@ -1668,6 +1698,7 @@ function MailHome() {
                             : undefined
                         }
                         accountId={(spansMailboxes ? firstRealAccountId : effectiveAccountId) ?? ""}
+                        alias={aliasSpace?.id}
                         labelId={selectedLabelId}
                         combined={combined}
                         accountIds={accountIds}
@@ -1726,6 +1757,7 @@ function MailHome() {
                         key={mailtoSeq}
                         accounts={accounts}
                         defaultAccountId={composeAccountId}
+                        defaultAddress={aliasSpace?.alias.address}
                         onClose={() => {
                           setMailtoPrefill(null);
                           leaveSettings();
@@ -1890,7 +1922,8 @@ function MailHome() {
           onOpenChange={setPaletteOpen}
           accounts={accounts}
           views={views}
-          selectedAccountId={effectiveAccountId}
+          tabs={mailboxes.tabs}
+          selectedAccountId={effectiveSpaceId}
           onOpenMessage={handlePaletteOpenMessage}
           onSearchMail={(q) => openSearch(q)}
           onSelectAccount={handleSelectAccount}

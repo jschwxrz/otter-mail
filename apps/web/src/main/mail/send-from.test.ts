@@ -20,6 +20,19 @@ describe("replyAddress", () => {
     expect(replyAddress(account, message)).toBe("hello@samlee.dev");
   });
 
+  it("replies from the alias mailbox it's read in, whoever the mail was to", () => {
+    const cloud: MailAccount = {
+      id: "robin@cloud.example",
+      email: "robin@cloud.example",
+      name: "Robin",
+      sendAs: ["me@riverbank.example", "mail@riverbank.example"],
+    };
+    const message = { fromEmail: "ana@example.com", to: "mail@riverbank.example" };
+    expect(replyAddress(cloud, message, "ME@riverbank.example")).toBe("me@riverbank.example");
+    // Not one of its addresses (any more): as anywhere else.
+    expect(replyAddress(cloud, message, "old@riverbank.example")).toBe("mail@riverbank.example");
+  });
+
   it("falls back to the mailbox's own address", () => {
     expect(replyAddress(account, { fromEmail: "ana@example.com", to: "list@example.com" })).toBe(
       "me@icloud.com",

@@ -1,5 +1,5 @@
 import { ipc, task } from "~/lib/ipc";
-import type { ImapSettings } from "@otter-mail/contracts";
+import type { AliasMailbox, ImapSettings } from "@otter-mail/contracts";
 import type { NotificationConnection } from "@otter-mail/contracts/relay";
 export type { ChatChange } from "@otter-mail/contracts";
 import type { AgentAccess, AgentTokens, ConnectedAgent } from "@otter-mail/contracts/agent-tokens";
@@ -18,6 +18,7 @@ import type {
 export type ListMessagesParams = {
   accountId: string;
   labelIds?: string[];
+  alias?: string;
   pageToken?: string;
   maxResults?: number;
 };
@@ -292,6 +293,7 @@ export type UpdateAccountParams = {
   signature?: string;
   /** The IMAP mailbox's other addresses it sends from (`capabilities.sendAs === "device"`). */
   sendAs?: string[];
+  aliasMailboxes?: AliasMailbox[];
 };
 
 export type NotificationsMode = "off" | "inbox" | "all";
@@ -375,7 +377,8 @@ export const mailApi = {
   suggestSendAs: (accountId: string): Promise<string[]> =>
     ipc("gmail:suggestSendAs", { accountId }),
 
-  listLabels: (accountId: string): Promise<MailLabel[]> => ipc("gmail:listLabels", { accountId }),
+  listLabels: (accountId: string, alias?: string): Promise<MailLabel[]> =>
+    ipc("gmail:listLabels", { accountId, alias }),
 
   createLabel: (accountId: string, name: string): Promise<MailLabel> =>
     ipc("gmail:createLabel", { accountId, name }),
@@ -417,8 +420,8 @@ export const mailApi = {
   trashMessage: (accountId: string, messageId: string): Promise<{ ok: boolean }> =>
     ipc("gmail:trashMessage", { accountId, messageId }),
 
-  getThread: (accountId: string, threadId: string): Promise<MessageSummary[]> =>
-    ipc("gmail:getThread", { accountId, threadId }),
+  getThread: (accountId: string, threadId: string, alias?: string): Promise<MessageSummary[]> =>
+    ipc("gmail:getThread", { accountId, threadId, alias }),
 
   modifyThread: (params: ModifyThreadParams): Promise<{ ok: boolean }> =>
     ipc("gmail:modifyThread", params),
@@ -556,8 +559,11 @@ export const mailApi = {
 
   getSettingsTarget: (): Promise<SettingsTarget | null> => ipc("window:getSettingsTarget"),
 
-  takePendingOpenMessage: (): Promise<{ accountId: string; messageId: string } | null> =>
-    ipc("window:takePendingOpenMessage"),
+  takePendingOpenMessage: (): Promise<{
+    accountId: string;
+    messageId: string;
+    mailbox?: string;
+  } | null> => ipc("window:takePendingOpenMessage"),
 
   takePendingMailto: (): Promise<MailtoTarget | null> => ipc("app:takePendingMailto"),
 

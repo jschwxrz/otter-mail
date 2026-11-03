@@ -50,6 +50,7 @@ import {
   useThemeChoice,
 } from "../theme/apply-theme";
 import type { MailAccount, MessageSummary, MailView } from "./types";
+import type { MailboxTab } from "../mailboxes";
 import { PaneIcon } from "./top-bar";
 import type { SettingsPane } from "./api";
 import type { KeybindingCommand } from "../keybindings/commands";
@@ -71,6 +72,7 @@ type CommandPaletteProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accounts: MailAccount[];
+  tabs: MailboxTab[];
   views: MailView[];
   selectedAccountId: string | null;
   onOpenMessage: (message: MessageSummary) => void;
@@ -150,6 +152,7 @@ export function CommandPalette({
   open,
   onOpenChange,
   accounts,
+  tabs,
   views,
   selectedAccountId,
   onOpenMessage,
@@ -436,14 +439,14 @@ export function CommandPalette({
       },
     ];
 
-    const mailboxes: PaletteItem[] = accounts.map((account, i) => ({
-      id: `mailbox:${account.id}`,
-      icon: <Dot color={getAccountColor(account)} />,
-      title: getAccountDisplayName(account),
-      description: account.email,
+    const mailboxes: PaletteItem[] = tabs.map((tab, i) => ({
+      id: `mailbox:${tab.id}`,
+      icon: <Dot color={tab.alias?.color ?? getAccountColor(tab.account)} />,
+      title: tab.alias?.name ?? getAccountDisplayName(tab.account),
+      description: tab.alias?.alias.address ?? tab.account.email,
       shortcut: jump(i + 1),
-      checked: selectedAccountId === account.id,
-      run: () => onSelectAccount(account.id),
+      checked: selectedAccountId === tab.id,
+      run: () => onSelectAccount(tab.id),
     }));
 
     const viewItems: PaletteItem[] = views.map((view) => ({
@@ -534,6 +537,7 @@ export function CommandPalette({
     themeChoice,
     update,
     accounts,
+    tabs,
     views,
     selectedAccountId,
     mailResults,

@@ -1,4 +1,9 @@
-import type { ImapSettings, MailCapabilities, MailProviderKind } from "@otter-mail/contracts";
+import type {
+  AliasMailbox,
+  ImapSettings,
+  MailCapabilities,
+  MailProviderKind,
+} from "@otter-mail/contracts";
 
 export type MailAccount = {
   id: string;
@@ -17,6 +22,8 @@ export type MailAccount = {
   signatureInGmail?: boolean;
   /** The other addresses it sends from (`capabilities.sendAs`); never its own. */
   sendAs?: string[];
+  /** Stale ones too: use `aliasMailboxesOf`. */
+  aliasMailboxes?: AliasMailbox[];
   signedOut?: boolean;
 };
 
@@ -37,6 +44,8 @@ export type MessageSummary = {
   fromName: string;
   fromEmail: string;
   to: string;
+  /** Absent from Gmail's and Outlook's list summaries; the detail has it. */
+  cc?: string;
   subject: string;
   snippet: string;
   date: number;
@@ -71,7 +80,6 @@ export type MessageDetail = MessageSummary & {
   draftRevision?: string;
   bodyHtml: string | null;
   bodyText: string | null;
-  cc?: string;
   bcc?: string;
   attachments: {
     id: string;

@@ -141,7 +141,8 @@ export interface Platform {
     title: string;
     subtitle?: string;
     body?: string;
-    open?: { accountId: string; messageId: string };
+    /** `mailbox`: the alias mailbox to open it in. */
+    open?: { accountId: string; messageId: string; mailbox?: string };
     code?: string;
   }): void;
   setUnreadCount(count: number): void;

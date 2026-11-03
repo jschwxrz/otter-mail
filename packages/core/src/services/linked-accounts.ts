@@ -15,7 +15,7 @@ import { isSignedIn } from "../providers/index.js";
 import * as mailStore from "./mail-store.js";
 import { getImapPassword, setAsideImapPassword } from "./imap-passwords.js";
 import { getOtterUser, relayRequest, RelayError } from "./otter-account.js";
-import { syncedSendAs, syncedSignature } from "./preferences.js";
+import { syncedAliasMailboxes, syncedSendAs, syncedSignature } from "./preferences.js";
 import type { MailAccount } from "../types.js";
 
 export type LocalAccount = Pick<
@@ -156,6 +156,7 @@ export function accountFromRelay(account: RelayAccount): MailAccount {
           imap,
           signature: syncedSignature(account.email),
           sendAs: syncedSendAs(account.email),
+          aliasMailboxes: syncedAliasMailboxes(account.email),
         }
       : {}),
     ...(account.provider === "outlook"

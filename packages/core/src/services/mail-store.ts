@@ -1,3 +1,5 @@
+import { ARCHIVE_LABEL_ID } from "@otter-mail/contracts";
+
 import { platform, type SqlDatabase } from "../platform.js";
 import { ALL_MAIL_LABEL_ID } from "../types.js";
 import { withPendingLabels } from "./pending-label-writes.js";
@@ -112,6 +114,13 @@ function getDb(): SqlDatabase {
       WHERE EXISTS (SELECT 1 FROM message_labels l WHERE l.accountId = messages.accountId AND l.messageId = messages.id AND l.labelId = 'DRAFT')
         AND EXISTS (SELECT 1 FROM kv WHERE key = 'outlookPeeked:' || messages.accountId)`);
   }
+  // Address sets (addressSet), for alias mailboxes' mail.
+  if (!messageCols.has("deliveredTo")) {
+    handle.exec("ALTER TABLE messages ADD COLUMN deliveredTo TEXT;");
+  }
+  if (!messageCols.has("recipients")) {
+    handle.exec("ALTER TABLE messages ADD COLUMN recipients TEXT;");
+  }
   handle.exec(
     "CREATE INDEX IF NOT EXISTS idx_messages_undownloaded ON messages (accountId, detailFetched, date DESC);",
   );
@@ -183,6 +192,7 @@ interface MessageRow {
   draftRevision: string | null;
   messageIdHeader: string | null;
   referencesHeader: string | null;
+  deliveredTo: string | null;
 }
 
 function parseLabelIds(json: string): string[] {
@@ -202,6 +212,7 @@ function rowToSummary(row: MessageRow): MessageSummary {
     fromName: row.fromName,
     fromEmail: row.fromEmail,
     to: row.toField,
+    cc: row.cc ?? undefined,
     subject: row.subject,
     snippet: row.snippet,
     date: row.date,
@@ -240,7 +251,6 @@ function rowToDetail(row: MessageRow): MessageDetail {
   }
   return {
     ...rowToSummary(row),
-    cc: row.cc ?? undefined,
     bcc: row.bcc ?? undefined,
     draftRevision: row.draftRevision ?? undefined,
     bodyHtml: row.bodyHtml,
@@ -266,17 +276,26 @@ function inTransaction(fn: () => void): void {
   }
 }
 
+/** `<a@x.example><b@y.example>`: `instr` with the brackets matches whole addresses only. */
+const addressSet = (addresses: string[]): string =>
+  addresses.map((address) => `<${address.toLowerCase()}>`).join("");
+
+function recipientsOf(to: string, cc: string | undefined): string {
+  return addressSet(addressList(cc ? `${to},${cc}` : to));
+}
+
 function writeSummaries(accountId: string, fetched: MessageSummary[]): void {
   // Gmail may not have caught up with changes made here moments ago; keep them.
   const messages = withPendingLabels(accountId, fetched);
   const d = getDb();
 
   // hasAttachments from a list response is always false; never clobber a `true`
-  // already established by a full-message fetch.
+  // already established by a full-message fetch. A summary without Cc (Gmail's
+  // lists) keeps the Cc, and the recipients, a detail brought.
   const upsert = d.prepare(`
     INSERT INTO messages
-      (accountId, id, threadId, fromName, fromEmail, toField, subject, snippet, date, unread, starred, hasAttachments, labelIds, messageIdHeader, referencesHeader)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (accountId, id, threadId, fromName, fromEmail, toField, subject, snippet, date, unread, starred, hasAttachments, labelIds, messageIdHeader, referencesHeader, cc, recipients, deliveredTo)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(accountId, id) DO UPDATE SET
       threadId       = excluded.threadId,
       fromName       = excluded.fromName,
@@ -290,7 +309,11 @@ function writeSummaries(accountId: string, fetched: MessageSummary[]): void {
       labelIds       = excluded.labelIds,
       hasAttachments = CASE WHEN excluded.hasAttachments = 1 THEN 1 ELSE messages.hasAttachments END,
       messageIdHeader  = COALESCE(excluded.messageIdHeader, messages.messageIdHeader),
-      referencesHeader = COALESCE(excluded.referencesHeader, messages.referencesHeader)
+      referencesHeader = COALESCE(excluded.referencesHeader, messages.referencesHeader),
+      cc               = COALESCE(excluded.cc, messages.cc),
+      recipients       = CASE WHEN excluded.cc IS NULL AND messages.recipients IS NOT NULL
+                              THEN messages.recipients ELSE excluded.recipients END,
+      deliveredTo      = COALESCE(excluded.deliveredTo, messages.deliveredTo)
   `);
   const delLabels = d.prepare("DELETE FROM message_labels WHERE accountId = ? AND messageId = ?");
   const insLabel = d.prepare(
@@ -314,6 +337,9 @@ function writeSummaries(accountId: string, fetched: MessageSummary[]): void {
       JSON.stringify(m.labelIds),
       m.messageIdHeader ?? null,
       m.referencesHeader ?? null,
+      m.cc ?? null,
+      recipientsOf(m.to, m.cc),
+      m.deliveredTo?.length ? addressSet(m.deliveredTo) : null,
     );
     delLabels.run(accountId, m.id);
     for (const lid of m.labelIds) insLabel.run(accountId, m.id, lid);
@@ -328,7 +354,7 @@ export function upsertMessageDetails(accountId: string, details: MessageDetail[]
   if (details.length === 0) return;
   const setBody = getDb().prepare(`
     UPDATE messages
-       SET cc = ?, bcc = ?, bodyHtml = ?, bodyText = ?, attachments = ?, hasAttachments = ?, draftRevision = ?, detailFetched = 1
+       SET cc = ?, recipients = ?, bcc = ?, bodyHtml = ?, bodyText = ?, attachments = ?, hasAttachments = ?, draftRevision = ?, detailFetched = 1
      WHERE accountId = ? AND id = ?
   `);
   inTransaction(() => {
@@ -336,6 +362,7 @@ export function upsertMessageDetails(accountId: string, details: MessageDetail[]
     for (const detail of details) {
       setBody.run(
         detail.cc ?? null,
+        recipientsOf(detail.to, detail.cc),
         detail.bcc ?? null,
         detail.bodyHtml,
         detail.bodyText,
@@ -553,7 +580,8 @@ function threadPageQuery(matchedSql: string): string {
     WITH matched AS (${matchedSql}),
     agg AS (
       SELECT t.accountId AS accountId, t.threadId AS threadId,
-             COUNT(*) AS threadCount,
+             -- Copies of one message (delivered to two of its addresses) count once.
+             COUNT(DISTINCT COALESCE(t.messageIdHeader, t.id)) AS threadCount,
              MAX(t.unread) AS threadUnread,
              MAX(t.starred) AS threadStarred,
              MAX(t.date) AS repDate
@@ -583,23 +611,61 @@ function threadPageQuery(matchedSql: string): string {
 const NOT_SPAM_TRASH =
   "NOT EXISTS (SELECT 1 FROM message_labels mlx WHERE mlx.accountId = m.accountId AND mlx.messageId = m.id AND mlx.labelId IN ('SPAM', 'TRASH'))";
 
+/** Lower-cased; `sendAs` is the parent's whole Send from list. */
+export type AliasScope = { address: string; sendAs: string[] };
+
+const inSet = (column: string) => `instr(COALESCE(${column}, ''), '<' || ? || '>') > 0`;
+const SENT_BY = "lower(m.fromEmail) = ?";
+
+/**
+ * A copy delivered to any of the parent's other addresses (iCloud's Original-Recipient,
+ * Postfix's X-Original-To) is for the aliases named there only. Otherwise, delivered to the
+ * mailbox's own address or with no delivery headers, To and Cc decide.
+ */
+function receivedBy({ address, sendAs }: AliasScope): { clause: string; params: string[] } {
+  const named = sendAs.length > 0 ? sendAs.map(() => inSet("m.deliveredTo")).join(" OR ") : "0";
+  return {
+    clause: `(CASE WHEN ${named} THEN ${inSet("m.deliveredTo")} ELSE ${inSet("m.recipients")} END)`,
+    params: [...sendAs, address, address],
+  };
+}
+
+function aliasWhere(
+  labelId: string | undefined,
+  alias: AliasScope,
+): { clause: string; params: string[] } {
+  const received = receivedBy(alias);
+  if (labelId === "INBOX" || labelId === "SPAM") return received;
+  if (labelId === "SENT" || labelId === "DRAFT") {
+    return { clause: SENT_BY, params: [alias.address] };
+  }
+  return {
+    clause: `(${received.clause} OR ${SENT_BY})`,
+    params: [...received.params, alias.address],
+  };
+}
+
 export function getThreadsPage(
   accountId: string,
   labelId: string,
   offset: number,
   limit: number,
+  alias?: AliasScope,
 ): { messages: MessageSummary[]; hasMore: boolean } {
   const d = getDb();
+  const own = alias ? aliasWhere(labelId, alias) : null;
+  const ownSql = own ? `AND ${own.clause}` : "";
+  const ownParams = own?.params ?? [];
   if (labelId === ALL_MAIL_LABEL_ID) {
     const rows = d
       .prepare(
         threadPageQuery(`
           SELECT DISTINCT m.accountId AS accountId, m.threadId AS threadId
             FROM messages m
-           WHERE m.accountId = ? AND ${NOT_SPAM_TRASH}
+           WHERE m.accountId = ? AND ${NOT_SPAM_TRASH} ${ownSql}
         `),
       )
-      .all(accountId, limit + 1, offset) as unknown as ThreadRow[];
+      .all(accountId, ...ownParams, limit + 1, offset) as unknown as ThreadRow[];
     return { messages: rows.slice(0, limit).map(rowToThreadSummary), hasMore: rows.length > limit };
   }
   const exclusion = labelId === "SPAM" || labelId === "TRASH" ? "" : `AND ${NOT_SPAM_TRASH}`;
@@ -610,13 +676,113 @@ export function getThreadsPage(
           FROM messages m
           JOIN message_labels ml
             ON ml.accountId = m.accountId AND ml.messageId = m.id
-         WHERE m.accountId = ? AND ml.labelId = ? ${exclusion}
+         WHERE m.accountId = ? AND ml.labelId = ? ${exclusion} ${ownSql}
       `),
     )
-    .all(accountId, labelId, limit + 1, offset) as unknown as ThreadRow[];
+    .all(accountId, labelId, ...ownParams, limit + 1, offset) as unknown as ThreadRow[];
 
   const hasMore = rows.length > limit;
   return { messages: rows.slice(0, limit).map(rowToThreadSummary), hasMore };
+}
+
+const ALIAS_FOLDERS = ["INBOX", "STARRED", "SENT", "DRAFT", ARCHIVE_LABEL_ID, "SPAM", "TRASH"];
+
+export function getAliasLabels(accountId: string, alias: AliasScope): MailLabel[] {
+  const d = getDb();
+  const parent = new Set(getLabels(accountId).map((l) => l.id));
+  return ALIAS_FOLDERS.filter((id) => parent.has(id)).map((id) => {
+    const own = aliasWhere(id, alias);
+    const exclusion = id === "SPAM" || id === "TRASH" ? "" : `AND ${NOT_SPAM_TRASH}`;
+    const row = d
+      .prepare(`
+        SELECT COUNT(*) AS total, COALESCE(SUM(m.unread), 0) AS unread
+          FROM message_labels ml
+          JOIN messages m ON m.accountId = ml.accountId AND m.id = ml.messageId
+         WHERE ml.accountId = ? AND ml.labelId = ? ${exclusion} AND ${own.clause}
+      `)
+      .get(accountId, id, ...own.params) as unknown as { total: number; unread: number };
+    return { id, name: id, type: "system", unread: row.unread, total: row.total };
+  });
+}
+
+/** Of copies with one Message-ID: the alias mailbox's own, then any but a draft, then the first. */
+function copyRank(row: MessageRow, alias: string | undefined): number {
+  const own =
+    !!alias && (row.deliveredTo?.includes(`<${alias}>`) || row.fromEmail.toLowerCase() === alias)
+      ? 0
+      : 2;
+  return own + (parseLabelIds(row.labelIds).includes("DRAFT") ? 1 : 0);
+}
+
+/** Each message once, unread while any copy is; actions still take every copy (`getCopies`). */
+export function getThreadForReading(
+  accountId: string,
+  threadId: string,
+  alias?: string,
+): MessageSummary[] {
+  const rows = getDb()
+    .prepare(
+      "SELECT * FROM messages WHERE accountId = ? AND threadId = ? ORDER BY date ASC, id ASC",
+    )
+    .all(accountId, threadId) as unknown as MessageRow[];
+  const shown = new Map<string, { row: MessageRow; unread: boolean }>();
+  for (const row of rows) {
+    const key = row.messageIdHeader ?? row.id;
+    const kept = shown.get(key);
+    const unread = row.unread === 1 || kept?.unread === true;
+    if (!kept || copyRank(row, alias) < copyRank(kept.row, alias)) shown.set(key, { row, unread });
+    else kept.unread = unread;
+  }
+  return rows.flatMap((row) => {
+    const kept = shown.get(row.messageIdHeader ?? row.id);
+    return kept?.row === row ? [{ ...rowToSummary(row), unread: kept.unread }] : [];
+  });
+}
+
+const folderOf = (labelIds: string): string =>
+  parseLabelIds(labelIds)
+    .filter((id) => !["UNREAD", "STARRED", "IMPORTANT"].includes(id) && !id.startsWith("category:"))
+    .sort()
+    .join();
+
+/** With `sameFolder`, a Bcc'd copy beside it moves too, your own copy in Sent doesn't. */
+export function getCopies(accountId: string, messageId: string, sameFolder = false): string[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT c.id, c.labelIds, m.labelIds AS own FROM messages m
+         JOIN messages c ON c.accountId = m.accountId AND c.threadId = m.threadId
+                        AND c.messageIdHeader = m.messageIdHeader
+        WHERE m.accountId = ? AND m.id = ? AND c.id != m.id`,
+    )
+    .all(accountId, messageId) as unknown as { id: string; labelIds: string; own: string }[];
+  const copies = rows.filter((r) => !sameFolder || folderOf(r.labelIds) === folderOf(r.own));
+  return [messageId, ...copies.map((r) => r.id)];
+}
+
+export function setDeliveredTo(
+  accountId: string,
+  messages: { id: string; deliveredTo: string[] }[],
+): void {
+  if (messages.length === 0) return;
+  const d = getDb();
+  const read = d.prepare("SELECT toField, cc FROM messages WHERE accountId = ? AND id = ?");
+  const write = d.prepare(
+    "UPDATE messages SET deliveredTo = ?, recipients = ? WHERE accountId = ? AND id = ?",
+  );
+  inTransaction(() => {
+    for (const m of messages) {
+      const row = read.get(accountId, m.id) as unknown as
+        | { toField: string; cc: string | null }
+        | undefined;
+      if (!row) continue;
+      write.run(
+        m.deliveredTo.length > 0 ? addressSet(m.deliveredTo) : null,
+        recipientsOf(row.toField, row.cc ?? undefined),
+        accountId,
+        m.id,
+      );
+    }
+  });
 }
 
 export function getThreadSummaries(accountId: string, threadIds: string[]): MessageSummary[] {
@@ -936,7 +1102,7 @@ export function countInboxUnreadAll(except: ReadonlySet<string> = new Set()): nu
   const d = getDb();
   const rows = d
     .prepare(`
-      SELECT m.accountId, COUNT(*) AS n
+      SELECT m.accountId, COUNT(DISTINCT COALESCE(m.messageIdHeader, m.id)) AS n
         FROM messages m
         JOIN message_labels ml
           ON ml.accountId = m.accountId AND ml.messageId = m.id AND ml.labelId = 'INBOX'
@@ -1062,6 +1228,7 @@ function toFtsMatch(query: string): string | null {
 
 export type SearchScope = {
   labelId?: string;
+  alias?: AliasScope;
   rules?: ViewRule[];
   starred?: boolean;
   important?: boolean;
@@ -1114,6 +1281,11 @@ export function searchMessages(
   } else {
     conds.push(NOT_SPAM_TRASH);
   }
+  if (scope?.alias) {
+    const own = aliasWhere(scope.labelId, scope.alias);
+    conds.push(own.clause);
+    params.push(...own.params);
+  }
   if (scope?.starred) conds.push("m.starred = 1");
   if (scope?.important) {
     conds.push(HAS_LABEL);
@@ -1160,6 +1332,11 @@ function splitAddressEntries(list: string): { name: string; email: string }[] {
   }
   if (current.trim()) out.push(parseAddressEntry(current));
   return out.filter((e) => e.email.includes("@"));
+}
+
+/** The addresses in a To or Cc line, lower-cased, in order. */
+export function addressList(list: string): string[] {
+  return splitAddressEntries(list).map((entry) => entry.email.toLowerCase());
 }
 
 export function suggestContacts(queryText: string, limit: number): ContactSuggestion[] {
@@ -1445,6 +1622,7 @@ export function removeAccountData(accountId: string): void {
       "gmailWatch",
       "imapSync",
       "imapTrashedFrom",
+      "imapDeliveredTo",
     ].map((prefix) => `${prefix}:${accountId}`);
     d.prepare(`DELETE FROM kv WHERE key IN (${kvKeys.map(() => "?").join(", ")})`).run(...kvKeys);
     d.exec("COMMIT");

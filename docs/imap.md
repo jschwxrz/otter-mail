@@ -89,12 +89,60 @@ has:nouserlabels"`), so nothing is cached twice; `[Gmail]/Important` (`\Importan
 - Sync, per folder: `UIDVALIDITY` change → refetch the folder; otherwise new UIDs since the
   stored `UIDNEXT`, and flag changes since the stored `HIGHESTMODSEQ` (CONDSTORE/QRESYNC),
   or a full UID + FLAGS listing on servers without it (which also finds expunged mail).
-  Summaries come from ENVELOPE, FLAGS, BODYSTRUCTURE and the reply headers; bodies are
+  Summaries come from ENVELOPE (Cc included), FLAGS, BODYSTRUCTURE, the reply headers and the
+  delivery headers (alias mailboxes, below); bodies are
   fetched on open (`BODY.PEEK[]`, parsed with postal-mime).
 - Sending: SMTP, then APPEND to Sent unless the server files sent mail itself. Drafts: APPEND
   to Drafts, deleting the previous version.
 - Search runs on the local cache (FTS); signatures are stored on the device (synced as a
   preference); invitations are answered by email reply.
+
+## Alias mailboxes
+
+One of the addresses a mailbox sends from (`sendAs`) can have a mailbox of its own: the
+**Own mailbox** switch on its row in Settings › Connections › Send from. A custom domain's
+addresses delivered into one iCloud inbox then each get a tab beside the mailboxes, with their
+own Inbox, Flagged, Sent, Drafts, Archive, Junk and Trash, filtered from the parent's mail, and
+their own name, color and signature. The parent's tab still shows everything. IMAP only for now
+(`capabilities.sendAs === "device"`).
+
+- Data: `account.aliasMailboxes` (contracts' `AliasMailbox`: address, name, color, signature),
+  synced as the `aliasMailboxes` preference, `{ [parent address, lower-cased]: AliasMailbox[] }`,
+  like `sendAs` (`services/preferences.ts`). Each address must be one the parent sends from and
+  not a mailbox added of its own (`services/alias-mailboxes.ts`, `saveAliasMailboxes` in
+  `services/signatures.ts`); taking an address out of Send from takes its mailbox away. Its id
+  (route, `mail:mailboxes`, a notification's `open.mailbox`) is its address lower-cased. Its
+  default name is the address's local part, capitalized (me@ → "Me"); its default color comes
+  from the id, as an account's does.
+- Order and on/off: the `mail:mailboxes` UI preference, keyed by its id. An alias mailbox always
+  follows its parent (`arrangeMailboxes`, `apps/web/src/main/mailboxes.ts`); `order` ranks it
+  among the parent's others, and a new one comes last of them. Turned off, or with its parent off,
+  it isn't shown.
+- Which mail is its own (`aliasWhere`, `services/mail-store.ts`). Each copy keeps every
+  address it was delivered to: the topmost `Original-Recipient` (`rfc822;` stripped; iCloud
+  stamps it on every delivered copy), `Delivered-To` and `X-Original-To` (Postfix with virtual
+  aliases: the mailbox's own address, and the alias it came to), lower-cased, in
+  `messages.deliveredTo` (`deliveryAddressesOf`, `providers/imap/messages.ts`). The To and Cc
+  addresses are kept in `messages.recipients`. Both are `<a@x><b@y>`, so an address matches
+  exactly (`xme@` isn't `me@`). Inbox and Junk: a copy delivered to any of the parent's other
+  addresses (its Send from list) is for the alias mailboxes named there only; one delivered to
+  none of them (to the mailbox's own address, or naming none) goes by To and Cc, so mail to the
+  mailbox's own address is no alias's. Sent and Drafts: it's the From. Archive, Trash and
+  Flagged: either. Its folder counts come from the same rule (`gmail:listLabels` with `alias`);
+  the tab's dot is its Inbox's unread.
+- Copies: a message sent to one address and Bcc'd to another arrives twice in the same folder,
+  with one Message-ID, differing only in `Original-Recipient`. Each alias mailbox shows its own
+  copy; anywhere both are listed (the parent), the conversation counts and shows the message once
+  (`getThreadForReading`), and reading, flagging or trashing it changes every copy (`getCopies`).
+- Mail cached before the delivery headers were fetched is read once in the backfill lane: just
+  those headers, by UID, a page at a time (`backfillDeliveredTo`, `providers/imap/sync.ts`).
+- Actions act on the parent's mail (routes are `/<alias>/<label>[/<message>?account=<parent>]`).
+  Search started in an alias mailbox searches its mail. New mail written there starts From its
+  address, and replies there go from it; elsewhere a reply goes from whichever address the mail
+  was sent to. The signature follows From: the alias mailbox's own, else the parent's.
+- Notifications are named after the first alias mailbox in To, then Cc, then the addresses it
+  was delivered to, and open in it; copies notify once (by Message-ID, for a quarter of an hour), and the
+  badge counts them once (`services/notifier.ts`).
 
 ## The web app's tunnel
 

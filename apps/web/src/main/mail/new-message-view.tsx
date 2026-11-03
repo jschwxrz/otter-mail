@@ -31,6 +31,7 @@ import {
 import { useDraftAutosave } from "./use-draft-autosave";
 import { RecipientInput } from "./recipient-input";
 import { addressesOf, chosenAddress } from "./send-from";
+import { aliasMailboxId, aliasMailboxesOf, signatureFor } from "./alias-mailboxes";
 import type { ComposeAttachment, MailAccount } from "./types";
 
 export function FromPicker({
@@ -46,6 +47,9 @@ export function FromPicker({
   unavailable?: boolean;
   onChange: (accountId: string, address: string) => void;
 }) {
+  const colorOf = (account: MailAccount, address: string) =>
+    aliasMailboxesOf(account, accounts).find((a) => a.id === aliasMailboxId(address))?.color ??
+    getAccountColor(account);
   return (
     <>
       <DropdownMenu>
@@ -57,7 +61,7 @@ export function FromPicker({
           >
             <span
               className="size-2 shrink-0 rounded-full"
-              style={{ backgroundColor: getAccountColor(value) }}
+              style={{ backgroundColor: colorOf(value, address) }}
             />
             <span className="truncate">{address}</span>
             <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
@@ -71,7 +75,7 @@ export function FromPicker({
                 icon={
                   <span
                     className="size-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: getAccountColor(account) }}
+                    style={{ backgroundColor: colorOf(account, each) }}
                     aria-hidden
                   />
                 }
@@ -95,16 +99,18 @@ export function FromPicker({
 export function NewMessageView({
   accounts,
   defaultAccountId,
+  defaultAddress,
   onClose,
   prefill,
 }: {
   accounts: MailAccount[];
   defaultAccountId: string;
+  defaultAddress?: string;
   onClose: () => void;
   prefill?: { to?: string; cc?: string; subject?: string; body?: string };
 }) {
   const [fromId, setFromId] = useState(defaultAccountId);
-  const [pickedAddress, setPickedAddress] = useState<string>();
+  const [pickedAddress, setPickedAddress] = useState(defaultAddress);
   const [to, setTo] = useState(prefill?.to ?? "");
   const [cc, setCc] = useState(prefill?.cc ?? "");
   const [ccVisible, setCcVisible] = useState(Boolean(prefill?.cc));
@@ -329,7 +335,7 @@ export function NewMessageView({
               minHeightClass="min-h-[40vh]"
               maxHeightClass="max-h-none"
               initialHTML={prefill?.body ? textToHtml(prefill.body) : undefined}
-              signatureHTML={fromAccount?.signature}
+              signatureHTML={fromAccount ? signatureFor(fromAccount, fromAddress) : undefined}
             />
           }
           attachments={

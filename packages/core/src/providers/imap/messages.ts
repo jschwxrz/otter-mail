@@ -12,14 +12,30 @@ import { labelsFor, messageId, type Folder } from "./folders.js";
 
 const SNIPPET_BYTES = 1024;
 
+export const DELIVERY_HEADERS = ["Original-Recipient", "Delivered-To", "X-Original-To"];
+
 export const SUMMARY_QUERY: FetchQuery = {
   flags: true,
   envelope: true,
   bodyStructure: true,
   internalDate: true,
-  headers: ["References"],
+  headers: ["References", ...DELIVERY_HEADERS],
   textStart: SNIPPET_BYTES,
 };
+
+/**
+ * Each header's topmost only: lower ones are earlier hops. iCloud stamps Original-Recipient on
+ * each delivered copy (a message Bcc'd to a second address arrives twice, alike but for it);
+ * Postfix puts the mailbox's own address in Delivered-To and the alias in X-Original-To.
+ */
+export function deliveryAddressesOf(headers: Record<string, string> | undefined): string[] {
+  const addresses = DELIVERY_HEADERS.flatMap((name) => {
+    const value = headers?.[name.toLowerCase()]?.replace(/^\s*rfc822\s*;/i, "");
+    const address = value?.match(/[^\s<>;,"]+@[^\s<>;,"]+/)?.[0];
+    return address ? [address.toLowerCase()] : [];
+  });
+  return [...new Set(addresses)];
+}
 
 export function formatAddresses(addresses: ImapAddress[]): string {
   return addresses
@@ -134,6 +150,7 @@ export async function toSummary(
     fromName: from?.name ?? "",
     fromEmail: from?.address ?? "",
     to: formatAddresses(envelope?.to ?? []),
+    cc: formatAddresses(envelope?.cc ?? []) || undefined,
     subject: envelope?.subject ?? "",
     snippet: await snippetFromStart(message.bodyStructure, message.textStart ?? new Uint8Array()),
     date: (message.internalDate ?? envelope?.date)?.getTime() ?? 0,
@@ -143,6 +160,7 @@ export async function toSummary(
     hasAttachments: hasAttachments(message.bodyStructure),
     messageIdHeader: envelope?.messageId ?? undefined,
     referencesHeader: references || undefined,
+    deliveredTo: deliveryAddressesOf(message.headers),
   };
 }
 
@@ -165,7 +183,6 @@ export async function toDetail(
   return {
     ...summary,
     snippet: snippetOf(parsed) || summary.snippet,
-    cc: formatAddresses(message.envelope?.cc ?? []) || undefined,
     bcc: formatAddresses(message.envelope?.bcc ?? []) || undefined,
     bodyHtml: parsed.html,
     bodyText: parsed.text,
