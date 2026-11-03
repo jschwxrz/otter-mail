@@ -64,3 +64,10 @@ release; `OTTER_MAIL_ERROR_REPORTS=1` lets a development build (`pnpm dev:fake`,
 3. In each project's settings: turn off "Store client IP addresses" and keep the server-side
    data scrubber on, as a second net.
 4. Alerts: the default "new issue" alert is enough to start.
+5. Resolving with fixes: Sentry's GitHub integration (Settings › Integrations) with this
+   repository added. The Release workflow's `sentry_release` job then creates each version's
+   release (`otter-mail@<version>`, in `otter-mail-desktop` and `otter-mail-web`) with its
+   commits and a deploy to `stable` or `nightly`. A commit or PR that says
+   `Fixes <SHORT-ID>` (the issue's ID, e.g. `OTTER-MAIL-DESKTOP-1A`, not the number in its URL)
+   links to the issue, and the issue resolves when a release holding that commit is made; an
+   event from a later version reopens it as a regression.
