@@ -1289,6 +1289,7 @@ export function registerMailHandlers(): void {
     }
   });
 
+  // An image that won't load is the sender's server's doing: the mail shows without it.
   handle("gmail:proxyImage", async (params: unknown) => {
     const p = params as Record<string, unknown>;
     try {
@@ -1296,7 +1297,7 @@ export function registerMailHandlers(): void {
       return await proxyRemoteImage(url);
     } catch (err) {
       console.log("[gmail:proxyImage] error", { error: String(err) });
-      throw err;
+      return { dataUrl: null };
     }
   });
 

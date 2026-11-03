@@ -507,7 +507,8 @@ export const mailApi = {
   openComposeAttachment: (params: { name: string; base64: string }): Promise<{ ok: boolean }> =>
     ipc("gmail:openComposeAttachment", params),
 
-  proxyImage: (url: string): Promise<{ dataUrl: string }> => ipc("gmail:proxyImage", { url }),
+  proxyImage: (url: string): Promise<{ dataUrl: string | null }> =>
+    ipc("gmail:proxyImage", { url }),
 
   openAttachment: (params: AttachmentFileParams): Promise<{ ok: boolean }> =>
     task("gmail:openAttachment", params),
