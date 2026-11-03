@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MessageScroller } from "@shadcn/react/message-scroller";
+import { MessageScroller, useMessageScroller } from "@shadcn/react/message-scroller";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -259,6 +259,12 @@ export function ChatTranscript({
   onOpenChange: (change: ChatChange) => Promise<void>;
 }) {
   const [expandedFolds, setExpandedFolds] = useState<Set<string>>(() => new Set());
+  const { scrollToEnd } = useMessageScroller();
+  const sent = turns.filter((turn) => turn.role === "user").length;
+  useEffect(() => {
+    scrollToEnd();
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Each message sent jumps to the end, even scrolled up.
+  }, [sent, scrollToEnd]);
   const toggleFold = (id: string) =>
     setExpandedFolds((prev) => {
       const next = new Set(prev);
@@ -269,7 +275,7 @@ export function ChatTranscript({
   return turns.map((turn) => {
     if (turn.role === "user") {
       return (
-        <MessageScroller.Item key={turn.id} messageId={turn.id} scrollAnchor>
+        <MessageScroller.Item key={turn.id} messageId={turn.id}>
           <div className="group flex flex-col items-end gap-1 py-3">
             {turn.intent ? <IntentMarker intent={turn.intent} /> : null}
             {turn.context ? <ContextRecap context={turn.context} onOpen={onOpenContext} /> : null}
@@ -313,8 +319,9 @@ export function ChatTranscript({
         ? `Worked for ${formatDuration(turn.finishedAt - turn.startedAt)}`
         : `Took ${steps} step${steps === 1 ? "" : "s"}`;
     return (
-      <MessageScroller.Item key={turn.id} messageId={turn.id} scrollAnchor>
+      <MessageScroller.Item key={turn.id} messageId={turn.id}>
         <div className="flex flex-col">
+          {live ? <WorkingRow startedAt={turn.startedAt} /> : null}
           {folded ? (
             <WorkFoldRow
               label={foldLabel}
@@ -335,7 +342,6 @@ export function ChatTranscript({
               ) : null}
             </div>
           ) : null}
-          {live ? <WorkingRow startedAt={turn.startedAt} /> : null}
           {isLast && !streaming && detached ? <DetachedRow providerName={providerName} /> : null}
           {turn.error ? <ErrorRow message={turn.error} providerName={providerName} /> : null}
           {!live && turn.changes?.length ? (
