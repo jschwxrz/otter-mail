@@ -1,6 +1,11 @@
 import { useEffect } from "react";
 import type { MeetingService } from "@otter-mail/contracts";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { ipc, task } from "~/lib/ipc";
 import { toast } from "../mail/toast";
 import { DAY, addDays } from "./dates";
@@ -161,7 +166,7 @@ export function withTimes(accountId: string, calendarId: string, event: Calendar
   return { ...event, accountId, calendarId, startMs, endMs };
 }
 
-const sameEvent = (e: CalEvent, of: CalEvent) =>
+const sameEvent = (e: CalEvent, of: Pick<CalEvent, "accountId" | "calendarId" | "id">) =>
   e.accountId === of.accountId && e.calendarId === of.calendarId && e.id === of.id;
 
 const KEY = ["calendar", "events"] as const;
@@ -223,6 +228,21 @@ export function useCalendarEvents(refs: CalendarRef[], from: number, to: number)
       });
   }, [qc, latest, from, to]);
   return query;
+}
+
+/** What core's `calendar:listEvents` returns at most, per calendar, the soonest first. */
+export const LIST_LIMIT = 500;
+
+/** An event in any range loaded, the grid's or the drawer's (one the grid filters out, too). */
+export function findCachedEvent(
+  qc: QueryClient,
+  ref: Pick<CalEvent, "accountId" | "calendarId" | "id">,
+): CalEvent | null {
+  for (const [, data] of qc.getQueriesData<Cached>({ queryKey: KEY })) {
+    const found = data?.events.find((e) => sameEvent(e, ref));
+    if (found) return found;
+  }
+  return null;
 }
 
 /** A calendar's events from `from` through the year after: the drawer's list. */

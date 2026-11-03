@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { ChevronsLeftIcon } from "lucide-react";
 import { IconBtn, cn } from "../mail/ui";
-import { useUpcomingEvents, type CalEvent } from "./api";
+import { LIST_LIMIT, useUpcomingEvents, type CalEvent } from "./api";
 import { useCalendar } from "./calendar-store";
 import type { ListedCalendar } from "./calendar-view";
 import { addDays, dayKey, durationLabel, sameDay, startOfDay } from "./dates";
@@ -43,8 +43,14 @@ export function AgendaDrawer({
     },
     from,
   );
+  // Its own: an event just made elsewhere lands in every cached range.
   const events = (data?.events ?? [])
-    .filter((e) => e.endMs > now.getTime())
+    .filter(
+      (e) =>
+        e.accountId === calendar.account.id &&
+        e.calendarId === calendar.info.id &&
+        e.endMs > now.getTime(),
+    )
     .sort((a, b) => a.startMs - b.startMs || b.endMs - a.endMs);
   const days: { day: Date; events: CalEvent[] }[] = [];
   for (const event of events) {
@@ -119,6 +125,12 @@ export function AgendaDrawer({
             ))}
           </section>
         ))}
+        {/* At the list's limit, the year runs past what came back. */}
+        {(data?.events.length ?? 0) >= LIST_LIMIT && days.length ? (
+          <p className="px-2 pt-4 text-center text-xs text-muted-foreground">
+            Showing what's coming until {dayTitle(days[days.length - 1]!.day, now)}.
+          </p>
+        ) : null}
         {!loading && !days.length ? (
           <p className="px-2 pt-6 text-center text-[13px] text-muted-foreground">
             Nothing coming up in the next year.

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLatest } from "../use-latest";
 import { AllowAccessButton } from "../mail/allow-access";
 import { getAccountColor, getAccountDisplayName } from "../mail/account-style";
@@ -15,6 +16,7 @@ import type { MailAccount } from "../mail/types";
 import { HintTooltip, IconBtn, buttonClass } from "../mail/ui";
 import {
   calendarKey,
+  findCachedEvent,
   hasGuests,
   useCalendarActions,
   useCalendarEvents,
@@ -220,6 +222,8 @@ export function CalendarView({
     ? { accountId: defaultTarget.account.id, calendarId: defaultTarget.info.id }
     : null;
 
+  // From the drawer, an event the grid doesn't show (a hidden calendar's, a declined one) opens too.
+  const qc = useQueryClient();
   const selected =
     selection && !("draft" in selection)
       ? (events.find(
@@ -227,7 +231,7 @@ export function CalendarView({
             e.accountId === selection.accountId &&
             e.calendarId === selection.calendarId &&
             e.id === selection.id,
-        ) ?? null)
+        ) ?? findCachedEvent(qc, selection))
       : null;
 
   const go = (by: number) => {
