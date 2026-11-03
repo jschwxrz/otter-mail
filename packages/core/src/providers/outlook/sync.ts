@@ -3,7 +3,8 @@
 import { logger } from "../../logger.js";
 import * as store from "../../services/mail-store.js";
 import type { MessageSummary } from "../../types.js";
-import type { SyncContext } from "../provider.js";
+import { hasPendingLabelWrites } from "../../services/pending-label-writes.js";
+import { SyncCancelled, type SyncContext } from "../provider.js";
 import {
   FOLDER_PREFIX,
   isSyncedFolder,
@@ -18,6 +19,7 @@ import {
   findApiMessages,
   getApiMessages,
   SUMMARY_FIELDS,
+  toImmutableIds,
   toSummary,
   type ApiMessage,
 } from "./messages.js";
@@ -177,6 +179,7 @@ export async function syncOutlook(accountId: string, ctx: SyncContext): Promise<
   ctx.update({ phase: mailboxOf(accountId) ? "incremental" : "labels" });
   const mailbox = await refreshFolders(accountId, false, ctx);
   await relabelFolders(accountId, mailbox, ctx);
+  await repairRegularIds(accountId, ctx);
   if (store.getKv(peekedKey(accountId)) !== "1") await peekInbox(accountId, mailbox, ctx);
 
   ctx.update({ phase: "incremental", synced: 0 });
@@ -416,5 +419,46 @@ async function reconcileUnlisted(
     accountId,
     synced.map((m) => toSummary(accountId, m)),
   );
+  ctx.bumpRevision();
+}
+
+async function repairRegularIds(accountId: string, ctx: SyncContext): Promise<void> {
+  const regular = store.getMessageIdsWithPrefix(accountId, "AAMk");
+  if (regular.length === 0 || hasPendingLabelWrites(accountId)) return;
+  let immutable: Map<string, string>;
+  let gone: string[];
+  let fresh: ApiMessage[];
+  try {
+    immutable = await toImmutableIds(accountId, regular);
+    ({ gone } = await findApiMessages(
+      accountId,
+      regular.filter((id) => !immutable.has(id)),
+    ));
+    fresh = await getApiMessages(accountId, [...new Set(immutable.values())], SUMMARY_FIELDS, true);
+  } catch (err) {
+    if (err instanceof SyncCancelled) throw err;
+    logger.warn("outlook-sync", `couldn't repair regular ids of ${accountId}; trying next sync`, {
+      error: (err as Error).message,
+    });
+    return;
+  }
+  ctx.assertActive();
+  const replaced = new Set(fresh.map((m) => m.id));
+  const dropped = [
+    ...regular.filter((id) => {
+      const target = immutable.get(id);
+      return target && (replaced.has(target) || store.getMessageLabelIds(accountId, target));
+    }),
+    ...gone,
+  ];
+  const touched = new Set(dropped.flatMap((id) => store.getMessageLabelIds(accountId, id) ?? []));
+  store.applyHistoryChanges(
+    accountId,
+    dropped.map((id) => ({ kind: "deleted" as const, id })),
+  );
+  const summaries = fresh.map((m) => toSummary(accountId, m));
+  store.upsertMessages(accountId, summaries);
+  for (const m of summaries) for (const l of m.labelIds) touched.add(l);
+  store.recountLabels(accountId, [...touched]);
   ctx.bumpRevision();
 }
