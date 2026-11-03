@@ -12,6 +12,8 @@ export type CalendarPreferences = {
   timeFormat: TimeFormat;
   /** The mailboxes whose new events get their calendar's online meeting (Notion's default conferencing). */
   meetingsByDefault: string[];
+  /** Where new events go (a calendarKey), picked in the sidebar; empty, the first primary one. */
+  defaultCalendar: string;
 };
 
 export const CALENDAR_DEFAULTS: CalendarPreferences = {
@@ -20,6 +22,7 @@ export const CALENDAR_DEFAULTS: CalendarPreferences = {
   showDeclined: true,
   timeFormat: "auto",
   meetingsByDefault: [],
+  defaultCalendar: "",
 };
 
 const KEYS = {
@@ -28,6 +31,7 @@ const KEYS = {
   showDeclined: "calendar:show-declined",
   timeFormat: "calendar:time-format",
   meetingsByDefault: "calendar:meetings-by-default",
+  defaultCalendar: "calendar:default-calendar",
 } as const;
 
 const WEEK_STARTS = new Set<string>(["auto", "sunday", "monday", "saturday"]);
@@ -59,6 +63,7 @@ function read(): CalendarPreferences {
     showDeclined: readStorage(KEYS.showDeclined) !== "false",
     timeFormat: TIME_FORMATS.has(timeFormat) ? timeFormat : CALENDAR_DEFAULTS.timeFormat,
     meetingsByDefault: readList(KEYS.meetingsByDefault),
+    defaultCalendar: readStorage(KEYS.defaultCalendar) ?? "",
   };
 }
 

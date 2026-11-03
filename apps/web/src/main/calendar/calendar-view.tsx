@@ -74,6 +74,17 @@ function CalendarTitle({
   return <h1 className="shrink-0 text-sm font-semibold text-foreground">{monthTitle(middle)}</h1>;
 }
 
+/** Where new events go: the calendar picked in the sidebar, else the first primary one that takes them. */
+export function defaultCalendarOf(
+  calendars: ListedCalendar[],
+  chosen: string,
+): ListedCalendar | undefined {
+  const writable = calendars.filter((c) => c.info.writable);
+  return (
+    writable.find((c) => c.key === chosen) ?? writable.find((c) => c.info.primary) ?? writable[0]
+  );
+}
+
 /** A near-black calendar color (a mailbox colored black) lifted toward the text, so it reads on a dark canvas. */
 function legible(hex: string): string {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
@@ -162,7 +173,7 @@ export function CalendarView({
   const bodyRef = useRef<HTMLDivElement>(null);
 
   // Re-renders on any calendar setting: the week's first day and the time format reach every label.
-  const { showWeekends, showDeclined } = useCalendarPreferences();
+  const { showWeekends, showDeclined, defaultCalendar: chosenDefault } = useCalendarPreferences();
   const calendars = calendarAccounts(accounts);
   // Every calendar of every mailbox, and those shown.
   const lists = useCalendarLists(calendars.map((a) => a.id)).data;
@@ -214,9 +225,8 @@ export function CalendarView({
     ]),
   ]);
   const colorOf = (key: string) => legible(colors.get(key) ?? "#8a8a8a");
-  // New events go to the first shown calendar that takes them, primary first.
-  const defaultTarget =
-    visible.find((c) => c.info.primary && c.info.writable) ?? visible.find((c) => c.info.writable);
+  // New events go to the default calendar, among those shown.
+  const defaultTarget = defaultCalendarOf(visible, chosenDefault);
   const defaultCalendar = defaultTarget
     ? { accountId: defaultTarget.account.id, calendarId: defaultTarget.info.id }
     : null;

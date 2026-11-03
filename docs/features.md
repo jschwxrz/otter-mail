@@ -270,7 +270,7 @@ color, the others their color in Google or Outlook. IMAP mailboxes have none.
 | Day, week and month views; mini month and calendars in sidebar                                                                               | ✓   | ✓   | —      |
 | Show or hide each calendar with its eye (Google's unchecked ones start hidden); click one for its coming events in a drawer                  | ✓   | ✓   | —      |
 | Followed and read-only calendars: looked at, not changed (no drag, read-only card)                                                           | ✓   | ✓   | —      |
-| New events on any calendar that takes them (picked in the card; the default first)                                                           | ✓   | ✓   | —      |
+| New events on any calendar that takes them (picked in the card; the default first: click a calendar's square to make it the default)         | ✓   | ✓   | —      |
 | Event panel: title, time, place, notes edit in place; guests                                                                                 | ✓   | ✓   | —      |
 | Yes / No / Maybe on invitations, with a note; repeating ones ask: this event or all events                                                   | ✓   | ✓   | —      |
 | Online meetings: Google Meet, Teams, Zoom, Webex shown with Join and copy link (also links found in an invitation's text)                    | ✓   | ✓   | —      |

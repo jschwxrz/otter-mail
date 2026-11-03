@@ -13,11 +13,12 @@ import { Section, SidebarBody } from "../mail/sidebar-ui";
 import type { MailAccount } from "../mail/types";
 import { HintTooltip, cn } from "../mail/ui";
 import { isShown, useCalendar } from "./calendar-store";
-import { useCalendarPreferences } from "./preferences";
+import { setCalendarPreference, useCalendarPreferences } from "./preferences";
 import { useCalendarLists } from "./api";
 import {
   TEAM_COLORS,
   calendarAccounts,
+  defaultCalendarOf,
   listedCalendars,
   type ListedCalendar,
 } from "./calendar-view";
@@ -212,7 +213,12 @@ export function CalendarSidebar({
   const setAgenda = useCalendar((s) => s.setAgenda);
   const mailboxes = calendarAccounts(accounts);
   const lists = useCalendarLists(mailboxes.map((a) => a.id)).data;
+  const chosen = useCalendarPreferences().defaultCalendar;
   const listed = listedCalendars(mailboxes, lists);
+  const defaultKey = defaultCalendarOf(
+    listed.filter((c) => isShown(shown, c.key, c.info.hiddenByDefault)),
+    chosen,
+  )?.key;
   return (
     <div className="flex min-h-0 flex-1 flex-col pt-2">
       <MiniMonth mode={mode} />
@@ -232,6 +238,11 @@ export function CalendarSidebar({
                     calendar={calendar}
                     on={on}
                     open={agenda === calendar.key}
+                    isDefault={calendar.key === defaultKey}
+                    onMakeDefault={() => {
+                      setCalendarPreference("defaultCalendar", calendar.key);
+                      if (!on) setShown(calendar.key, true);
+                    }}
                     onOpen={() => setAgenda(agenda === calendar.key ? null : calendar.key)}
                     onToggle={() => setShown(calendar.key, !on)}
                   />
@@ -253,15 +264,36 @@ function CalendarRow({
   calendar,
   on,
   open,
+  isDefault,
   onOpen,
+  onMakeDefault,
   onToggle,
 }: {
   calendar: ListedCalendar;
   on: boolean;
   open: boolean;
+  isDefault: boolean;
   onOpen: () => void;
+  onMakeDefault: () => void;
   onToggle: () => void;
 }) {
+  const swatch = (
+    <span
+      aria-hidden
+      className={cn(
+        "flex size-3.5 shrink-0 items-center justify-center rounded-[4px] transition-[opacity,outline-color] duration-150",
+        !on && "opacity-40",
+      )}
+      style={{
+        background: calendar.color,
+        // The default wears a ring, as in Notion Calendar.
+        outline: `1.5px solid ${isDefault ? calendar.color : "transparent"}`,
+        outlineOffset: 1.5,
+      }}
+    >
+      {calendar.info.writable ? null : <RssIcon className="size-2.5 text-white" strokeWidth={3} />}
+    </span>
+  );
   const { info } = calendar;
   return (
     <div
@@ -270,22 +302,30 @@ function CalendarRow({
         open ? "bg-sidebar-row-selected" : "hover:bg-sidebar-row-hover",
       )}
     >
+      {/* The square makes it the default, where it can take events. */}
+      {info.writable ? (
+        <HintTooltip label={isDefault ? "Default calendar" : "Make default"}>
+          <button
+            type="button"
+            aria-label="Make default"
+            aria-pressed={isDefault}
+            onClick={onMakeDefault}
+            className="ml-[calc(var(--sidebar-row-content-inset)-5px)] flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+          >
+            {swatch}
+          </button>
+        </HintTooltip>
+      ) : (
+        <span className="ml-[calc(var(--sidebar-row-content-inset)-5px)] flex size-6 shrink-0 items-center justify-center">
+          {swatch}
+        </span>
+      )}
       <button
         type="button"
         aria-expanded={open}
         onClick={onOpen}
-        className="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md pl-(--sidebar-row-content-inset) text-left text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+        className="flex h-full min-w-0 flex-1 cursor-pointer items-center rounded-md pl-0.5 text-left text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
       >
-        <span
-          aria-hidden
-          className={cn(
-            "flex size-3.5 shrink-0 items-center justify-center rounded-[4px] transition-opacity duration-150",
-            !on && "opacity-40",
-          )}
-          style={{ background: calendar.color }}
-        >
-          {info.writable ? null : <RssIcon className="size-2.5 text-white" strokeWidth={3} />}
-        </span>
         <span
           className={cn(
             "min-w-0 flex-1 truncate transition-colors",
@@ -293,7 +333,7 @@ function CalendarRow({
           )}
         >
           {info.name}
-          {info.primary ? (
+          {isDefault ? (
             <span className="ml-1.5 font-normal text-sidebar-muted-foreground">Default</span>
           ) : null}
         </span>
