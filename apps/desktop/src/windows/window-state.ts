@@ -59,3 +59,28 @@ export function trackFrame(key: string, win: BrowserWindow): void {
     save();
   });
 }
+
+function openFile(): string {
+  return path.join(app.getPath("userData"), "open-windows.json");
+}
+
+export function savedOpenWindows(): number[] {
+  try {
+    const saved: unknown = JSON.parse(fs.readFileSync(openFile(), "utf-8"));
+    if (Array.isArray(saved)) {
+      const keys = saved.filter((key): key is number => Number.isInteger(key) && key >= 0);
+      if (keys.length > 0) return [...new Set(keys)];
+    }
+  } catch {
+    // First launch.
+  }
+  return [0];
+}
+
+export function saveOpenWindows(keys: number[]): void {
+  try {
+    fs.writeFileSync(openFile(), JSON.stringify(keys));
+  } catch {
+    // Losing which windows were open is not worth surfacing.
+  }
+}

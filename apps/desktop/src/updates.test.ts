@@ -34,6 +34,7 @@ vi.mock("electron-updater", () => ({
 vi.mock("./ipc.js", () => ({ broadcast: vi.fn() }));
 vi.mock("./logger.js", () => ({ logger: { info: vi.fn(), warn: vi.fn() } }));
 vi.mock("./os/index.js", () => ({ hostOS: { installsUpdatesOnQuit: true } }));
+vi.mock("./windows/main-window.js", () => ({ rememberWindowsForUpdate: vi.fn() }));
 
 const nightly = "0.13.10-nightly.20261013.123";
 const state = () => fixture.ipc.get("updates:getState")!();

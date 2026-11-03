@@ -5,9 +5,7 @@ import { hostOS } from "../os/index.js";
 import { attachBrowser } from "../services/browser.js";
 import { isDriveContent } from "../services/drive-content.js";
 import { getPreloadPath, getWindowUrl } from "./window-paths.js";
-import { savedFrame, trackFrame } from "./window-state.js";
-
-const FRAME_KEY = "main";
+import { saveOpenWindows, savedFrame, savedOpenWindows, trackFrame } from "./window-state.js";
 
 /**
  * The app's windows: the main one, and those a tab was dragged out into.
@@ -16,6 +14,34 @@ const FRAME_KEY = "main";
  */
 const windows: BrowserWindow[] = [];
 let creating: Promise<BrowserWindow> | null = null;
+
+/**
+ * Each window's number, which names its frame and its tabs (the renderer's).
+ * A new window takes the lowest free one. A launch opens the window focused
+ * last again, and a restart to update every window that was open.
+ */
+const keys = new Map<BrowserWindow, number>();
+let lastKey = 0;
+let launched = false;
+let updating = false;
+
+/** Before the updater closes the windows, which it does before "before-quit". */
+export function rememberWindowsForUpdate(): void {
+  updating = true;
+  saveOpenWindows(windows.flatMap((win) => keys.get(win) ?? []));
+}
+app.on("before-quit", () => {
+  if (!updating) saveOpenWindows([lastKey]);
+});
+
+function freeKey(): number {
+  const used = new Set(keys.values());
+  let key = 0;
+  while (used.has(key)) key++;
+  return key;
+}
+
+const frameKey = (key: number) => (key === 0 ? "main" : `window-${key}`);
 
 // A Dock click or a mailto link during startup must not load a window whose
 // page invokes channels main hasn't registered yet.
@@ -62,8 +88,9 @@ export function openLinksExternally(win: BrowserWindow): void {
 }
 
 function createAppWindow(
+  key: number,
   bounds: { width: number; height: number; x?: number; y?: number },
-  search = "",
+  search: Record<string, string> = {},
   hash = "",
 ): { win: BrowserWindow; loaded: Promise<void> } {
   const chrome = hostOS.mainWindowOptions();
@@ -85,6 +112,8 @@ function createAppWindow(
     },
   });
   windows.push(win);
+  keys.set(win, key);
+  trackFrame(frameKey(key), win);
   hostOS.windowFollowsTheme(win);
   openLinksExternally(win);
   attachBrowser(win);
@@ -95,13 +124,17 @@ function createAppWindow(
   win.on("focus", () => {
     windows.splice(windows.indexOf(win), 1);
     windows.unshift(win);
+    lastKey = key;
   });
   win.on("closed", () => {
     const at = windows.indexOf(win);
     if (at >= 0) windows.splice(at, 1);
+    keys.delete(win);
+    if (windows[0] && key === lastKey) lastKey = keys.get(windows[0]) ?? lastKey;
   });
 
-  const url = getWindowUrl("index.html") + search + hash;
+  const params = new URLSearchParams({ window: String(key), ...search });
+  const url = `${getWindowUrl("index.html")}?${params}${hash}`;
   logger.info("main", "Loading window", { url });
   return { win, loaded: win.loadURL(url) };
 }
@@ -113,16 +146,24 @@ export async function createMainWindow(): Promise<BrowserWindow> {
 
   creating = (async () => {
     await started;
-    const frame = savedFrame(FRAME_KEY);
-    const { win, loaded } = createAppWindow({
-      width: frame?.width ?? 1180,
-      height: frame?.height ?? 780,
-      ...(frame ? { x: frame.x, y: frame.y } : {}),
+    const restoring = launched ? [lastKey] : savedOpenWindows();
+    launched = true;
+    lastKey = restoring[0]!;
+    saveOpenWindows([lastKey]);
+    const opened = restoring.map((key) => {
+      const frame = savedFrame(frameKey(key));
+      const { win, loaded } = createAppWindow(key, {
+        width: frame?.width ?? 1180,
+        height: frame?.height ?? 780,
+        ...(frame ? { x: frame.x, y: frame.y } : {}),
+      });
+      if (frame?.maximized) win.maximize();
+      return { win, loaded };
     });
-    if (frame?.maximized) win.maximize();
-    trackFrame(FRAME_KEY, win);
-    await loaded;
-    return win;
+    await Promise.all(opened.map(({ loaded }) => loaded));
+    const front = opened[0]!.win;
+    if (!front.isDestroyed()) front.focus();
+    return front;
   })().finally(() => {
     creating = null;
   });
@@ -181,10 +222,10 @@ function carry(win: BrowserWindow, from: WebContents, tab: CarriedTab, grab: Poi
 export function openTabWindow(from: WebContents, tab: CarriedTab, grab: Point): void {
   const at = screen.getCursorScreenPoint();
   const [width, height] = BrowserWindow.fromWebContents(from)?.getSize() ?? [1180, 780];
-  const search = new URLSearchParams({ window: "tab", title: tab.title, icon: tab.icon });
   const { win, loaded } = createAppWindow(
+    freeKey(),
     { width: width!, height: height!, x: Math.round(at.x - grab.x), y: Math.round(at.y - grab.y) },
-    `?${search}`,
+    { tab: "1", title: tab.title, icon: tab.icon },
     `#${tab.href}`,
   );
   loaded.catch((error: unknown) => logger.error("main", "Failed to load a tab's window", error));
