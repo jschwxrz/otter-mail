@@ -580,6 +580,11 @@ function SendAsSection({ account }: { account: MailAccount }) {
   const [adding, setAdding] = useState("");
   const editable = capabilitiesOf(account).sendAs === "device";
   const addresses = account.sendAs ?? [];
+  const suggested = useQuery({
+    queryKey: ["send-as-suggestions", account.id, addresses.join()],
+    queryFn: () => mailApi.suggestSendAs(account.id),
+    enabled: editable,
+  }).data;
 
   const save = (sendAs: string[]) => {
     console.log("[Settings:updateSendAs]", { accountId: account.id, count: sendAs.length });
@@ -589,8 +594,7 @@ function SendAsSection({ account }: { account: MailAccount }) {
       throw err;
     });
   };
-  const add = () => {
-    const address = adding.trim();
+  const add = (address = adding.trim()) => {
     if (!address) return;
     void save([...addresses, address]).then(
       () => setAdding(""),
@@ -624,6 +628,20 @@ function SendAsSection({ account }: { account: MailAccount }) {
           }
         />
       ))}
+      {editable
+        ? suggested?.map((address) => (
+            <SettingsRow
+              key={address}
+              title={address}
+              description="Found in your mail"
+              control={
+                <Btn size="sm" disabled={updateAccount.isPending} onClick={() => add(address)}>
+                  Add
+                </Btn>
+              }
+            />
+          ))
+        : null}
       {editable ? (
         <SettingsRow
           title="Add an address"
@@ -640,7 +658,11 @@ function SendAsSection({ account }: { account: MailAccount }) {
                 }}
                 className="@min-[32rem]/settings-row:w-56"
               />
-              <Btn size="sm" disabled={!adding.trim() || updateAccount.isPending} onClick={add}>
+              <Btn
+                size="sm"
+                disabled={!adding.trim() || updateAccount.isPending}
+                onClick={() => add()}
+              >
                 Add
               </Btn>
             </div>

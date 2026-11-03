@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import type { ImapSettings, MailServer } from "@otter-mail/contracts";
-import { ChevronRightIcon, ServerIcon } from "lucide-react";
+import { ChevronRightIcon, CloudIcon, ServerIcon } from "lucide-react";
 import { GmailMark, MicrosoftMark } from "./provider-mark";
 import { Button } from "~/components/ui/button";
 import { Dialog } from "~/components/ui/dialog";
@@ -54,7 +54,7 @@ export function AddMailboxMenu({
   services?: ReactNode;
   children: ReactNode;
 }) {
-  const [imapOpen, setImapOpen] = useState(false);
+  const [imapOpen, setImapOpen] = useState<ImapService | null>(null);
   const outlook = useAddOutlook(onAdded);
   const providers = useMailProviders().data;
   return (
@@ -71,7 +71,10 @@ export function AddMailboxMenu({
               Outlook
             </DropdownMenuItem>
           ) : null}
-          <DropdownMenuItem icon={<ServerIcon />} onSelect={() => setImapOpen(true)}>
+          <DropdownMenuItem icon={<CloudIcon />} onSelect={() => setImapOpen("icloud")}>
+            iCloud
+          </DropdownMenuItem>
+          <DropdownMenuItem icon={<ServerIcon />} onSelect={() => setImapOpen("other")}>
             Other mail (IMAP)
           </DropdownMenuItem>
           {services ? (
@@ -83,7 +86,14 @@ export function AddMailboxMenu({
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
-      <ImapAccountDialog open={imapOpen} onOpenChange={setImapOpen} onAdded={onAdded} />
+      <ImapAccountDialog
+        open={imapOpen !== null}
+        service={imapOpen ?? undefined}
+        onOpenChange={(open) => {
+          if (!open) setImapOpen(null);
+        }}
+        onAdded={onAdded}
+      />
     </>
   );
 }
@@ -127,16 +137,33 @@ function guessSettings(email: string): ImapSettings {
   };
 }
 
+/** iCloud's servers, for an address at a domain of its own whose servers can't be found. */
+function icloudSettings(email: string): ImapSettings {
+  return {
+    username: email,
+    imap: { host: "imap.mail.me.com", port: 993, security: "tls" },
+    smtp: { host: "smtp.mail.me.com", port: 587, security: "starttls" },
+  };
+}
+
+const ICLOUD_DOMAINS = /@(icloud|me|mac)\.com$/i;
+const APPLE_ACCOUNT_URL = "https://account.apple.com";
+
+/** Which IMAP mailbox the dialog adds: iCloud walks through its app-specific password. */
+export type ImapService = "icloud" | "other";
+
 const looksLikeEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 type Discovery = { email: string; state: "looking" | "found" | "none" } | null;
 
 export function ImapAccountDialog({
   open,
+  service = "other",
   onOpenChange,
   onAdded,
 }: {
   open: boolean;
+  service?: ImapService;
   onOpenChange: (open: boolean) => void;
   onAdded?: (account: MailAccount) => void;
 }) {
@@ -165,10 +192,11 @@ export function ImapAccountDialog({
     setDiscovery({ email: address, state: "looking" });
     setError(null);
     const found = await mailApi.discoverImap(address).catch(() => null);
-    const next = found ?? guessSettings(address);
+    const icloud = service === "icloud";
+    const next = found ?? (icloud ? icloudSettings(address) : guessSettings(address));
     setSettings(next);
-    setDiscovery({ email: address, state: found ? "found" : "none" });
-    if (!found) setShowServers(true);
+    setDiscovery({ email: address, state: found || icloud ? "found" : "none" });
+    if (!found && !icloud) setShowServers(true);
     return next;
   };
 
@@ -203,7 +231,10 @@ export function ImapAccountDialog({
 
   const setServer = (key: "imap" | "smtp", server: MailServer) =>
     setSettings((s) => (s ? { ...s, [key]: server } : s));
-  const hint = appPasswordHint(settings);
+  const icloud = service === "icloud";
+  const hint = icloud ? undefined : appPasswordHint(settings);
+  // iCloud+ custom domains sign in with the Apple Account's iCloud address.
+  const ownDomain = icloud && looksLikeEmail(email.trim()) && !ICLOUD_DOMAINS.test(email.trim());
 
   return (
     <Dialog
@@ -212,15 +243,43 @@ export function ImapAccountDialog({
         onOpenChange(next);
         if (!next) reset();
       }}
-      title="Add other mail"
+      title={icloud ? "Add iCloud" : "Add other mail"}
       size="large"
-      description="Any mailbox that works with IMAP: iCloud, Fastmail, Yahoo, your own domain."
+      description={
+        icloud
+          ? "Apple doesn't let other apps use your Apple Account password: make an app-specific password for Otter Mail."
+          : "Any mailbox that works with IMAP: iCloud, Fastmail, Yahoo, your own domain."
+      }
       confirmLabel={add.isPending ? "Signing in…" : "Add mailbox"}
       confirmDisabled={add.isPending}
       onConfirm={submit}
     >
       <div className="flex flex-col gap-3">
-        <Field label="Email">
+        {icloud ? (
+          <ol className="list-decimal space-y-1 pl-5 text-[13px] text-muted-foreground">
+            <li>
+              Open{" "}
+              <button
+                type="button"
+                className="cursor-pointer text-foreground underline underline-offset-2"
+                onClick={() => void window.desktopBridge.openExternal(APPLE_ACCOUNT_URL)}
+              >
+                account.apple.com
+              </button>{" "}
+              and sign in.
+            </li>
+            <li>Sign-In and Security › App-Specific Passwords: add one named Otter Mail.</li>
+            <li>Paste it below, with your iCloud address.</li>
+          </ol>
+        ) : null}
+        <Field
+          label="Email"
+          description={
+            ownDomain
+              ? "With your own domain, sign in with your @icloud.com address. Your domain's addresses go in Send from after."
+              : undefined
+          }
+        >
           <Input
             type="email"
             autoComplete="username"
@@ -231,15 +290,16 @@ export function ImapAccountDialog({
               const address = email.trim();
               if (looksLikeEmail(address)) void discover(address);
             }}
-            placeholder="you@example.com"
+            placeholder={icloud ? "you@icloud.com" : "you@example.com"}
           />
         </Field>
-        <Field label="Password" description={hint}>
+        <Field label={icloud ? "App-specific password" : "Password"} description={hint}>
           <Input
             type="password"
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            placeholder={icloud ? "xxxx-xxxx-xxxx-xxxx" : undefined}
           />
         </Field>
         <Field label="Your name (optional)">
