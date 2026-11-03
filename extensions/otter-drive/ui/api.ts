@@ -198,6 +198,18 @@ export const driveApi = {
   createApiKey: (name: string): Promise<{ key: string }> =>
     task("otterDrive:createApiKey", { name }),
   revokeApiKey: (keyId: string): Promise<void> => task("otterDrive:revokeApiKey", { keyId }),
+  saveEdit: (
+    id: string,
+    folderId: string | undefined,
+    edit: { text: string } | { sheets: { name: string; rows: string[][] }[] },
+    /** The version the edit started from, and how many there were then. */
+    source: { version: number; count: number },
+  ): Promise<DriveArtifact> => task("otterDrive:saveEdit", { id, folderId, edit, source }),
+  promoteVersion: (
+    id: string,
+    folderId: string | undefined,
+    version: number,
+  ): Promise<DriveArtifact> => task("otterDrive:promoteVersion", { id, folderId, version }),
   uploadPicked: (folderId: string): Promise<DriveArtifact[]> =>
     task("otterDrive:uploadPicked", { folderId }),
   uploadBytes: (

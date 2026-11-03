@@ -663,6 +663,8 @@ async function uploadVersion(
   file: LocalFile,
   label: string,
   expected: number,
+  /** Carries this version's other files forward (a site, edited at its entry). */
+  baseVersion?: number,
 ): Promise<DriveArtifact> {
   if (file.bytes.length > MAX_UPLOAD) throw new Error(`${file.path} is over 100 MB.`);
   const sha256 = await sha256Hex(file.bytes);
@@ -679,6 +681,7 @@ async function uploadVersion(
         label,
         entryPath: file.path,
         expectedCurrentVersion: expected,
+        ...(baseVersion ? { baseVersion } : {}),
         files: [
           { path: file.path, contentType: file.contentType, size: file.bytes.length, sha256 },
         ],
@@ -832,6 +835,131 @@ export async function download(
     folder,
   );
   return platform().userFiles.save(`${raw.slug}.zip`, new Uint8Array(await response.arrayBuffer()));
+}
+
+export type DriveEdit = { text: string } | { sheets: { name: string; rows: string[][] }[] };
+
+export const delimited = (rows: string[][], delimiter: string) =>
+  rows
+    .map((row) =>
+      row
+        .map((cell) =>
+          /["\r\n]/.test(cell) || cell.includes(delimiter) ? `"${cell.replace(/"/g, '""')}"` : cell,
+        )
+        .join(delimiter),
+    )
+    .join("\r\n");
+
+/** A cell typed in as Excel keeps it: a number when it reads as one (not "00123"), text otherwise. */
+const cellValue = (cell: string): string | number =>
+  /^-?(0|[1-9]\d{0,14})(\.\d+)?$/.test(cell.trim()) ? Number(cell) : cell;
+
+/**
+ * Saves an edit as the document's next version, in its own format: text and
+ * Markdown as they are, a table as CSV or TSV (its first sheet), a workbook as
+ * Excel with only the cells that changed rewritten (the others keep their
+ * types, formats and formulas). `source` is the version the edit started
+ * from: if another version came since, or another was made current, saving
+ * refuses rather than overwrite it.
+ */
+export async function saveEdit(
+  id: string,
+  folderId: string | undefined,
+  edit: DriveEdit,
+  source: { version: number; count: number },
+): Promise<DriveArtifact> {
+  const { auth, folder, raw } = await documentAccess(id, folderId);
+  const current = raw.currentVersion;
+  if (!current) throw new Error("This document has no version to edit.");
+  if (current.number !== source.version || raw.versionCount !== source.count)
+    throw new Error(
+      "This document changed since you started editing. Copy your changes, then open it again.",
+    );
+  const path = current.entryPath;
+  const extension = path.split(".").pop()?.toLowerCase() ?? "";
+  let contentType: string;
+  let bytes: Uint8Array;
+  if ("text" in edit) {
+    contentType =
+      extension === "md" || extension === "markdown"
+        ? "text/markdown"
+        : extension === "json"
+          ? "application/json"
+          : "text/plain";
+    bytes = utf8Encode(edit.text);
+  } else if (extension === "csv" || extension === "tsv") {
+    contentType = extension === "tsv" ? "text/tab-separated-values" : "text/csv";
+    bytes = utf8Encode(delimited(edit.sheets[0]?.rows ?? [], extension === "tsv" ? "\t" : ","));
+  } else if (extension === "xlsx") {
+    const response = await call(
+      `/api/v1/artifacts/${ref(id)}/content?${new URLSearchParams({ path, version: String(current.number) })}`,
+      { headers: { accept: "*/*" } },
+      auth,
+      folder,
+    );
+    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    bytes = await patchWorkbook(new Uint8Array(await response.arrayBuffer()), edit.sheets);
+  } else {
+    throw new Error("This kind of document can't be edited here.");
+  }
+  forget(id);
+  return uploadVersion(
+    auth,
+    folder,
+    id,
+    { path, contentType, bytes },
+    "Edited in Otter Mail",
+    source.count,
+    current.fileCount > 1 ? source.version : undefined,
+  );
+}
+
+/**
+ * The workbook with the cells that read differently from how it shows them
+ * (its `preview`) rewritten, and nothing else touched.
+ */
+export async function patchWorkbook(
+  original: Uint8Array,
+  sheets: { name: string; rows: string[][] }[],
+): Promise<Uint8Array> {
+  const XLSX = await import("@e965/xlsx");
+  const book = XLSX.read(original, {
+    type: "array",
+    cellDates: true,
+    cellNF: true,
+    cellFormula: true,
+  });
+  for (const sheet of sheets) {
+    const ws = book.Sheets[sheet.name];
+    if (!ws) throw new Error(`The sheet “${sheet.name}” isn't in the workbook any more.`);
+    const shown = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: "", raw: false });
+    sheet.rows.forEach((row, r) =>
+      row.forEach((value, c) => {
+        if (value === String(shown[r]?.[c] ?? "")) return;
+        const address = XLSX.utils.encode_cell({ r, c });
+        if (value === "") delete ws[address];
+        else XLSX.utils.sheet_add_aoa(ws, [[cellValue(value)]], { origin: address });
+      }),
+    );
+  }
+  return new Uint8Array(XLSX.write(book, { bookType: "xlsx", type: "array" }) as ArrayBuffer);
+}
+
+/** Makes an earlier version the current one again. */
+export async function promoteVersion(
+  id: string,
+  folderId: string | undefined,
+  versionNumber: number,
+): Promise<DriveArtifact> {
+  const { auth, folder } = await documentAccess(id, folderId);
+  const result = await request<{ data: RawArtifact }>(
+    `/api/v1/artifacts/${ref(id)}/promote`,
+    { method: "POST", body: JSON.stringify({ version: versionNumber }) },
+    auth,
+    folder,
+  );
+  forget(id);
+  return artifact(result.data);
 }
 
 /** Moves a document into another folder (its owner's, into one they own). */
