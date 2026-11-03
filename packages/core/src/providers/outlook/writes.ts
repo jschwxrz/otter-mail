@@ -55,7 +55,7 @@ async function destination(
   }
   if (current && remove.includes(current)) {
     if (current === "SPAM" || current === "TRASH" || current === ARCHIVE_LABEL_ID) {
-      return wellKnownId(accountId, ownMail ? "sentitems" : "inbox");
+      return wellKnownId(accountId, message.isDraft ? "drafts" : ownMail ? "sentitems" : "inbox");
     }
     if (current === "INBOX" || current.startsWith(FOLDER_PREFIX)) {
       return wellKnownId(accountId, "archive");
@@ -170,14 +170,10 @@ export async function deleteForever(accountId: string, messageIds: string[]): Pr
   );
 }
 
-export async function emptyFolder(
-  accountId: string,
-  labelId: "SPAM" | "TRASH",
-  cachedIds: string[],
-): Promise<string[]> {
+export async function emptyFolder(accountId: string, labelId: "SPAM" | "TRASH"): Promise<string[]> {
   const mailbox = await readMailbox(accountId);
   const folders = mailbox.folders.filter((f) => f.labelId === labelId);
-  const ids = new Set(cachedIds);
+  const ids = new Set<string>();
   for (const folder of folders) {
     const listed = await graphAll<{ id: string }>(
       accountId,

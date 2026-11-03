@@ -38,6 +38,7 @@ type Message = {
   importance: "normal" | "high";
   categories: string[];
   fromMe: boolean;
+  draft?: boolean;
   date: number;
   version: number;
 };
@@ -124,7 +125,7 @@ const resource = (m: Message) => ({
   toRecipients: [{ emailAddress: { name: "Me", address: account.email } }],
   receivedDateTime: new Date(m.date).toISOString(),
   isRead: m.isRead,
-  isDraft: m.folder === "drafts",
+  isDraft: m.draft ?? m.folder === "drafts",
   flag: { flagStatus: m.flagged ? "flagged" : "notFlagged" },
   importance: m.importance,
   categories: m.categories,
@@ -256,6 +257,14 @@ function handle(method: string, url: URL, body: unknown): Response {
         .filter((m) => !conversation || m.conversationId === conversation[1])
         .map(asListed),
     });
+  }
+
+  const purge = /^\/me\/messages\/([^/]+)\/permanentDelete$/.exec(path);
+  if (purge) {
+    const id = decodeURIComponent(purge[1]!);
+    if (!messages.has(id)) return notFound();
+    remove(id);
+    return json({});
   }
 
   const one = /^\/me\/messages\/([^/]+)(\/move)?$/.exec(path);
@@ -1057,6 +1066,34 @@ describe("Outlook sync", () => {
     });
     await provider.modifyThread(account.id, "s", { addLabelIds: ["INBOX"] });
     expect(messages.get("later")?.folder).toBe("inbox");
+  });
+
+  it("restores a trashed draft to Drafts, not Sent Items", async () => {
+    deliver("draft", "deleteditems", { draft: true, fromMe: true });
+    deliver("mine", "deleteditems", { fromMe: true });
+    const { status, labelsOf, invoke } = await boot();
+    await until(() => status().fullSyncDone && !status().syncing, "the first sync");
+
+    await invoke("gmail:untrashMessage", { accountId: account.id, messageId: "draft" });
+    await invoke("gmail:untrashMessage", { accountId: account.id, messageId: "mine" });
+    expect(messages.get("draft")!.folder).toBe("drafts");
+    expect(labelsOf("draft")).toContain("DRAFT");
+    expect(messages.get("mine")!.folder).toBe("sentitems");
+  });
+
+  it("empties Deleted Items of what Outlook lists there, never mail restored elsewhere", async () => {
+    deliver("trashed", "deleteditems");
+    deliver("restored", "deleteditems");
+    const { status, labelsOf, invoke } = await boot();
+    await until(() => status().fullSyncDone && !status().syncing, "the first sync");
+
+    messages.get("restored")!.folder = "inbox";
+    await invoke("gmail:emptyFolder", { accountId: account.id, labelId: "TRASH" });
+    expect(writes.filter((w) => w.path.endsWith("/permanentDelete")).map((w) => w.path)).toEqual([
+      "/me/messages/trashed/permanentDelete",
+    ]);
+    expect(messages.has("restored")).toBe(true);
+    expect(labelsOf("trashed")).toBeUndefined();
   });
 
   it("searches with Outlook's engine, Gmail's operators translated", async () => {
