@@ -18,7 +18,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 import { DriveActionDialogs } from "./actions";
-import { setDriveOpener } from "./search";
+import { setDriveConnected, setDriveOpener } from "./search";
+import { ShareDialogHost } from "./share";
 import { driveApi, driveLabel } from "./api";
 import { DriveMark } from "./drive-mark";
 import { errorText, useDriveStatus, useFolders } from "./hooks";
@@ -34,18 +35,28 @@ export function saveToOtterDrive(email: MessageTarget): void {
 export function OtterDriveDialogs() {
   const [email, setEmail] = useState<MessageTarget | null>(null);
   const openWorkspace = useOpenWorkspace();
-  useEffect(() => {
-    setDriveOpener((location, item) => openWorkspace("drive", { location, item }));
-    return () => setDriveOpener(null);
-  }, [openWorkspace]);
-  // ⌘K's Drive results go when the sign-in or the drives that are on change.
   const qc = useQueryClient();
+  useEffect(() => {
+    // What it opens may be new here (a link just accepted): the lists catch up first.
+    setDriveOpener(
+      (location, item) =>
+        void Promise.all(
+          ["folders", "artifacts", "drives"].map((key) =>
+            qc.invalidateQueries({ queryKey: ["otter-drive", key] }),
+          ),
+        ).then(() => openWorkspace("drive", { location, item })),
+    );
+    return () => setDriveOpener(null);
+  }, [openWorkspace, qc]);
+  // ⌘K's Drive results go when the sign-in or the drives that are on change.
   const status = useDriveStatus().data;
   const reach = status ? `${status.connected}:${status.hidden.join(",")}` : null;
   useEffect(() => {
     qc.removeQueries({ queryKey: ["palette-search", "otter-drive"] });
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- runs when what Drive can reach changes.
   }, [qc, reach]);
+  const connected = status?.connected === true;
+  useEffect(() => setDriveConnected(connected), [connected]);
   useEffect(() => {
     listeners.add(setEmail);
     return () => void listeners.delete(setEmail);
@@ -53,6 +64,7 @@ export function OtterDriveDialogs() {
   return (
     <>
       <DriveActionDialogs />
+      <ShareDialogHost />
       {email ? <SaveToDrive email={email} onClose={() => setEmail(null)} /> : null}
     </>
   );

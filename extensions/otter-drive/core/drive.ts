@@ -903,6 +903,169 @@ export async function deleteFolder(id: string): Promise<void> {
   forget();
 }
 
+// ---------------------------------------------------------------------------
+// Sharing, as Otter Drive has it (Google Drive's model): people by email as
+// viewers or editors, and anyone with the link. A shared drive shares by its
+// members. Answers come back as Drive gives them (its `Sharing`).
+// ---------------------------------------------------------------------------
+
+export type ShareTarget = { type: "folder" | "artifact"; id: string; folderId?: string };
+export type ShareRole = "viewer" | "editor";
+
+async function sharingCall(
+  target: ShareTarget,
+  rest: string,
+  init: RequestInit = {},
+): Promise<unknown> {
+  if (target.type === "folder") {
+    const auth = await reachable(target.id);
+    return request(`/api/v1/folders/${ref(target.id)}/sharing${rest}`, init, auth);
+  }
+  const { auth, folder } = await documentAccess(target.id, target.folderId);
+  return request(`/api/v1/artifacts/${ref(target.id)}/sharing${rest}`, init, auth, folder);
+}
+
+/** Who has access, and the link. */
+export async function sharing(target: ShareTarget): Promise<unknown> {
+  return ((await sharingCall(target, "")) as { data: unknown }).data;
+}
+
+export async function sharePeople(
+  target: ShareTarget,
+  input: { emails: string[]; role: ShareRole; notify: boolean; message?: string },
+): Promise<unknown> {
+  const done = await sharingCall(target, "/people", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  forget(target.type === "artifact" ? target.id : undefined);
+  return done;
+}
+
+/** A person's access: a role, or null to remove it (yours too: leaving answers nothing). */
+export async function setShareRole(
+  target: ShareTarget,
+  entryId: string,
+  role: ShareRole | null,
+): Promise<unknown> {
+  const done = await sharingCall(
+    target,
+    `/people/${ref(entryId)}`,
+    role ? { method: "PATCH", body: JSON.stringify({ role }) } : { method: "DELETE" },
+  );
+  forget(target.type === "artifact" ? target.id : undefined);
+  forget();
+  return done ?? null;
+}
+
+/** Anyone with the link: on as a viewer's or an editor's, or off (null). */
+export async function setShareLink(target: ShareTarget, role: ShareRole | null): Promise<unknown> {
+  const done = await sharingCall(
+    target,
+    "/link",
+    role ? { method: "PUT", body: JSON.stringify({ role }) } : { method: "DELETE" },
+  );
+  forget(target.type === "artifact" ? target.id : undefined);
+  forget();
+  return done;
+}
+
+/** People you work with whose name or email has the text, for adding. */
+export async function suggestPeople(query: string): Promise<unknown> {
+  const auth = await signedIn();
+  const result = await request<{ data: unknown }>(
+    `/api/v1/people?q=${encodeURIComponent(query)}`,
+    {},
+    auth,
+  );
+  return result.data;
+}
+
+let whoCache: { token: string; userId: string } | null = null;
+
+/** Your Otter Drive user id: to tell "you" among the people with access. */
+export async function me(): Promise<{ userId: string }> {
+  const auth = await signedIn();
+  if (whoCache?.token !== auth.token) {
+    const result = await request<{ data: { userId: string } }>("/api/v1/me", {}, auth);
+    whoCache = { token: auth.token, userId: result.data.userId };
+  }
+  return { userId: whoCache.userId };
+}
+
+/**
+ * Where a Drive link goes in the workspace: a shared link (`/s/<token>`, which
+ * adds what it shares to Shared with me), a document's page, or a folder.
+ * Null for any other page, or one in a drive that's off.
+ */
+export async function resolveLink(
+  href: string,
+): Promise<{ location: string; item: string | null } | null> {
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return null;
+  }
+  if (url.origin !== BASE) return null;
+  const auth = await signedIn();
+  const parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+  // Opened by its id, which reaches it anywhere (and checks its drive is on).
+  const byId = async (id: string) => {
+    const found = await documentAccess(id, undefined);
+    return { location: found.folder ?? SHARED, item: id };
+  };
+  // A slug names a document only within its folder: in one you can reach, ask
+  // there; a document shared with you on its own is found in Shared with me.
+  const bySlug = async (slug: string, where: { folderId?: string; folderSlug?: string }) => {
+    const folder = (await allFolders(auth)).find((f) =>
+      where.folderId ? f.id === where.folderId : f.slug === where.folderSlug,
+    );
+    if (folder) {
+      await reachable(folder.id);
+      const found = await request<{ data: RawArtifact }>(
+        `/api/v1/artifacts/${ref(slug)}`,
+        {},
+        auth,
+        folder.id,
+      );
+      return byId(found.data.id);
+    }
+    const shared = await request<{
+      data: { type: string; folderSlug: string; artifact?: RawArtifact }[];
+    }>("/api/v1/shared", {}, auth);
+    const item = shared.data.find(
+      (i) =>
+        i.artifact?.slug === slug &&
+        (where.folderId
+          ? (i.artifact.folderId ?? i.artifact.organizationId) === where.folderId
+          : i.folderSlug === where.folderSlug),
+    );
+    return item?.artifact ? byId(item.artifact.id) : null;
+  };
+  try {
+    if (parts[0] === "s" && parts[1]) {
+      const opened = await request<{
+        data: { type: "folder" | "artifact"; folderId: string; slug: string | null };
+      }>(`/api/v1/links/${ref(parts[1])}`, { method: "POST" }, auth);
+      forget();
+      const { type, folderId, slug } = opened.data;
+      if (type === "artifact" && slug) return await bySlug(slug, { folderId });
+      await reachable(folderId);
+      return { location: folderId, item: null };
+    }
+    if (parts[1] === "a" && parts[2]) return await bySlug(parts[2], { folderSlug: parts[0] });
+    const folderId = url.searchParams.get("folder");
+    if (parts[0] === "home" && folderId) {
+      await reachable(folderId);
+      return { location: folderId, item: null };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 /** Every document in the drives that are on, for search: built at most once a minute. */
 let index: { at: number; key: string; list: Promise<DriveArtifact[]> } | null = null;
 
