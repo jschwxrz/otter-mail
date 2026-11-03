@@ -219,7 +219,7 @@ function open(url: string, { token, bootstrapToken }: Credentials): Promise<Gate
         client: clientInfo,
         role: plan.role,
         scopes: plan.scopes,
-        caps: ["tool-events", "exec-approvals"],
+        caps: ["tool-events", "exec-approvals", "plugin-approvals"],
         auth: plan.auth,
         device: plan.device,
       }),
@@ -404,17 +404,27 @@ type Turn = {
   emit: Emit;
   text: OpenClawText;
   resynced: boolean;
+  sessionApprovals: boolean;
+  descendants: Map<string, Promise<boolean>>;
   finish: (event: ChatEvent) => void;
 };
 
 const turns = new Map<string, Turn>();
-const approvals = new Map<string, { requestId: string; approval: ApprovalRequest }>();
+const approvals = new Map<
+  string,
+  { requestId: string; approval: ApprovalRequest; kind?: string }
+>();
 const questions = new Map<string, { requestId: string; question: ChatQuestion }>();
 
 const DECISIONS: Record<ApprovalDecision, string> = {
   once: "allow-once",
   session: "allow-once",
   always: "allow-always",
+  deny: "deny",
+};
+const CHOICES: Record<string, ApprovalDecision> = {
+  "allow-once": "once",
+  "allow-always": "always",
   deny: "deny",
 };
 
@@ -428,6 +438,8 @@ function newTurn(requestId: string, sessionKey: string, gateway: Gateway, emit: 
     emit,
     text: new OpenClawText(requestId, emit),
     resynced: false,
+    sessionApprovals: false,
+    descendants: new Map(),
     finish: () => {},
   };
 }
@@ -499,9 +511,82 @@ function askApproval(turn: Turn, payload: Record<string, unknown>): void {
   turn.emit({ requestId: turn.requestId, type: "approval", approval });
 }
 
-function askQuestion(turn: Turn, record: Record<string, unknown>): void {
-  if (record.sessionKey !== turn.sessionKey || typeof record.id !== "string") return;
-  if ((record.runId && !ownsRun(turn, record.runId)) || record.status !== "pending") return;
+async function sessionName(turn: Turn, key: string): Promise<string> {
+  const { session } = await turn.gateway.client
+    .request<{ session?: Record<string, unknown> }>("sessions.describe", { key })
+    .catch(() => ({ session: undefined }));
+  const name = session?.label ?? session?.displayName ?? session?.derivedTitle;
+  return typeof name === "string" && name ? name : "a subagent";
+}
+
+async function askSessionApproval(
+  turn: Turn,
+  snapshot: Record<string, unknown>,
+  source: unknown,
+): Promise<void> {
+  const id = snapshot.id;
+  const p = (snapshot.presentation ?? {}) as Record<string, unknown>;
+  if (typeof id !== "string" || snapshot.status !== "pending" || approvals.has(id)) return;
+  if (p.kind !== "exec" && p.kind !== "plugin") return;
+  if (typeof source === "string" && source !== turn.sessionKey) {
+    turn.descendants.set(source, Promise.resolve(true));
+  }
+  const choices = ((p.allowedDecisions ?? []) as string[]).flatMap((d) => CHOICES[d] ?? []);
+  const approval: ApprovalRequest =
+    p.kind === "exec"
+      ? {
+          id,
+          kind: "command",
+          title: "Command approval",
+          detail: String(p.commandText ?? "") || undefined,
+          choices,
+        }
+      : {
+          id,
+          kind: "tool",
+          title: String(p.title ?? "") || "Tool approval",
+          detail: String(p.description ?? "") || undefined,
+          choices,
+        };
+  approvals.set(id, { requestId: turn.requestId, approval, kind: p.kind });
+  if (typeof source === "string" && source !== turn.sessionKey)
+    approval.reason = `Asked by ${await sessionName(turn, source)}`;
+  if (approvals.get(id)?.approval !== approval) return;
+  turn.emit({ requestId: turn.requestId, type: "approval", approval });
+}
+
+function approvalResolved(turn: Turn, id: unknown): void {
+  if (typeof id === "string" && approvals.delete(id))
+    turn.emit({ requestId: turn.requestId, type: "approvalResolved", approvalId: id });
+}
+
+function descends(turn: Turn, key: string): Promise<boolean> {
+  let known = turn.descendants.get(key);
+  if (!known) {
+    known = (async () => {
+      let current = key;
+      for (let depth = 0; depth < 8; depth++) {
+        const { session } = await turn.gateway.client.request<{
+          session?: { parentSessionKey?: unknown; spawnedBy?: unknown };
+        }>("sessions.describe", { key: current });
+        const parent = session?.parentSessionKey ?? session?.spawnedBy;
+        if (typeof parent !== "string" || !parent) return false;
+        if (parent === turn.sessionKey) return true;
+        current = parent;
+      }
+      return false;
+    })().catch(() => false);
+    turn.descendants.set(key, known);
+  }
+  return known;
+}
+
+async function askQuestion(turn: Turn, record: Record<string, unknown>): Promise<void> {
+  if (typeof record.id !== "string" || typeof record.sessionKey !== "string") return;
+  if (record.status !== "pending") return;
+  if (record.sessionKey === turn.sessionKey) {
+    if (record.runId && !ownsRun(turn, record.runId)) return;
+  } else if (!(await descends(turn, record.sessionKey))) return;
   if (questions.has(record.id)) return;
   const question: ChatQuestion = {
     id: record.id,
@@ -522,28 +607,42 @@ function askQuestion(turn: Turn, record: Record<string, unknown>): void {
   turn.emit({ requestId: turn.requestId, type: "question", question });
 }
 
-async function askPending(turn: Turn): Promise<void> {
+// Gateways before 2026.7 refuse `includeApprovals`; their exec approvals are listed instead.
+async function watch(turn: Turn): Promise<void> {
+  const { client } = turn.gateway;
+  const key = turn.sessionKey;
+  const subscribed = await client
+    .request<{ approvalReplay?: { approvals?: Record<string, unknown>[] } }>(
+      "sessions.messages.subscribe",
+      { key, includeApprovals: true },
+    )
+    .catch(() => null);
+  turn.sessionApprovals = subscribed !== null;
+  if (!subscribed)
+    void client
+      .request("sessions.messages.subscribe", { key })
+      .catch((error: unknown) =>
+        logger.info("agent", "openclaw transcript watch failed", { error: String(error) }),
+      );
   const [pendingApprovals, pendingQuestions] = await Promise.all([
-    turn.gateway.client
-      .request<Record<string, unknown>[]>("exec.approval.list", {})
-      .catch(() => []),
+    subscribed
+      ? (subscribed.approvalReplay?.approvals ?? [])
+      : client.request<Record<string, unknown>[]>("exec.approval.list", {}).catch(() => []),
     // Needs `operator.questions`, which a device paired before may not have yet.
-    turn.gateway.client
+    client
       .request<{ questions?: Record<string, unknown>[] }>("question.list", {})
       .catch(() => ({ questions: [] })),
   ]);
-  for (const payload of pendingApprovals) {
-    if (!approvals.has(String(payload.id))) askApproval(turn, payload);
-  }
-  for (const record of pendingQuestions.questions ?? []) askQuestion(turn, record);
-}
-
-function watchTranscript(turn: Turn): void {
-  void turn.gateway.client
-    .request("sessions.messages.subscribe", { key: turn.sessionKey })
-    .catch((error: unknown) =>
-      logger.info("agent", "openclaw transcript watch failed", { error: String(error) }),
-    );
+  await Promise.all([
+    ...pendingApprovals.map((payload) =>
+      subscribed
+        ? askSessionApproval(turn, payload, payload.sourceSessionKey)
+        : approvals.has(String(payload.id))
+          ? undefined
+          : askApproval(turn, payload),
+    ),
+    ...(pendingQuestions.questions ?? []).map((record) => askQuestion(turn, record)),
+  ]);
 }
 
 function catchUp(turn: Turn, state: RunState): void {
@@ -621,8 +720,7 @@ async function follow(
         turn.resynced = true;
         if (!state.active) return await settle(state);
         catchUp(turn, state);
-        watchTranscript(turn);
-        await askPending(turn);
+        await watch(turn);
         return hush();
       } catch (error) {
         logger.info("agent", "openclaw reconnect failed", { requestId, error: String(error) });
@@ -648,13 +746,19 @@ async function follow(
   };
   const onEvent = ({ event, payload }: EventFrame) => {
     const p = (payload ?? {}) as Record<string, unknown>;
-    if (event === "exec.approval.requested") return askApproval(turn, p);
-    if (event === "exec.approval.resolved") {
-      if (typeof p.id === "string" && approvals.delete(p.id))
-        emit({ requestId, type: "approvalResolved", approvalId: p.id });
+    if (event === "session.approval") {
+      if (p.sessionKey !== sessionKey) return;
+      const snapshot = (p.approval ?? {}) as Record<string, unknown>;
+      if (p.phase === "pending") void askSessionApproval(turn, snapshot, p.sourceSessionKey);
+      else approvalResolved(turn, snapshot.id);
       return;
     }
-    if (event === "question.requested") return askQuestion(turn, p);
+    if (event === "exec.approval.requested") {
+      if (!turn.sessionApprovals) askApproval(turn, p);
+      return;
+    }
+    if (event === "exec.approval.resolved") return approvalResolved(turn, p.id);
+    if (event === "question.requested") return void askQuestion(turn, p);
     if (event === "question.resolved") {
       if (typeof p.id === "string" && questions.delete(p.id))
         emit({ requestId, type: "questionResolved", questionId: p.id });
@@ -774,10 +878,9 @@ async function follow(
       questions.delete(questionId);
       emit({ requestId, type: "questionResolved", questionId });
     }
-    if (turn.resynced)
-      void turn.gateway.client
-        .request("sessions.messages.unsubscribe", { key: sessionKey })
-        .catch(() => {});
+    void turn.gateway.client
+      .request("sessions.messages.unsubscribe", { key: sessionKey })
+      .catch(() => {});
   }
 }
 
@@ -893,6 +996,7 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
         ...(attachments.length > 0 ? { attachments } : {}),
       });
       turn.runId = sent.runId ?? requestId;
+      await watch(turn);
     });
   },
 
@@ -932,10 +1036,7 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
     if (!state.found) return emit({ requestId, type: "error", message: "not_received" });
     catchUp(turn, state);
     if (!state.active) return emit({ requestId, type: "done", responseId: null });
-    await follow(turn, settings, async () => {
-      watchTranscript(turn);
-      await askPending(turn);
-    });
+    await follow(turn, settings, () => watch(turn));
   },
 
   cancel(requestId) {
@@ -968,10 +1069,12 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
 
   async respondApproval(requestId, approvalId, decision) {
     const turn = turns.get(requestId);
-    if (!turn || approvals.get(approvalId)?.requestId !== requestId) return;
-    await turn.gateway.client.request("exec.approval.resolve", {
+    const owner = approvals.get(approvalId);
+    if (!turn || owner?.requestId !== requestId) return;
+    await turn.gateway.client.request(owner.kind ? "approval.resolve" : "exec.approval.resolve", {
       id: approvalId,
       decision: DECISIONS[decision],
+      ...(owner.kind ? { kind: owner.kind } : {}),
     });
     approvals.delete(approvalId);
     turn.emit({ requestId, type: "approvalResolved", approvalId });

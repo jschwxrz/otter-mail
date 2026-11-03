@@ -208,6 +208,128 @@ describe("OpenClaw runs picked up again", () => {
     await ended;
   });
 
+  it("asks for its subagents' approvals too, and answers them on the gateway", async () => {
+    const exec = (id: string) => ({
+      id,
+      status: "pending",
+      presentation: {
+        kind: "exec",
+        commandText: "make deploy",
+        allowedDecisions: ["allow-once", "allow-always", "deny"],
+      },
+    });
+    const resolved = vi.fn();
+    fixture.request.mockImplementation(async (method: string, params: { key?: string }) => {
+      if (method === "chat.history")
+        return { messages: [sent], sessionInfo: { hasActiveRun: true } };
+      if (method === "sessions.messages.subscribe")
+        return {
+          approvalReplay: { approvals: [{ ...exec("ap-1"), sourceSessionKey: "s:child" }] },
+        };
+      if (method === "sessions.describe")
+        return { session: { key: params.key, label: "Triager", parentSessionKey: "s" } };
+      if (method === "approval.resolve") return resolved(params);
+      return {};
+    });
+    const { events, ended } = await resume("req-1");
+    await vi.waitFor(() => expect(events.some((e) => e.type === "approval")).toBe(true));
+    expect(events.find((e) => e.type === "approval")).toMatchObject({
+      approval: {
+        id: "ap-1",
+        kind: "command",
+        detail: "make deploy",
+        reason: "Asked by Triager",
+        choices: ["once", "always", "deny"],
+      },
+    });
+
+    fixture.onEvent({
+      event: "session.approval",
+      payload: {
+        sessionKey: "s",
+        sourceSessionKey: "s",
+        phase: "pending",
+        approval: {
+          id: "plugin:ap-2",
+          status: "pending",
+          presentation: {
+            kind: "plugin",
+            title: "Create a Google Task",
+            description: "Executor wants to add a reminder",
+            allowedDecisions: ["allow-once", "deny"],
+          },
+        },
+      },
+    });
+    fixture.onEvent({
+      event: "exec.approval.requested",
+      payload: { id: "ap-3", request: { sessionKey: "s", command: "ls" } },
+    });
+    await vi.waitFor(() =>
+      expect(events.filter((e) => e.type === "approval").map((e) => e.approval.id)).toEqual([
+        "ap-1",
+        "plugin:ap-2",
+      ]),
+    );
+    expect(events.at(-1)).toMatchObject({
+      approval: { kind: "tool", title: "Create a Google Task", choices: ["once", "deny"] },
+    });
+    expect(events.at(-1)).not.toHaveProperty("approval.reason");
+
+    await openClawProvider.respondApproval!("req-1", "ap-1", "once");
+    expect(resolved).toHaveBeenCalledWith({ id: "ap-1", kind: "exec", decision: "allow-once" });
+    fixture.onEvent({
+      event: "session.approval",
+      payload: { sessionKey: "s", phase: "terminal", approval: { id: "plugin:ap-2" } },
+    });
+    expect(events.filter((e) => e.type === "approvalResolved")).toEqual([
+      { requestId: "req-1", type: "approvalResolved", approvalId: "ap-1" },
+      { requestId: "req-1", type: "approvalResolved", approvalId: "plugin:ap-2" },
+    ]);
+    fixture.onEvent({
+      event: "chat",
+      payload: { sessionKey: "s", runId: "req-1", state: "aborted" },
+    });
+    await ended;
+  });
+
+  it("asks what a subagent asks, however deep, and not what other sessions do", async () => {
+    const parents: Record<string, string> = { "s:child": "s", "s:grandchild": "s:child" };
+    fixture.request.mockImplementation(async (method: string, params: { key?: string }) => {
+      if (method === "chat.history")
+        return { messages: [sent], sessionInfo: { hasActiveRun: true } };
+      if (method === "sessions.describe")
+        return { session: { parentSessionKey: parents[params.key ?? ""] } };
+      if (method === "question.list") return { questions: [] };
+      return {};
+    });
+    const { events, ended } = await resume("req-1");
+    const ask = (id: string, sessionKey: string) =>
+      fixture.onEvent({
+        event: "question.requested",
+        payload: {
+          id,
+          sessionKey,
+          runId: "child-run",
+          status: "pending",
+          questions: [{ questionId: "pick", header: "Pick", question: "Which?", options: [] }],
+        },
+      });
+    await vi.waitFor(() => expect(fixture.request).toHaveBeenCalledWith("question.list", {}));
+    ask("ask-other", "elsewhere");
+    ask("ask-deep", "s:grandchild");
+    await vi.waitFor(() => expect(events.some((e) => e.type === "question")).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(events.filter((e) => e.type === "question").map((e) => e.question.id)).toEqual([
+      "ask-deep",
+    ]);
+    fixture.onEvent({
+      event: "chat",
+      payload: { sessionKey: "s", runId: "req-1", state: "aborted" },
+    });
+    await ended;
+  });
+
   it("says so when the message never reached the gateway", async () => {
     gateway(() => ({ messages: earlier, sessionInfo: { hasActiveRun: false } }));
     const { events, ended } = await resume("req-1");
