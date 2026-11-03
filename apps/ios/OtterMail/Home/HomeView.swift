@@ -177,7 +177,7 @@ struct HomeView: View {
             guard session.opening == destination else { return }
             session.opening = nil
             guard destination.userId == nil || destination.userId == session.user?.id else { return }
-            // The mailbox it's for, or the alias mailbox (whose mail is its parent's; the parent, if it's since turned off).
+            // An alias mailbox turned off since opens in its parent.
             let mailbox = destination.email.flatMap { email in
                 store.mailboxes.first { $0.email.lowercased() == email.lowercased() }
                     ?? store.alias(email).flatMap { alias in store.shownScopes.contains(alias) ? alias : store.mailbox(alias.source) }

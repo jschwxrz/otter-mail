@@ -70,9 +70,7 @@ enum DemoMail {
         var signature: String
         var labels: [SeedLabel]
         var threads: [SeedThread]
-        /** An IMAP mailbox's (pretend) servers; it's then IMAP-shaped: folders, flags, its Archive. */
         var imap: ImapSettings?
-        /** The account's `sendAs` and `aliasMailboxes` for it, as the Mac and the web set them. */
         var sendAs: [String]?
         var aliasMailboxes: [AliasMailbox]?
     }

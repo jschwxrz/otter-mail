@@ -18,7 +18,6 @@ nonisolated enum VerifiedNotification {
         var sender: String
         var subject: String
         var preview: String
-        /** The alias mailbox it's for (IMAP), when the mailbox has any. */
         var alias: AliasMailbox? = nil
     }
 
@@ -135,10 +134,8 @@ nonisolated enum VerifiedNotification {
         } onCancel: { client.close() }
     }
 
-    /** The headers that say where a copy was delivered (`AliasMailbox.deliveredTo`), as IMAP fetches them. */
     static let deliveredToFields = "ORIGINAL-RECIPIENT DELIVERED-TO X-ORIGINAL-TO"
 
-    /** Which of `aliases` a fetched message (its ENVELOPE, and the delivered-to headers) is announced as. */
     static func alias(_ envelope: [ImapValue], _ fields: [String: ImapValue], among aliases: [AliasMailbox]) -> AliasMailbox? {
         guard !aliases.isEmpty else { return nil }
         let addresses = { (i: Int) in i < envelope.count ? imapAddresses(envelope[i]).map(\.email) : [] }

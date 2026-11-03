@@ -3,13 +3,11 @@ import Testing
 import UserNotifications
 @testable import Otter_Mail
 
-/** Alias mailboxes (a mailbox's address with a mailbox of its own) and sending from a mailbox's other addresses. */
 @MainActor
 struct AliasMailboxTests {
     private let parent = "robin@icloud.example"
     private let me = "me@robin.example", studio = "mail@robin.example", accounts = "accounts@robin.example"
     private let ines = Person(name: "Inês", email: "ines@duarte.example")
-    /** The parent's other addresses (its Send from). */
     private var others: Set<String> { [me, studio, accounts] }
 
     private func mailbox(_ email: String = "robin@icloud.example", imap: Bool = true) -> Mailbox {
@@ -103,7 +101,6 @@ struct AliasMailboxTests {
         let draft = thread("draft", [], [message("d", from: Person(name: "Robin", email: studio), to: [ines.email], draft: true)])
         #expect(MailStore.belongs(draft, to: studio, in: .drafts, others: others))
         #expect(!MailStore.belongs(draft, to: studio, in: .sent, others: others))
-        // Archive, Trash and Flagged take either.
         let archived = thread("archived", ["ARCHIVE"], [message("r", to: [me], deliveredTo: me)])
         #expect(MailStore.belongs(archived, to: me, in: .archive, others: others))
         #expect(MailStore.belongs(sent, to: me, in: .archive, others: others))
@@ -121,9 +118,7 @@ struct AliasMailboxTests {
         #expect(store.threads(in: .sent, scope: me).isEmpty)
         #expect(store.unreadCount(in: .inbox, scope: me) == 2)
         #expect(store.unreadCount(in: .inbox, scope: studio) == 1)
-        // The icon's badge counts each thread once: the aliases' mail is the parent's.
         #expect(store.appBadge == 3)
-        // Both copies are one message to read; an alias mailbox reads its own copy.
         #expect(copies.distinctMessages().map(\.id) == ["copy-studio"])
         #expect(copies.distinctMessages(preferring: me).map(\.id) == ["copy-me"])
     }
@@ -151,7 +146,6 @@ struct AliasMailboxTests {
         #expect(store.alias(me)?.displayName == "Me")
         #expect(store.alias(me)?.color == Session.defaultColor(me))
         #expect(store.alias(me)?.signature == "<div>Robin</div>")
-        // mail:mailboxes orders the mailboxes, and alias mailboxes only among their parent's: always right after it.
         store.preferences.arrangement.order = [gmail.email, studio, parent]
         #expect(store.shownScopes.map(\.email) == [gmail.email, parent, studio, me])
         store.setOn(false, store.alias(studio)!)
@@ -169,13 +163,11 @@ struct AliasMailboxTests {
         let gmail = mailbox("robin@gmail.example", imap: false)
         let store = store([], mailboxes: [mailbox(), gmail])
         #expect(store.arrangedScopes.map(\.email) == [parent, me, studio, gmail.email])
-        // Studio above Me: among its parent's.
         store.move(from: [2], to: 1)
         #expect(store.arrangedScopes.map(\.email) == [parent, studio, me, gmail.email])
         // Dragged past the Gmail mailbox, it goes back after its parent.
         store.move(from: [1], to: 4)
         #expect(store.arrangedScopes.map(\.email) == [parent, me, studio, gmail.email])
-        // A mailbox takes its alias mailboxes along.
         store.move(from: [3], to: 0)
         #expect(store.arrangedScopes.map(\.email) == [gmail.email, parent, me, studio])
     }
@@ -203,7 +195,6 @@ struct AliasMailboxTests {
         store.otherAddresses.aliasMailboxes[other.email] = [AliasMailbox(address: "ME@robin.example")]
         #expect(store.aliases(of: other).isEmpty)
         #expect(store.alias(me)?.source == parent)
-        // A mailbox's own address is never an alias mailbox.
         store.otherAddresses.sendAs[parent] = [me, other.email]
         store.otherAddresses.aliasMailboxes[parent] = [AliasMailbox(address: me), AliasMailbox(address: other.email)]
         #expect(store.aliases(of: mailbox()).map(\.email) == [me])
@@ -236,14 +227,12 @@ struct AliasMailboxTests {
     @Test func draftsStartFromTheAliasWithItsSignature() throws {
         let thread = thread("t", ["INBOX"], [message("a", to: [studio, "kai@example.com"], cc: [me], deliveredTo: studio)])
         let store = store([thread])
-        // In the parent, a reply goes from the address the mail was for, signed as its alias mailbox.
         let reply = try #require(store.reply(to: thread, in: parent, all: true))
         #expect(reply.from == parent)
         #expect(reply.address == studio)
         #expect(reply.body.hasPrefix("\n\nStudio"))
         #expect(Draft.people(reply.to).map(\.email) == [ines.email])
         #expect(Draft.people(reply.cc).map(\.email) == ["kai@example.com"])
-        // In an alias mailbox, from that alias; one without a signature of its own signs as the parent.
         let fromMe = try #require(store.reply(to: thread, in: me, all: false))
         #expect(fromMe.address == me)
         #expect(fromMe.body.hasPrefix("\n\nRobin"))
@@ -252,10 +241,8 @@ struct AliasMailboxTests {
         #expect(new.address == studio)
         #expect(store.signature(of: new) == "<div>Studio</div>")
         #expect(Draft.new(from: mailbox()).address == nil)
-        // The address goes out only while it's still one of the mailbox's.
         #expect(store.sendingAddress(new, of: mailbox()) == studio)
         #expect(store.sendingAddress(Draft(from: parent, address: "someone@else.example"), of: mailbox()) == parent)
-        // A saved draft resumes from the address it was written from.
         let saved = MailThread(id: "d", mailbox: parent, subject: "Draft", labels: [],
                                messages: [message("d", from: Person(name: "Robin", email: studio), to: [ines.email], draft: true)])
         #expect(Draft.resume(saved.latest, in: saved).address == studio)
@@ -284,7 +271,6 @@ struct AliasMailboxTests {
         let plain = thread("p", ["INBOX"], [message("p", to: [parent], deliveredTo: parent)])
         #expect(sync.alert(plain.latest, in: plain).subtitle == "iCloud · p")
         #expect(sync.alert(plain.latest, in: plain).userInfo["mailbox"] as? String == parent)
-        // One mailbox and no aliases: the subject alone.
         store.otherAddresses = MailAddresses()
         #expect(sync.alert(plain.latest, in: plain).subtitle == "p")
     }
@@ -321,10 +307,8 @@ struct AliasMailboxTests {
         #expect(provider.pages == 4)
         #expect(sync.listed(store.threads(in: .inbox, scope: me), in: .inbox).count == 20)
         #expect(sync.hasMore(.inbox, scope: me))
-        // The parent's own list pages one at a time, as before.
         await sync.loadMore(.inbox, scope: parent)
         #expect(provider.pages == 5)
-        // At the end of the parent's pages it stops, short of a full page.
         await sync.loadMore(.inbox, scope: me)
         #expect(provider.pages == 6)
         #expect(!sync.hasMore(.inbox, scope: me))
@@ -341,13 +325,12 @@ struct AliasMailboxTests {
         #expect(provider.pages == MailSync.aliasPageLimit)
         #expect(sync.paused(.inbox, scope: me))
         #expect(sync.hasMore(.inbox, scope: me))
-        // Asked again, it looks through as many more.
         await sync.loadMore(.inbox, scope: me)
         #expect(provider.pages == 2 * MailSync.aliasPageLimit)
     }
 }
 
-/** A parent's inbox in pages of 30 (6 of them unless said), every sixth thread (or `aliasEvery`th) delivered to the alias. */
+/** Pages of 30 threads, every `aliasEvery`th delivered to the alias. */
 @MainActor
 private final class PagedProvider: MailProvider {
     let alias: String, parent: String, count: Int, aliasEvery: Int

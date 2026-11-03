@@ -175,7 +175,6 @@ struct ComposeView: View {
         var address: String
     }
 
-    /** Where it can be from: every shown mailbox's addresses, or (a reply, a saved draft) its own mailbox's. */
     private var senders: [Sender] {
         let mailboxes = draft.messageID == nil && draft.threadID == nil ? store.shownMailboxes : store.mailbox(draft.from).map { [$0] } ?? []
         return mailboxes.flatMap { mailbox in store.addresses(of: mailbox.email).map { Sender(mailbox: mailbox.email, address: $0) } }
@@ -186,7 +185,7 @@ struct ComposeView: View {
         return senders.contains(picked) ? picked : Sender(mailbox: draft.from, address: draft.from.lowercased())
     }
 
-    /** Another From, and its signature for the last one's (or, not yet written in, at the top as a new message has it). */
+    /** A signature not in the body yet goes where `Draft.new` puts it, while the body is untouched. */
     private func pick(_ sender: Sender) {
         let before = Signature.plainText(store.signature(of: draft))
         draft.from = sender.mailbox

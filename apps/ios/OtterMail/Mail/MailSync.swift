@@ -32,10 +32,9 @@ final class MailSync {
     private var waiting: [String: [CheckedContinuation<Void, Never>]] = [:]
     /** Folder pages being fetched ("email key"), so the same page isn't asked for twice at once. */
     private var paging: Set<String> = []
-    /** Alias mailboxes' lists paging their parents ("scope key"), run apart from the list that asked. */
+    /** Tasks of their own, so a list's `.task` restarting doesn't cancel a page midway. */
     @ObservationIgnored private var aliasPaging: [String: Task<Void, Never>] = [:]
 
-    /** `providers`: ready-made ones by mailbox (tests' pretend servers). */
     init(store: MailStore, google: GoogleAuth, microsoft: MicrosoftAuth = MicrosoftAuth(), relay: Relay? = nil, cache: MailCache = .live,
          providers: [String: any MailProvider] = [:]) {
         self.store = store
@@ -269,11 +268,8 @@ final class MailSync {
         return threads.filter { !paged.contains($0.mailbox) || states[$0.mailbox]?.lists($0, in: key) != false }
     }
 
-    /** The matching threads a "load more" in an alias mailbox wants before it stops paging the parent. */
     static let aliasPage = 20
-    /** The parent's pages one "load more" in an alias mailbox looks through at most. */
     static let aliasPageLimit = 10
-    /** Alias mailboxes' lists ("scope key") whose last load reached the limit short of a page: the list asks before paging on. */
     private(set) var aliasPaused: Set<String> = []
 
     func paused(_ folder: Folder, scope: String) -> Bool { aliasPaused.contains("\(scope) \(Self.key(folder))") }
@@ -290,10 +286,8 @@ final class MailSync {
     }
 
     /**
-     * An alias mailbox lists some of its parent's mail, which may be far
-     * between: the parent pages on until a page's worth of the alias's is in,
-     * its pages end (or one fails), or it has looked through `aliasPageLimit`
-     * of them; then the list waits to be asked.
+     * An alias mailbox's mail can be sparse in its parent's: page the parent until `aliasPage` of it are in,
+     * but through at most `aliasPageLimit` pages before the list waits to be asked.
      */
     private func pageAlias(_ folder: Folder, scope: String) async {
         let count = { self.listed(self.store.threads(in: folder, scope: scope), in: folder).count }
@@ -334,7 +328,6 @@ final class MailSync {
         return found
     }
 
-    /** The mailbox a place's mail comes from: its own, or an alias mailbox's parent. */
     private func mailboxes(_ scope: String) -> [String] {
         let source = store.mailbox(for: scope)?.source ?? scope
         return store.shownMailboxes.filter { !$0.signedOut && $0.email == source }.map(\.email)
@@ -369,7 +362,7 @@ final class MailSync {
             files.append(MIME.File(filename: file.filename, mimeType: file.mimeType, data: data))
         }
         let html = Compose.html(draft.body, signature: store.signature(of: draft))
-        // From the address it picked; the server (and SMTP's envelope) stay the mailbox's.
+        // The server and SMTP's envelope stay the mailbox's.
         let raw = MIME.message(
             from: Person(name: mailbox.name, email: store.sendingAddress(draft, of: mailbox)),
             to: to,
@@ -427,7 +420,7 @@ final class MailSync {
     private func announce(_ threads: [MailThread], before: [String: MailThread]) async {
         let mode = store.preferences.notifications
         guard mode != .off, !stopped, !Task.isCancelled else { return }
-        // One alert per Message-ID: a copy delivered to each of two aliases is one message.
+        // One per Message-ID: a copy delivered to each of two aliases is one message.
         var announced: Set<String> = []
         for thread in threads {
             guard !stopped, !Task.isCancelled, store.preferences.notifications != .off else { return }
@@ -450,10 +443,6 @@ final class MailSync {
 }
 
 extension MailSync {
-    /**
-     * A local alert for new mail: named (when there's more than one mailbox)
-     * and opened as the alias mailbox it's for (AliasMailbox.announced), else its mailbox.
-     */
     func alert(_ message: Message, in thread: MailThread) -> UNMutableNotificationContent {
         let alias = AliasMailbox.announced(to: message.to.map(\.email), cc: message.cc.map(\.email), deliveredTo: message.deliveredTo,
                                            among: store.shownAliases(of: thread.mailbox))

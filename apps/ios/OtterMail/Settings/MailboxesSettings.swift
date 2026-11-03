@@ -13,7 +13,7 @@ struct MailboxesSettings: View {
                 let mailboxes = store.shownMailboxes.count
                 ForEach(store.arrangedScopes) { mailbox in
                     if let parent = mailbox.parent {
-                        // Made on the Mac and the web (Send from › Own mailbox); under its parent, in order among its others.
+                        // Made and edited on the Mac and the web, so no page of its own here.
                         row(mailbox, on: shown.contains(mailbox), locked: shown.allSatisfy { $0.email != parent }) {
                             Text(mailbox.displayName).foregroundStyle(palette.text)
                         }
@@ -79,7 +79,6 @@ struct MailboxesSettings: View {
         }
     }
 
-    /** A mailbox's row: its mark, title and address, and its switch (`locked`: not to be switched now). */
     private func row(_ mailbox: Mailbox, on: Bool, locked: Bool, @ViewBuilder title: () -> some View) -> some View {
         HStack(spacing: 12) {
             MailboxMark(mailbox: mailbox, size: 30)

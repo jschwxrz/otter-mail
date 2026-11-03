@@ -20,14 +20,10 @@ nonisolated struct Mailbox: Identifiable, Hashable, Codable {
     var signedOut = false
     var imap: ImapSettings? = nil
     var outlook: Bool? = nil
-    /**
-     * Set on an alias mailbox (`MailStore.alias`): the mailbox it's an address
-     * of, whose mail and server it uses. Never in `MailStore.mailboxes`.
-     */
+    /** Set on an alias mailbox (`MailStore.aliases`), which is never in `MailStore.mailboxes`. */
     var parent: String? = nil
 
     var id: String { email }
-    /** The mailbox whose server has its mail: the parent's, for an alias mailbox. */
     var source: String { parent ?? email }
     var me: Person { Person(name: name, email: email) }
     var provider: MailProviderKind { imap != nil ? .imap : outlook == true ? .outlook : .gmail }
@@ -53,14 +49,9 @@ nonisolated struct Mailbox: Identifiable, Hashable, Codable {
     }
 }
 
-/**
- * The mailboxes' addresses besides their own, as the Mac and the web set them
- * (the account's `sendAs` and `aliasMailboxes` sections; read here, never written).
- */
 nonisolated struct MailAddresses: Codable, Equatable {
-    /** The other addresses each mailbox sends from, by its lower-cased address. */
+    // Both by the mailbox's lower-cased address.
     var sendAs: [String: [String]] = [:]
-    /** Those with a mailbox of their own, by their parent's lower-cased address. */
     var aliasMailboxes: [String: [AliasMailbox]] = [:]
 
     init(sendAs: [String: [String]] = [:], aliasMailboxes: [String: [AliasMailbox]] = [:]) {
@@ -68,7 +59,7 @@ nonisolated struct MailAddresses: Codable, Equatable {
         self.aliasMailboxes = aliasMailboxes
     }
 
-    /** The sections as synced (JSON), an entry that isn't one skipped, as core's parseAliasMailboxes skips it. */
+    /** Malformed entries are skipped, as core's parseAliasMailboxes does, rather than failing the section. */
     init(sendAs: Any?, aliasMailboxes: Any?) {
         let text = { (value: Any?) in (value as? String).flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 } }
         self.sendAs = ((sendAs as? [String: Any]) ?? [:]).mapValues { ($0 as? [Any] ?? []).compactMap(text) }
@@ -138,14 +129,9 @@ nonisolated struct Message: Identifiable, Hashable, Codable {
     var unread: Bool
     var starred: Bool
     var draft: Bool
-    /**
-     * The ones replies and unsubscribing need (Message-ID, References,
-     * List-Unsubscribe), and where IMAP delivered it (Original-Recipient,
-     * Delivered-To, X-Original-To; mail cached before has none).
-     */
+    /** The ones replies, unsubscribing and alias mailboxes need: Message-ID, References, List-Unsubscribe, Original-Recipient, Delivered-To, X-Original-To. */
     var headers: [String: String]
 
-    /** The addresses this copy was delivered to (`AliasMailbox.deliveredTo`), lower-cased. */
     var deliveredTo: [String] { AliasMailbox.deliveredTo { headers[$0] } }
 
     var snippet: String {
@@ -172,10 +158,7 @@ nonisolated struct MailThread: Identifiable, Hashable, Codable {
     var isDraft: Bool { messages.allSatisfy(\.draft) }
     var sent: [Message] { messages.filter { !$0.draft } }
 
-    /**
-     * Its messages with each Message-ID once: iCloud files a copy for each of
-     * the addresses it was delivered to. `address`'s copy (an alias mailbox's) is the one kept.
-     */
+    /** iCloud files a copy for each address a message was delivered to; `address`'s (an alias mailbox's) is kept. */
     func distinctMessages(preferring address: String? = nil) -> [Message] {
         var kept: [String: Int] = [:]
         var distinct: [Message] = []

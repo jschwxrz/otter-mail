@@ -10,7 +10,6 @@ struct ThreadRow: View {
     @Environment(\.palette) private var palette
     let thread: MailThread
     var mark = "star"
-    /** The mailbox's addresses (MailStore.addresses): mail from them is "me". */
     var mine: Set<String> = []
 
     var body: some View {

@@ -43,7 +43,6 @@ final class Session {
 
     private static let userKey = "otter:user"
     private static let demoKey = "otter:demo"
-    /** The account's `sendAs` and `aliasMailboxes`, as last pulled (MailAddresses). */
     private static let addressesKey = "otter:addresses"
 
     init(preferences: Preferences) {
@@ -422,7 +421,7 @@ final class Session {
         if signatures == nil { preferenceChanged("signatures") }
     }
 
-    /** The account's other addresses and alias mailboxes (set on the Mac and the web): read, never written. */
+    /** Read only: the Mac and the web write these sections. */
     private func applyAddresses(sendAs: Any?, aliasMailboxes: Any?) {
         let addresses = MailAddresses(sendAs: sendAs, aliasMailboxes: aliasMailboxes)
         guard addresses != store.otherAddresses else { return }
@@ -625,7 +624,6 @@ final class Session {
         let originalUser = user?.id
         guard destination.userId == nil || destination.userId == user?.id else { opening = nil; return }
         await sync?.waitForCache()
-        // An alias mailbox's mail is its parent's.
         let known = { [store] (email: String?) in
             email.flatMap { email in
                 store.mailboxes.first { $0.email.lowercased() == email.lowercased() } ?? store.alias(email).flatMap { store.mailbox($0.source) }

@@ -60,6 +60,8 @@ account offers each kind.
 | Sidebar: each mailbox opens to its folders and labels; views                                                | ✓                  | ✓                                   | — (bar menu)            |
 | Sidebar hidden: hover the window's edge to peek                                                             | ✓                  | ✓                                   | —                       |
 | Rename and color a mailbox (synced)                                                                         | ✓                  | ✓                                   | ✓                       |
+| Own mailbox for a Send from address (IMAP): a tab, filtered folders, name, color, signature; synced         | ✓                  | ✓                                   | ✓ (made on Mac, web)    |
+| A message Bcc'd to two of your addresses: a copy in each alias mailbox, shown once elsewhere                | ✓                  | ✓                                   | ✓                       |
 | Google profile picture per mailbox                                                                          | ✓ (kept current)   | ✓ (kept current)                    | —                       |
 | Remove a mailbox (unlinks it everywhere)                                                                    | ✓                  | ✓                                   | ✓                       |
 | Mailbox linked elsewhere shows "signed out"                                                                 | ✓                  | ✓                                   | ✓                       |
@@ -253,7 +255,8 @@ chats read the same everywhere and continue on that Mac.
 | Forward                                | ✓ (with attachments)                                                                                                              | ✓        | last message, with attachments                 |
 | Cc / Bcc                               | ✓ / ✓                                                                                                                             | ✓        | ✓ / ✓                                          |
 | From: pick the mailbox                 | ✓                                                                                                                                 | ✓        | ✓                                              |
-| From: other addresses (aliases)        | Gmail: its "Send mail as"; IMAP: entered in Settings (suggested from its mail), synced; replies from the address mail was sent to | ✓        | —                                              |
+| From: other addresses (aliases)        | Gmail: its "Send mail as"; IMAP: entered in Settings (suggested from its mail), synced; replies from the address mail was sent to | ✓        | IMAP: synced from the Mac and the web          |
+| From in an alias mailbox               | new mail and replies from its address; its signature, else the mailbox's                                                          | ✓        | ✓                                              |
 | Contact suggestions (from cached mail) | ✓                                                                                                                                 | ✓        | ✓ (recipient chips)                            |
 | Attachments (25 MB)                    | ✓                                                                                                                                 | ✓        | ✓ (Photos / Files)                             |
 | Rich text (bold, lists, links, quotes) | ✓                                                                                                                                 | ✓        | —                                              |
@@ -331,6 +334,7 @@ color, the others their color in Google or Outlook. IMAP mailboxes have none.
 | Feature                                                    | Mac                                         | Web                     | iPhone                                                               |
 | ---------------------------------------------------------- | ------------------------------------------- | ----------------------- | -------------------------------------------------------------------- |
 | New-mail notifications (Off / Inbox / All), click opens it | ✓                                           | ✓ (browser)             | ✓ (verified APNs for connected Gmail, Outlook, IMAP; local fallback) |
+| Mail for an alias mailbox: named after it, opens there     | ✓ (copies of one message: once)             | ✓                       | ✓ (copies of one message: once)                                      |
 | Sign-in codes in notifications                             | ✓ (Copy & trash button; Linux: in the text) | in the text             | —                                                                    |
 | Gmail push via relay                                       | ✓ (with an Otter account)                   | ✓                       | ✓ (WebSocket + verified APNs)                                        |
 | Outlook push via relay (Graph subscription)                | ✓ (with an Otter account)                   | ✓                       | ✓ (WebSocket + verified APNs)                                        |

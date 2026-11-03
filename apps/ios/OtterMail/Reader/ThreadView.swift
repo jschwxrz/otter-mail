@@ -106,7 +106,6 @@ struct ThreadView: View {
         }
     }
 
-    /** The mailbox the thread is shown in: an alias mailbox's place shows it as the alias's. */
     private func shown(_ mailbox: Mailbox) -> Mailbox {
         store.alias(place.scope).flatMap { $0.source == mailbox.email ? $0 : nil } ?? mailbox
     }

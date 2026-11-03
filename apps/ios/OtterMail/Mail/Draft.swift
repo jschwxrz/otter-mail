@@ -2,9 +2,8 @@ import Foundation
 
 nonisolated struct Draft: Identifiable, Hashable, Codable {
     var id = UUID()
-    /** The mailbox it's written in, whose server sends it. */
     var from: String
-    /** The address it's from, lower-cased, when not the mailbox's own: another of its (MailStore.addresses). */
+    /** The From address, lower-cased, when it isn't `from` (the mailbox, whose server sends it). */
     var address: String? = nil
     var to = ""
     var cc = ""
@@ -62,16 +61,10 @@ nonisolated struct Draft: Identifiable, Hashable, Codable {
             && !person.email.contains(where: { $0.isWhitespace || "<>,;\"".contains($0) })
     }
 
-    /** A new message; in an alias mailbox (`mailbox.parent`), from its address. */
     @MainActor static func new(from mailbox: Mailbox, to: String = "") -> Draft {
         Draft(from: mailbox.source, address: mailbox.parent == nil ? nil : mailbox.email, to: to, body: signatureBlock(mailbox))
     }
 
-    /**
-     * A reply from `mailbox` (the address's alias mailbox, if it has one) and
-     * `address`, else its own; `mine` is every address of its mailbox, so
-     * Reply all leaves them out.
-     */
     @MainActor static func reply(to thread: MailThread, in mailbox: Mailbox, address: String? = nil, mine: Set<String> = [], all: Bool) -> Draft {
         let last = thread.sent.last ?? thread.latest
         let address = (address ?? mailbox.email).lowercased()
@@ -95,11 +88,6 @@ nonisolated struct Draft: Identifiable, Hashable, Codable {
         )
     }
 
-    /**
-     * The address a reply to `message` goes from (`addresses`: its mailbox's,
-     * its own first): the message's From if it's one of them, else the first
-     * of them in To, then Cc, then the addresses it was delivered to.
-     */
     static func replyAddress(_ message: Message, _ addresses: [String]) -> String? {
         let candidates = [message.from.email] + message.to.map(\.email) + message.cc.map(\.email) + message.deliveredTo
         return candidates.map { $0.lowercased() }.first(where: addresses.contains) ?? addresses.first

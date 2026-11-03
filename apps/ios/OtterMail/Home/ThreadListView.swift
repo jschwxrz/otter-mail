@@ -67,7 +67,7 @@ struct ThreadListView: View {
 
             if !searching && !searchTab, let sync = store.sync, sync.hasMore(place.folder, scope: place.scope) {
                 if sync.paused(place.folder, scope: place.scope) {
-                    // An alias mailbox whose parent's last pages had little of its mail: further on a tap.
+                    // Paging stopped at `aliasPageLimit`: going further takes a tap.
                     Button("Load more") { Task { await sync.loadMore(place.folder, scope: place.scope) } }
                         .font(.inter(.subheadline))
                         .foregroundStyle(palette.muted)

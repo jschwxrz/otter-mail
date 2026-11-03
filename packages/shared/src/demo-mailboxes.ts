@@ -1618,13 +1618,8 @@ export const DEMO_OUTLOOK_ACCOUNT: OutlookSeedAccount = {
   ],
 };
 
-// ── IMAP with alias mailboxes ────────────────────────────────────────────────
-// The iPhone demo's IMAP mailbox, shaped like iCloud with a domain of its own:
-// mail to robinotter.example is delivered into it, and two of those addresses
-// have a mailbox of their own (the account's `sendAs` and `aliasMailboxes`, as
-// Send from sets them on the Mac and the web). Each delivered copy carries
-// iCloud's Original-Recipient; mail cached before that header shows To and Cc
-// alone. In the iPhone app's bundle (scripts/export-ios-resources.ts).
+// An iCloud-shaped IMAP mailbox with a domain delivered into it, two of its Send from addresses
+// with alias mailboxes. Only in the iPhone app's bundle (scripts/export-ios-resources.ts).
 
 export type AliasSeedAccount = SeedAccount & {
   imap: {
