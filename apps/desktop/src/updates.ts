@@ -9,6 +9,7 @@ import { releaseChannel, versionMatchesChannel } from "@otter-mail/shared/releas
 import { broadcast } from "./ipc.js";
 import { logger } from "./logger.js";
 import { hostOS } from "./os/index.js";
+import { rememberWindowsForUpdate } from "./windows/main-window.js";
 
 const { autoUpdater } = electronUpdater;
 
@@ -142,6 +143,7 @@ export function initUpdates(): void {
     )
       return;
     logger.info("updates", "Restarting to install", { version: state.availableVersion });
+    rememberWindowsForUpdate();
     autoUpdater.quitAndInstall(true, true);
   });
 

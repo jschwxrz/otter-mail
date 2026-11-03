@@ -23,24 +23,27 @@ export type WindowTab = {
 
 type State = { tabs: WindowTab[]; activeId: string };
 
-const KEY = "otter:window-tabs";
-
 /**
- * The main window keeps its tabs across launches; a window a tab was dragged
- * out into keeps its own, only while it's open (sessionStorage is per window).
- * What it opened on is `otter:tab-window` (the entry's, from its address).
+ * Each of the desktop app's windows keeps its tabs across launches, by its
+ * number (the first's, and the web app's, under the plain key). A window a tab
+ * was dragged out into starts from that tab: `otter:tab-window`, once.
  */
+const KEY = (() => {
+  const key = sessionStorage.getItem("otter:window");
+  return key && key !== "0" ? `otter:window-tabs:${key}` : "otter:window-tabs";
+})();
 const tabWindow = (() => {
   try {
-    return JSON.parse(sessionStorage.getItem("otter:tab-window") ?? "null") as {
+    const seed = JSON.parse(sessionStorage.getItem("otter:tab-window") ?? "null") as {
       title: string;
       icon: string;
     } | null;
+    sessionStorage.removeItem("otter:tab-window");
+    return seed;
   } catch {
     return null;
   }
 })();
-const storage = tabWindow ? sessionStorage : localStorage;
 
 const newTabFor = (href: string): WindowTab => ({
   id: crypto.randomUUID(),
@@ -50,8 +53,18 @@ const newTabFor = (href: string): WindowTab => ({
 });
 
 function load(): State {
+  if (tabWindow && location.hash.length > 1) {
+    const tab = {
+      ...newTabFor(location.hash.slice(1)),
+      title: tabWindow.title,
+      icon: (tabWindow.icon || "inbox") as RecentIcon,
+    };
+    const state = { tabs: [tab], activeId: tab.id };
+    localStorage.setItem(KEY, JSON.stringify(state));
+    return state;
+  }
   try {
-    const saved = JSON.parse(storage.getItem(KEY) ?? "null") as State | null;
+    const saved = JSON.parse(localStorage.getItem(KEY) ?? "null") as State | null;
     if (saved && Array.isArray(saved.tabs) && saved.tabs.length > 0) {
       const activeId = saved.tabs.some((t) => t.id === saved.activeId)
         ? saved.activeId
@@ -61,14 +74,6 @@ function load(): State {
   } catch {
     // Broken tabs start over.
   }
-  if (tabWindow && location.hash.length > 1) {
-    const tab = {
-      ...newTabFor(location.hash.slice(1)),
-      title: tabWindow.title,
-      icon: (tabWindow.icon || "inbox") as RecentIcon,
-    };
-    return { tabs: [tab], activeId: tab.id };
-  }
   return { tabs: [], activeId: "" };
 }
 
@@ -77,7 +82,7 @@ export const useWindowTabs = create<State>(() => load());
 function set(update: (s: State) => State): void {
   const next = update(useWindowTabs.getState());
   useWindowTabs.setState(next, true);
-  storage.setItem(KEY, JSON.stringify(next));
+  localStorage.setItem(KEY, JSON.stringify(next));
 }
 
 export function followLocation(href: string): void {
