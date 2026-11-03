@@ -18,6 +18,18 @@ export interface RelayAccount {
   picture: string | null;
   displayName: string | null;
   color: string | null;
+  customPicture: string | null;
+}
+
+// A chosen picture is an inline data URL, never a link, so no device fetches it from anywhere.
+export const MAILBOX_PICTURE_MAX_LENGTH = 48_000;
+
+export function isMailboxPicture(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length <= MAILBOX_PICTURE_MAX_LENGTH &&
+    /^data:image\/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/.test(value)
+  );
 }
 
 export const GMAIL_SIGN_IN_CANCELLED = "sign-in-cancelled";
@@ -115,6 +127,7 @@ export interface PutAccountRequest {
   picture?: string | null;
   displayName?: string | null;
   color?: string | null;
+  customPicture?: string | null;
 }
 
 export type Preferences = Record<string, unknown>;

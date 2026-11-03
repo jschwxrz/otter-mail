@@ -26,6 +26,7 @@ const local = (
     color?: string;
     name?: string;
     picture?: string;
+    customPicture?: string;
     imap?: ImapSettings;
   } = {},
 ) => ({
@@ -36,6 +37,7 @@ const local = (
   signedIn: extra.signedIn ?? true,
   displayName: extra.displayName,
   color: extra.color,
+  customPicture: extra.customPicture,
 });
 
 const remote = (email: string, extra: Partial<RelayAccount> = {}): RelayAccount => ({
@@ -46,10 +48,13 @@ const remote = (email: string, extra: Partial<RelayAccount> = {}): RelayAccount 
   picture: null,
   displayName: null,
   color: null,
+  customPicture: null,
   ...extra,
 });
 
 const none = { link: [], unlink: [], add: [], remove: [], update: [], moved: [] };
+
+const PICTURE = "data:image/webp;base64,UklGRg==";
 
 describe("planReconcile", () => {
   it("does nothing when both sides agree", () => {
@@ -146,6 +151,31 @@ describe("planReconcile", () => {
     expect(same).toEqual(none);
   });
 
+  it("takes a picture chosen elsewhere, even over a signed-in Gmail account's own", () => {
+    const there = remote("a@x.com", { name: "Other", picture: "new", customPicture: PICTURE });
+    const plan = planReconcile(
+      [local("a@x.com", { picture: "old" })],
+      [there],
+      new Set(["a@x.com"]),
+    );
+    expect(plan).toEqual({ ...none, update: [{ ...there, name: null, picture: null }] });
+  });
+
+  it("a picture removed elsewhere is removed here", () => {
+    const here = local("a@x.com", { customPicture: PICTURE });
+    expect(planReconcile([here], [remote("a@x.com")], new Set(["a@x.com"]))).toEqual({
+      ...none,
+      update: [remote("a@x.com")],
+    });
+  });
+
+  it("a relay that doesn't know pictures leaves this device's alone", () => {
+    const here = local("a@x.com", { customPicture: PICTURE });
+    const { customPicture: _, ...older } = remote("a@x.com");
+    const plan = planReconcile([here], [older as RelayAccount], new Set(["a@x.com"]));
+    expect(plan).toEqual(none);
+  });
+
   it("compares addresses without case", () => {
     const plan = planReconcile([local("Me@X.com")], [remote("me@x.com")], new Set());
     expect(plan).toEqual(none);
@@ -208,6 +238,13 @@ describe("IMAP mailboxes", () => {
     expect(account.imap).toBeUndefined();
   });
 
+  it("arrives with the picture chosen for it", () => {
+    expect(accountFromRelay(remote("a@x.com", { customPicture: PICTURE })).customPicture).toBe(
+      PICTURE,
+    );
+    expect(accountFromRelay(remote("a@x.com")).customPicture).toBeUndefined();
+  });
+
   it("links with its settings and no ID token", async () => {
     const idToken = vi.fn(async () => "token");
     const body = await linkRequest(
@@ -218,6 +255,7 @@ describe("IMAP mailboxes", () => {
         provider: "imap",
         imap: imapSettings,
         color: "#0a0",
+        customPicture: PICTURE,
       },
       idToken,
     );
@@ -228,6 +266,7 @@ describe("IMAP mailboxes", () => {
       picture: null,
       displayName: null,
       color: "#0a0",
+      customPicture: PICTURE,
     });
     expect(idToken).not.toHaveBeenCalled();
   });
@@ -239,6 +278,8 @@ describe("IMAP mailboxes", () => {
     );
     expect(body).toMatchObject({ idToken: "token-for-a@gmail.com", name: "A" });
     expect(body).not.toHaveProperty("provider");
+    // A device that hasn't pulled the picture yet mustn't clear it.
+    expect(body).not.toHaveProperty("customPicture");
   });
 
   it("Outlook links with a Microsoft ID token, never its photo", async () => {
@@ -295,5 +336,15 @@ describe("accountEdited", () => {
     relayRequests.length = 0;
     await accountEdited(account, ["name", "picture"]);
     expect(relayRequests[0]?.[2]).toEqual({ name: "Ada", picture: "https://example.com/a.png" });
+  });
+
+  it("a chosen picture goes alone, and removing it sends null", async () => {
+    relayRequests.length = 0;
+    await accountEdited({ ...account, customPicture: PICTURE }, ["customPicture"]);
+    await accountEdited(account, ["customPicture"]);
+    expect(relayRequests.map((request) => request[2])).toEqual([
+      { customPicture: PICTURE },
+      { customPicture: null },
+    ]);
   });
 });

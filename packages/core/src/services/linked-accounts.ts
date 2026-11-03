@@ -20,7 +20,7 @@ import type { MailAccount } from "../types.js";
 
 export type LocalAccount = Pick<
   MailAccount,
-  "email" | "name" | "picture" | "displayName" | "color" | "imap"
+  "email" | "name" | "picture" | "displayName" | "color" | "customPicture" | "imap"
 > & {
   signedIn: boolean;
 };
@@ -63,6 +63,9 @@ export function planReconcile(
       if (
         (here.displayName ?? null) !== account.displayName ||
         (here.color ?? null) !== account.color ||
+        // undefined: a relay from before pictures, which mustn't blank ours.
+        (account.customPicture !== undefined &&
+          (here.customPicture ?? null) !== account.customPicture) ||
         (!fromGoogle && account.name !== null && here.name !== account.name) ||
         (!fromGoogle && account.picture !== null && (here.picture ?? null) !== account.picture)
       ) {
@@ -115,7 +118,14 @@ const profile = (account: MailAccount) => ({
   picture: account.picture?.startsWith("data:") ? null : (account.picture ?? null),
   displayName: account.displayName ?? null,
   color: account.color ?? null,
+  customPicture: account.customPicture ?? null,
 });
+
+// This device may not have pulled the picture another device chose: linking mustn't clear it.
+function linkProfile(account: MailAccount) {
+  const { customPicture, ...rest } = profile(account);
+  return customPicture ? { ...rest, customPicture } : rest;
+}
 
 /**
  * What links an account: Gmail proves the sign-in with a Google ID token,
@@ -127,12 +137,12 @@ export async function linkRequest(
   idToken: (accountId: string) => Promise<string>,
 ): Promise<PutAccountRequest> {
   if (account.provider === "imap") {
-    return { provider: "imap", imap: account.imap, ...profile(account) };
+    return { provider: "imap", imap: account.imap, ...linkProfile(account) };
   }
   if (account.provider === "outlook") {
-    return { provider: "outlook", idToken: await idToken(account.id), ...profile(account) };
+    return { provider: "outlook", idToken: await idToken(account.id), ...linkProfile(account) };
   }
-  return { idToken: await idToken(account.id), ...profile(account) };
+  return { idToken: await idToken(account.id), ...linkProfile(account) };
 }
 
 async function link(account: MailAccount): Promise<void> {
@@ -164,6 +174,7 @@ export function accountFromRelay(account: RelayAccount): MailAccount {
     picture: account.picture ?? undefined,
     displayName: account.displayName ?? undefined,
     color: account.color ?? undefined,
+    customPicture: account.customPicture ?? undefined,
   };
 }
 
@@ -247,6 +258,8 @@ export async function reconcileAccounts(
       picture: account.picture ?? undefined,
       displayName: account.displayName ?? "",
       color: account.color ?? "",
+      customPicture:
+        account.customPicture === undefined ? undefined : (account.customPicture ?? ""),
     });
   }
   for (const email of plan.moved) {

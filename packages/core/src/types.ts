@@ -12,6 +12,8 @@ export interface MailAccount {
   picture?: string;
   displayName?: string;
   color?: string;
+  /** Shown instead of `picture`, which Google's profile refresh rewrites; it never touches this. */
+  customPicture?: string;
   signature?: string;
   signatureInGmail?: boolean;
   /** The other addresses it sends from (`capabilities.sendAs`); never its own. */

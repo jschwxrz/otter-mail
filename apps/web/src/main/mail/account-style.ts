@@ -27,6 +27,12 @@ export function getAccountColor(account: Pick<MailAccount, "id" | "color">): str
   );
 }
 
+export function getAccountPicture(
+  account: Pick<MailAccount, "picture" | "customPicture">,
+): string | undefined {
+  return account.customPicture ?? account.picture;
+}
+
 export function getAccountDisplayName(account: Pick<MailAccount, "name" | "displayName">): string {
   return account.displayName?.trim() || account.name;
 }

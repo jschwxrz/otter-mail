@@ -78,6 +78,13 @@
       "when": 1793647714993,
       "tag": "0010_chat_shelves",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1793707581609,
+      "tag": "0011_mailbox_pictures",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `linked_accounts` ADD `custom_picture` text;

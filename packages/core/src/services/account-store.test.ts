@@ -38,6 +38,15 @@ describe("account-store", () => {
     expect(await getAccount("b")).toMatchObject({ email: "b@x.com" });
   });
 
+  it('keeps a chosen picture through Google\'s refresh; "" removes it', async () => {
+    const picture = "data:image/webp;base64,UklGRg==";
+    await updateAccount("a", { customPicture: picture });
+    expect(
+      await updateAccount("a", { name: "Ada L", picture: "https://example.com/new.png" }),
+    ).toMatchObject({ picture: "https://example.com/new.png", customPicture: picture });
+    expect((await updateAccount("a", { customPicture: "" })).customPicture).toBeUndefined();
+  });
+
   it("goes on after a change that fails", async () => {
     await expect(updateAccount("missing", { name: "M" })).rejects.toThrow("Account not found");
     expect(await updateAccount("a", { color: "#f00" })).toMatchObject({ color: "#f00" });

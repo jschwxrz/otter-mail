@@ -286,6 +286,7 @@ export type UpdateAccountParams = {
   accountId: string;
   displayName?: string;
   color?: string;
+  customPicture?: string;
   signature?: string;
   /** The IMAP mailbox's other addresses it sends from (`capabilities.sendAs === "device"`). */
   sendAs?: string[];

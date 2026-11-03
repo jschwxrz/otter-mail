@@ -316,6 +316,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["account colour combined"],
   },
   {
+    id: "mailbox-picture",
+    title: "Picture",
+    pane: "accounts",
+    searchTerms: ["mailbox account picture photo avatar image profile icon"],
+  },
+  {
     id: "signature",
     title: "Signature",
     pane: "accounts",

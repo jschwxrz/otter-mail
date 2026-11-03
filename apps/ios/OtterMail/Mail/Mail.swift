@@ -17,6 +17,7 @@ nonisolated struct Mailbox: Identifiable, Hashable, Codable {
     var labels: [MailLabel]
     var hasArchive: Bool? = nil
     var picture: String? = nil
+    var customPicture: String? = nil
     var signedOut = false
     var imap: ImapSettings? = nil
     var outlook: Bool? = nil

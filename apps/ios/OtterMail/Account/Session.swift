@@ -216,6 +216,7 @@ final class Session {
             signature: existing?.signature ?? remoteSignatures[profile.email] ?? "",
             labels: existing?.labels ?? [],
             hasArchive: existing?.hasArchive,
+            customPicture: existing?.customPicture,
             outlook: true
         ))
         saveMailboxes()
@@ -254,6 +255,7 @@ final class Session {
             signature: existing?.signature ?? "",
             labels: existing?.labels ?? [],
             hasArchive: existing?.hasArchive,
+            customPicture: existing?.customPicture,
             imap: settings
         ))
         saveMailboxes()
@@ -284,7 +286,8 @@ final class Session {
             signature: existing?.signature ?? "",
             labels: existing?.labels ?? [],
             hasArchive: existing?.hasArchive,
-            picture: profile.picture
+            picture: profile.picture,
+            customPicture: existing?.customPicture
         )
         store.upsert(mailbox: mailbox)
         saveMailboxes()
@@ -356,6 +359,7 @@ final class Session {
                 labels: existing?.labels ?? [],
                 hasArchive: existing?.hasArchive,
                 picture: account.picture,
+                customPicture: account.customPicture,
                 signedOut: imap != nil ? ImapProvider.password(account.email) == nil
                     : outlook ? !microsoft.isSignedIn(account.email) : !google.isSignedIn(account.email),
                 imap: imap,
