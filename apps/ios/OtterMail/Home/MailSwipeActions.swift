@@ -8,126 +8,122 @@ struct MailSwipeAction: Identifiable {
     var id: String { title }
 }
 
+/**
+ * Linear's swipe: the row follows the finger and rounds off on the side it
+ * uncovers, over a grey pill with the action. Past the threshold the pill takes
+ * the action's color (with a tap of haptics); let go there and it runs,
+ * anywhere short of it and the row springs back. One action a side.
+ */
 struct MailSwipeActions: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.layoutDirection) private var layoutDirection
-    let id: String
-    @Binding var activeRow: String?
-    let leading: [MailSwipeAction]
-    let trailing: [MailSwipeAction]
+    @Environment(\.palette) private var palette
+    let leading: MailSwipeAction?
+    let trailing: MailSwipeAction?
+    /** Full-width rows: the row and its pill stay square, the pill flush with the screen's edge. */
+    var square = false
 
     @State private var width: CGFloat = 0
     @State private var offset: CGFloat = 0
-    @State private var start: CGFloat = 0
+    @State private var dragging = false
     @State private var committing = false
 
-    private var animation: Animation? { reduceMotion ? nil : .easeOut(duration: 0.16) }
+    private var radius: CGFloat { square ? 0 : 28 }
+    private var inset: CGFloat { square ? 0 : 12 }
+
     private var direction: CGFloat { layoutDirection == .rightToLeft ? -1 : 1 }
-    private var actions: [MailSwipeAction] { offset > 0 ? leading : trailing }
+    private var action: MailSwipeAction? { offset > 0 ? leading : offset < 0 ? trailing : nil }
+    private var armed: Bool { MailSwipe.armed(offset: offset, width: width) }
 
     func body(content: Content) -> some View {
+        let edge = min(abs(offset), radius)
+        let fromLeading = offset > 0
         content
-            .overlay {
-                if activeRow != nil {
-                    Color.clear.contentShape(.rect).onTapGesture { activeRow = nil }
-                }
-            }
+            .clipShape(UnevenRoundedRectangle(
+                topLeadingRadius: fromLeading ? edge : 0, bottomLeadingRadius: fromLeading ? edge : 0,
+                bottomTrailingRadius: offset < 0 ? edge : 0, topTrailingRadius: offset < 0 ? edge : 0
+            ))
             .offset(x: offset * direction)
-            .background(alignment: offset > 0 ? .leading : .trailing) {
-                if offset != 0, let first = actions.first {
-                    let fullSwipe = abs(offset) >= width * 0.72
-                    HStack(spacing: 0) {
-                        ForEach(fullSwipe ? [first] : offset > 0 ? actions : Array(actions.reversed())) { action in
-                            Button { perform(action) } label: {
-                                VStack(spacing: 6) {
-                                    Image(systemName: action.symbol).font(.inter(.title3))
-                                    Text(action.title).lineLimit(1).minimumScaleFactor(0.8)
-                                }
-                                    .padding(.horizontal, 4)
-                                    .font(.inter(.caption).weight(.medium))
-                                    .foregroundStyle(.white)
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                    .background(action.tint)
-                                    .contentShape(.rect)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .frame(width: abs(offset))
-                    .disabled(committing)
+            .background(alignment: fromLeading ? .leading : .trailing) {
+                if let action {
+                    pill(action, fromLeading: fromLeading)
+                        // The whole row's width, still: the row covers it, and the drag uncovers it.
+                        .padding(fromLeading ? .leading : .trailing, inset)
                 }
             }
             .clipped()
             .contentShape(.rect)
-            .gesture(HorizontalMailSwipe(enabled: !committing && !(leading.isEmpty && trailing.isEmpty)) { state, translation, velocity in
+            .gesture(HorizontalMailSwipe(enabled: !committing && (leading != nil || trailing != nil)) { state, translation, velocity in
                 switch state {
                 case .began:
-                    start = offset
-                    activeRow = id
+                    dragging = true
                 case .changed:
-                    let next = start + translation * direction
-                    offset = min(max(next, trailing.isEmpty ? 0 : -width), leading.isEmpty ? 0 : width)
+                    let next = translation * direction
+                    offset = min(max(next, trailing == nil ? 0 : -width), leading == nil ? 0 : width)
                 case .ended:
+                    dragging = false
                     finish(velocity: velocity * direction)
-                case .cancelled, .failed:
-                    close()
-                default: break
+                default:
+                    dragging = false
+                    settle()
                 }
             })
+            .sensoryFeedback(trigger: armed) { _, _ in dragging ? .impact(weight: .medium) : nil }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
-            .onChange(of: activeRow) { _, active in
-                if active != id && !committing { withAnimation(animation) { offset = 0 } }
-            }
-            .onDisappear {
-                if activeRow == id { activeRow = nil }
-                offset = 0
-            }
+            .onDisappear { offset = 0 }
             .accessibilityActions {
-                ForEach(leading + trailing) { action in
-                    Button(action.title) { perform(action) }
+                ForEach([leading, trailing].compactMap(\.self)) { action in
+                    Button(action.title, action: action.perform)
                 }
             }
-            .accessibilityAction(.escape) { close() }
+    }
+
+    private func pill(_ action: MailSwipeAction, fromLeading: Bool) -> some View {
+        HStack(spacing: 10) {
+            if fromLeading { Image(systemName: action.symbol) }
+            Text(action.title)
+            if !fromLeading { Image(systemName: action.symbol) }
+        }
+        .font(.inter(.body).weight(.medium))
+        .lineLimit(1)
+        .fixedSize()
+        .foregroundStyle(armed ? .white : palette.muted)
+        .padding(.horizontal, 22)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: fromLeading ? .leading : .trailing)
+        .background(armed ? action.tint : palette.text.opacity(0.08))
+        .clipShape(UnevenRoundedRectangle(
+            topLeadingRadius: fromLeading ? radius : 0, bottomLeadingRadius: fromLeading ? radius : 0,
+            bottomTrailingRadius: fromLeading ? 0 : radius, topTrailingRadius: fromLeading ? 0 : radius
+        ))
+        .animation(reduceMotion ? nil : .smooth(duration: 0.18), value: armed)
     }
 
     private func finish(velocity: CGFloat) {
-        let target = MailSwipeTarget.resolve(offset: offset, velocity: velocity, width: width, actionCount: actions.count)
-        switch target {
-        case .closed: close()
-        case .revealed(let target):
-            withAnimation(animation) { offset = target }
-        case .committed:
-            guard let action = actions.first else { return close() }
-            committing = true
-            withAnimation(animation) {
-                offset = offset > 0 ? width : -width
-            } completion: {
-                perform(action)
-                committing = false
-            }
+        guard MailSwipe.commits(offset: offset, velocity: velocity, width: width), let action else { return settle() }
+        committing = true
+        withAnimation(reduceMotion ? nil : .smooth(duration: 0.22)) {
+            offset = offset > 0 ? width : -width
+        } completion: {
+            action.perform()
+            offset = 0
+            committing = false
         }
     }
 
-    private func close() {
-        withAnimation(animation) { offset = 0 }
-        if activeRow == id { activeRow = nil }
-    }
-
-    private func perform(_ action: MailSwipeAction) {
-        close()
-        action.perform()
+    private func settle() {
+        withAnimation(reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.2)) { offset = 0 }
     }
 }
 
-nonisolated enum MailSwipeTarget: Equatable {
-    case closed, revealed(CGFloat), committed
+nonisolated enum MailSwipe {
+    /** How far to pull before letting go runs the action. */
+    static func armed(offset: CGFloat, width: CGFloat) -> Bool {
+        width > 0 && abs(offset) >= min(width * 0.35, 150)
+    }
 
-    static func resolve(offset: CGFloat, velocity: CGFloat, width: CGFloat, actionCount: Int) -> Self {
-        guard width > 0, actionCount > 0, offset != 0 else { return .closed }
-        let sign: CGFloat = offset > 0 ? 1 : -1
-        if abs(offset) >= width * 0.72 && velocity * sign >= -100 { return .committed }
-        let reveal = min(CGFloat(actionCount) * 76, width * 0.6)
-        return (offset + velocity * 0.12) * sign > reveal * 0.4 ? .revealed(sign * reveal) : .closed
+    /** Armed, and not flung back toward where it started. */
+    static func commits(offset: CGFloat, velocity: CGFloat, width: CGFloat) -> Bool {
+        armed(offset: offset, width: width) && velocity * (offset > 0 ? 1 : -1) > -400
     }
 }
 

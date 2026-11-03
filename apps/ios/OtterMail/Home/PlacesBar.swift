@@ -3,71 +3,94 @@ import SwiftUI
 struct PlacesBar: View {
     @Environment(MailStore.self) private var store
     @Environment(\.palette) private var palette
+    @Namespace private var glass
 
     let place: Place
     let menuOpen: Bool
     let showsAgent: Bool
     let onSelect: (Folder) -> Void
+    let onPlace: (Place) -> Void
     let onMailbox: (Mailbox) -> Void
     let onSearch: () -> Void
+    let onSettings: () -> Void
     let onMenu: () -> Void
     let onAgent: () -> Void
 
     static let pinned: [Folder] = [.inbox, .drafts]
 
     var body: some View {
-        let mailbox = store.mailbox(place.scope)
-        HStack(spacing: 12) {
-            HStack(spacing: 0) {
-                Menu {
-                    MailboxChoices(current: place.scope, onPick: onMailbox)
-                } label: {
-                    MailboxAvatar(mailbox: mailbox, size: 30)
-                        .frame(width: 52, height: 48)
-                        .contentShape(.capsule)
+        // One glass: the bar grows into the menu and shrinks back (Linear's).
+        GlassEffectContainer(spacing: 0) {
+            HStack(alignment: .bottom, spacing: 12) {
+                ZStack(alignment: .bottomLeading) {
+                    if menuOpen {
+                        PlacesPanel(place: place, onSelect: onPlace, onSearch: onSearch, onSettings: onSettings)
+                            .frame(maxHeight: 560)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .glassEffect(.regular, in: .rect(cornerRadius: 32))
+                            .glassEffectID("places", in: glass)
+                    } else {
+                        tabs
+                            .glassEffect(.regular.interactive(), in: .capsule)
+                            .glassEffectID("places", in: glass)
+                    }
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Mailbox, \(mailbox?.displayName ?? "")")
-                .accessibilityHint("Switches mailbox")
-                ForEach(Self.pinned, id: \.self) { folder in
-                    Button { onSelect(folder) } label: {
-                        tabLabel(folder.symbol(in: mailbox), selected: !menuOpen && place.folder == folder,
-                                 dot: folder == .inbox && store.badge(in: .inbox, scope: place.scope) > 0)
+                // The bar's height either way, so the open menu rises over the list without moving it.
+                .frame(height: 56, alignment: .bottomLeading)
+
+                Spacer(minLength: 0)
+
+                if showsAgent {
+                    Button(action: onAgent) {
+                        Image("OtterAgent")
+                            .resizable().scaledToFit()
+                            .frame(width: 24, height: 24)
+                            .foregroundStyle(palette.text)
+                            .frame(width: 56, height: 56)
+                            .contentShape(.circle)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(folder.title(in: mailbox))
+                    .glassEffect(.regular.interactive(), in: .circle)
+                    .accessibilityLabel("Agent")
                 }
-                Button(action: onSearch) { tabLabel("magnifyingglass", selected: false) }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Search")
-                // Lit for any place the bar doesn't pin.
-                Button(action: onMenu) {
-                    tabLabel("chevron.up.chevron.down", selected: menuOpen || !Self.pinned.contains(place.folder))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("All places")
-            }
-            .padding(4)
-            .glassEffect(.regular.interactive(), in: .capsule)
-
-            Spacer(minLength: 0)
-
-            if showsAgent {
-                Button(action: onAgent) {
-                    Image("OtterAgent")
-                        .resizable().scaledToFit()
-                        .frame(width: 24, height: 24)
-                        .foregroundStyle(palette.text)
-                        .frame(width: 56, height: 56)
-                        .contentShape(.circle)
-                }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: .circle)
-                .accessibilityLabel("Agent")
             }
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 4)
+    }
+
+    private var tabs: some View {
+        let mailbox = store.mailbox(place.scope)
+        return HStack(spacing: 0) {
+            Menu {
+                MailboxChoices(current: place.scope, onPick: onMailbox)
+            } label: {
+                MailboxAvatar(mailbox: mailbox, size: 30)
+                    .frame(width: 52, height: 48)
+                    .contentShape(.capsule)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Mailbox, \(mailbox?.displayName ?? "")")
+            .accessibilityHint("Switches mailbox")
+            ForEach(Self.pinned, id: \.self) { folder in
+                Button { onSelect(folder) } label: {
+                    tabLabel(folder.symbol(in: mailbox), selected: place.folder == folder,
+                             dot: folder == .inbox && store.badge(in: .inbox, scope: place.scope) > 0)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(folder.title(in: mailbox))
+            }
+            Button(action: onSearch) { tabLabel("magnifyingglass", selected: false) }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Search")
+            // Lit for any place the bar doesn't pin.
+            Button(action: onMenu) {
+                tabLabel("chevron.up.chevron.down", selected: !Self.pinned.contains(place.folder))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("All places")
+        }
+        .padding(4)
     }
 
     private func tabLabel(_ symbol: String, selected: Bool, dot: Bool = false) -> some View {
@@ -135,7 +158,6 @@ struct PlacesPanel: View {
             .scrollBounceBehavior(.basedOnSize)
         }
         .frame(maxWidth: 340)
-        .glassEffect(.regular, in: .rect(cornerRadius: 32))
     }
 
     private func header(_ mailbox: Mailbox?) -> some View {

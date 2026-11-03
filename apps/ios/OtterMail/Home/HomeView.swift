@@ -26,48 +26,29 @@ struct HomeView: View {
 
     private var showsAgent: Bool { session.agent.isOn || session.user != nil }
 
-    private var menuAnimation: Animation? { reduceMotion ? nil : .smooth(duration: 0.25) }
+    private var menuAnimation: Animation? { reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.15) }
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            mail
-            if menuOpen {
-                Color.black.opacity(0.25)
-                    .ignoresSafeArea()
-                    .onTapGesture { setMenu(open: false) }
-                    .transition(.opacity)
-                PlacesPanel(
-                    place: place,
-                    onSelect: { select($0) },
-                    onSearch: { setMenu(open: false); searchOpen = true },
-                    onSettings: { setMenu(open: false); settingsOpen = true }
-                )
-                .frame(maxHeight: 560)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 76)
-                .transition(.scale(scale: 0.9, anchor: .bottomLeading).combined(with: .opacity))
+        mail
+            .onChange(of: store.shownMailboxes.map(\.email), initial: true) { _, shown in
+                if !shown.contains(place.scope) { place = Place(scope: shown.first ?? "") }
             }
-        }
-        .onChange(of: store.shownMailboxes.map(\.email), initial: true) { _, shown in
-            if !shown.contains(place.scope) { place = Place(scope: shown.first ?? "") }
-        }
-        .onChange(of: session.opening, initial: true) { _, _ in openNotification() }
-        .onChange(of: store.sync?.loadingCache) { _, loading in
-            if loading == false { openNotification() }
-        }
-        .sheet(item: $draft) { draft in
-            ComposeView(draft: store.recover(draft))
-        }
-        .sheet(isPresented: $settingsOpen) {
-            SettingsView()
-        }
-        .sheet(isPresented: $agentOpen) {
-            NavigationStack {
-                AgentView(sheet: true, onSettings: { agentOpen = false; settingsOpen = true })
+            .onChange(of: session.opening, initial: true) { _, _ in openNotification() }
+            .onChange(of: store.sync?.loadingCache) { _, loading in
+                if loading == false { openNotification() }
             }
-        }
-        .sheet(isPresented: $searchOpen) { search }
+            .sheet(item: $draft) { draft in
+                ComposeView(draft: store.recover(draft))
+            }
+            .sheet(isPresented: $settingsOpen) {
+                SettingsView()
+            }
+            .sheet(isPresented: $agentOpen) {
+                NavigationStack {
+                    AgentView(sheet: true, onSettings: { agentOpen = false; settingsOpen = true })
+                }
+            }
+            .sheet(isPresented: $searchOpen) { search }
     }
 
     private var mail: some View {
@@ -81,6 +62,14 @@ struct HomeView: View {
                 onSettings: { settingsOpen = true },
                 onResume: { draft = $0 }
             )
+            .overlay {
+                if menuOpen {
+                    Color.clear
+                        .contentShape(.rect)
+                        .ignoresSafeArea()
+                        .onTapGesture { setMenu(open: false) }
+                }
+            }
             // On the list, so it goes with it when a conversation opens.
             .safeAreaInset(edge: .bottom, spacing: 8) {
                 VStack(spacing: 12) {
@@ -104,8 +93,10 @@ struct HomeView: View {
                             menuOpen: menuOpen,
                             showsAgent: showsAgent,
                             onSelect: { select(Place(scope: place.scope, folder: $0)) },
+                            onPlace: { select($0) },
                             onMailbox: { switchMailbox($0) },
-                            onSearch: { searchOpen = true },
+                            onSearch: { setMenu(open: false); searchOpen = true },
+                            onSettings: { setMenu(open: false); settingsOpen = true },
                             onMenu: { setMenu(open: !menuOpen) },
                             onAgent: { agentOpen = true }
                         )
