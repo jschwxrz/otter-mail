@@ -30,6 +30,7 @@ const SYNCED_KEYS = [
   "calendar:time-format",
   "calendar:meetings-by-default",
   "calendar:default-calendar",
+  "calendar:colors",
 ] as const;
 
 export type SyncedKey = (typeof SYNCED_KEYS)[number];

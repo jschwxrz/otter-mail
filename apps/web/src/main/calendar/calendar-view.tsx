@@ -110,14 +110,19 @@ export type ListedCalendar = {
 export function listedCalendars(
   accounts: MailAccount[],
   lists: AccountCalendars[] | undefined,
+  /** Picked in the sidebar, over the rest. */
+  colors: Record<string, string> = {},
 ): ListedCalendar[] {
   return accounts.flatMap((account) =>
-    (lists?.find((l) => l.accountId === account.id)?.calendars ?? []).map((info) => ({
-      account,
-      info,
-      key: calendarKey({ accountId: account.id, calendarId: info.id }),
-      color: info.primary || !info.color ? getAccountColor(account) : info.color,
-    })),
+    (lists?.find((l) => l.accountId === account.id)?.calendars ?? []).map((info) => {
+      const key = calendarKey({ accountId: account.id, calendarId: info.id });
+      return {
+        account,
+        info,
+        key,
+        color: colors[key] ?? (info.primary || !info.color ? getAccountColor(account) : info.color),
+      };
+    }),
   );
 }
 
@@ -173,11 +178,16 @@ export function CalendarView({
   const bodyRef = useRef<HTMLDivElement>(null);
 
   // Re-renders on any calendar setting: the week's first day and the time format reach every label.
-  const { showWeekends, showDeclined, defaultCalendar: chosenDefault } = useCalendarPreferences();
+  const {
+    showWeekends,
+    showDeclined,
+    defaultCalendar: chosenDefault,
+    colors: chosenColors,
+  } = useCalendarPreferences();
   const calendars = calendarAccounts(accounts);
   // Every calendar of every mailbox, and those shown.
   const lists = useCalendarLists(calendars.map((a) => a.id)).data;
-  const listed = listedCalendars(calendars, lists);
+  const listed = listedCalendars(calendars, lists, chosenColors);
   const visible = listed.filter((c) => isShown(shown, c.key, c.info.hiddenByDefault));
   const refs = visible.map((c) => ({
     accountId: c.account.id,

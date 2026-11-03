@@ -73,6 +73,8 @@ type CalendarState = {
   setPeek: (date: Date | null) => void;
   goTo: (date: Date) => void;
   setShown: (key: string, show: boolean) => void;
+  /** Shows only this calendar of those listed. */
+  showOnly: (key: string, keys: string[]) => void;
   addTeammate: (teammate: Teammate) => void;
   removeTeammate: (email: string) => void;
   clearTeam: () => void;
@@ -101,6 +103,12 @@ export const useCalendar = create<CalendarState>((set) => ({
   setShown: (key, show) =>
     set((s) => {
       const shown = { ...s.shown, [key]: show };
+      localStorage.setItem(SHOWN_KEY, JSON.stringify(shown));
+      return { shown };
+    }),
+  showOnly: (key, keys) =>
+    set((s) => {
+      const shown = { ...s.shown, ...Object.fromEntries(keys.map((k) => [k, k === key])) };
       localStorage.setItem(SHOWN_KEY, JSON.stringify(shown));
       return { shown };
     }),
