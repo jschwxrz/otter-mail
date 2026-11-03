@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { senderOf } from "../outgoing.ts";
+import { buildMime, completeAddresses, senderOf } from "../outgoing.ts";
 import type { MailAccount } from "../../types.ts";
 
 const account: MailAccount = {
@@ -38,5 +38,22 @@ describe("senderOf for drafts", () => {
 
   it("still refuses what isn't one address", () => {
     expect(() => senderOf(account, "a@b.com, c@d.com", { draft: true })).toThrow();
+  });
+});
+
+describe("completeAddresses", () => {
+  it("keeps whole addresses, named or bare", () => {
+    expect(completeAddresses('"Lee, Sam" <sam@lee.dev>, bo@x.co, José <jose@example.com>')).toBe(
+      '"Lee, Sam" <sam@lee.dev>, bo@x.co, José <jose@example.com>',
+    );
+  });
+
+  it("drops a recipient still being typed, so a draft saves", () => {
+    for (const typing of ["jo", "José", "bob@", "Bob <bob@x", "Bob <bob@x.com> and", "a b@x.com"]) {
+      expect(completeAddresses(`sam@lee.dev, ${typing}`)).toBe("sam@lee.dev");
+    }
+    expect(
+      buildMime({ from: "me@x.co", to: completeAddresses("José"), subject: "", body: "" }),
+    ).not.toMatch(/^To:/m);
   });
 });

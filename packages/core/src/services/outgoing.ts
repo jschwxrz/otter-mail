@@ -95,6 +95,16 @@ export function splitAddressList(value: string): string[] {
   return parts.map((p) => p.replace(/[\r\n]+/g, " ").trim()).filter((p) => p.length > 0);
 }
 
+/**
+ * The entries of an address list that are whole addresses. A draft saves while a recipient is
+ * still being typed, and Gmail refuses the draft over a To header it can't parse.
+ */
+export function completeAddresses(value: string): string {
+  return splitAddressList(value)
+    .filter((entry) => isSingleAddress(entry.match(/<([^>]+)>$/)?.[1].trim() ?? entry))
+    .join(", ");
+}
+
 function encodeAddressList(value: string): string {
   return splitAddressList(value)
     .map((entry) => {

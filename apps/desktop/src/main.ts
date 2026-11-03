@@ -19,6 +19,7 @@ import { parseMailtoUrl, setPendingMailto } from "./services/mailto-target.js";
 import { initUpdates } from "./updates.js";
 import { setSettingsTarget } from "./windows/settings-window.js";
 import {
+  allowWindows,
   createMainWindow,
   focusMainWindow,
   focusedAppWindow,
@@ -329,6 +330,7 @@ void app.whenReady().then(async () => {
   registerHandlers();
   setupApplicationMenu();
   initUpdates();
+  allowWindows();
 
   const startupSettings = (await invokeBackend("gmail:getSyncSettings")) as AppSettings;
   if (app.isPackaged) {

@@ -17,6 +17,17 @@ const FRAME_KEY = "main";
 const windows: BrowserWindow[] = [];
 let creating: Promise<BrowserWindow> | null = null;
 
+// A Dock click or a mailto link during startup must not load a window whose
+// page invokes channels main hasn't registered yet.
+let startupDone!: () => void;
+const started = new Promise<void>((resolve) => {
+  startupDone = resolve;
+});
+
+export function allowWindows(): void {
+  startupDone();
+}
+
 export function getMainWindow(): BrowserWindow | null {
   return windows.find((win) => !win.isDestroyed()) ?? null;
 }
@@ -101,6 +112,7 @@ export async function createMainWindow(): Promise<BrowserWindow> {
   if (creating) return creating;
 
   creating = (async () => {
+    await started;
     const frame = savedFrame(FRAME_KEY);
     const { win, loaded } = createAppWindow({
       width: frame?.width ?? 1180,

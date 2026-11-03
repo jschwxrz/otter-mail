@@ -13,7 +13,12 @@ import { logger } from "../../logger.js";
 import { platform } from "../../platform.js";
 import { mapPool } from "../../pool.js";
 import { getAccount } from "../../services/account-store.js";
-import { buildMime, newMessageIdHeader, senderOf } from "../../services/outgoing.js";
+import {
+  buildMime,
+  completeAddresses,
+  newMessageIdHeader,
+  senderOf,
+} from "../../services/outgoing.js";
 import type { MailLabel, MessageSummary, MessageDetail } from "../../types.js";
 import { SendUncertain, type DraftSave, type ErrorKind, type OutgoingMail } from "../provider.js";
 import {
@@ -873,9 +878,9 @@ export async function saveDraft(
 
   const raw = buildMime({
     from: fromAddress,
-    to: params.to,
-    cc: params.cc,
-    bcc: params.bcc,
+    to: completeAddresses(params.to),
+    cc: params.cc && completeAddresses(params.cc),
+    bcc: params.bcc && completeAddresses(params.bcc),
     subject: params.subject,
     body: params.body,
     bodyHtml: params.bodyHtml,
