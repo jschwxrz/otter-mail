@@ -314,17 +314,28 @@ async function documentAccess(
   hint: string | undefined,
 ): Promise<{ auth: Session; folder: string | undefined; raw: RawArtifact }> {
   const auth = await signedIn();
-  const result = await request<{ data: RawArtifact }>(
-    `/api/v1/artifacts/${ref(id)}`,
-    {},
-    auth,
-    hint,
-  );
-  const home = result.data.folderId ?? result.data.organizationId;
+  let cached = looked.get(id);
+  if (!cached || cached.token !== auth.token || Date.now() - cached.at > 30_000) {
+    const raw = request<{ data: RawArtifact }>(`/api/v1/artifacts/${ref(id)}`, {}, auth, hint).then(
+      (r) => r.data,
+    );
+    cached = { at: Date.now(), token: auth.token, raw };
+    looked.set(id, cached);
+    raw.catch(() => looked.get(id) === cached && looked.delete(id));
+  }
+  const raw = await cached.raw;
+  const home = raw.folderId ?? raw.organizationId;
   await reachable(home);
   const list = await allFolders(auth);
-  return { auth, folder: list.some((f) => f.id === home) ? home : undefined, raw: result.data };
+  return { auth, folder: list.some((f) => f.id === home) ? home : undefined, raw };
 }
+
+/**
+ * Documents looked up in the last 30 seconds: opening one asks for it, its
+ * preview and its versions at once, and each needs to know where it is.
+ * Renaming or archiving one drops it.
+ */
+const looked = new Map<string, { at: number; token: string; raw: Promise<RawArtifact> }>();
 
 type RawVersion = {
   number: number;
@@ -553,6 +564,8 @@ export async function rename(
     auth,
     folder,
   );
+  // After the change, so a lookup made meanwhile isn't kept.
+  looked.delete(id);
   return artifact(result.data);
 }
 
@@ -569,6 +582,7 @@ export async function setArchived(
     auth,
     folder,
   );
+  looked.delete(id);
 }
 
 const THUMBNAILS = "https://usercontent.otterware.app/raw/thumbnail/";
