@@ -8,6 +8,7 @@ import {
   BellIcon,
   BellOffIcon,
   CheckIcon,
+  CloudIcon,
   InboxIcon,
   KeyboardIcon,
   LayersIcon,
@@ -19,7 +20,12 @@ import {
 import { AgentIcon } from "../mail/agent-icon";
 import { Switch } from "~/components/ui/switch";
 import { mailApi, type NotificationsMode, type SyncSettings } from "../mail/api";
-import { ImapAccountDialog, readableError, useAddOutlook } from "../mail/add-mailbox";
+import {
+  ImapAccountDialog,
+  readableError,
+  useAddOutlook,
+  type ImapService,
+} from "../mail/add-mailbox";
 import { GmailMark, MicrosoftMark } from "../mail/provider-mark";
 import { getAccountDisplayName } from "../mail/account-style";
 import { AccountPicture } from "../mail/account-picture";
@@ -353,7 +359,7 @@ function MailboxStep({ accounts }: { accounts: MailAccount[] }) {
   const outlook = useAddOutlook();
   const hasOutlook = useMailProviders().data?.outlook ?? false;
   const waitingFor = addAccount.isPending ? "Google" : outlook.pending ? "Microsoft" : null;
-  const [imapOpen, setImapOpen] = useState(false);
+  const [imapOpen, setImapOpen] = useState<ImapService | null>(null);
   const addGmail = async () => {
     console.log("[Setup:addGmail]");
     try {
@@ -395,14 +401,20 @@ function MailboxStep({ accounts }: { accounts: MailAccount[] }) {
           />
         ) : null}
         <ChoiceCard
+          icon={<CloudIcon />}
+          title="iCloud"
+          description="Your iCloud address, your own domain's too, with an app-specific password."
+          onClick={() => setImapOpen("icloud")}
+        />
+        <ChoiceCard
           icon={<ServerIcon />}
           title="Other mail"
           description={
             hasOutlook
-              ? "iCloud, Fastmail or any IMAP server, found from your address."
-              : "iCloud, Fastmail, Outlook or any IMAP server, found from your address."
+              ? "Fastmail, Yahoo or any IMAP server, found from your address."
+              : "Fastmail, Outlook or any IMAP server, found from your address."
           }
-          onClick={() => setImapOpen(true)}
+          onClick={() => setImapOpen("other")}
         />
       </div>
       {waitingFor ? (
@@ -436,7 +448,13 @@ function MailboxStep({ accounts }: { accounts: MailAccount[] }) {
           <OtterSignInOnboardingLink />
         </div>
       )}
-      <ImapAccountDialog open={imapOpen} onOpenChange={setImapOpen} />
+      <ImapAccountDialog
+        open={imapOpen !== null}
+        service={imapOpen ?? undefined}
+        onOpenChange={(open) => {
+          if (!open) setImapOpen(null);
+        }}
+      />
     </>
   );
 }

@@ -41,6 +41,11 @@ MailProvider                packages/core/src/providers/provider.ts
   signatures. Sending uses one as the From header and the SMTP envelope sender
   (`senderOf`, `services/outgoing.ts`); the server must accept it. Gmail's come from its
   "Send mail as" settings (`"server"`).
+  Settings suggests ones the mailbox's mail shows it uses (`gmail:suggestSendAs`,
+  `services/send-as-suggestions.ts`): any its Sent mail is from, and any at a domain of its own
+  (not a public one like icloud.com) that inbox mail came to more than once.
+- iCloud has its own choice in Add account: the same IMAP mailbox, with iCloud's servers and the
+  steps to make an app-specific password. Apple has no mail API or OAuth for other apps.
 
 ## Live mail
 

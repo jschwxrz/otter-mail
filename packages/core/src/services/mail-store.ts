@@ -1224,6 +1224,46 @@ export function suggestContacts(queryText: string, limit: number): ContactSugges
     .map((e) => ({ name: e.name === e.email ? "" : e.name, email: e.email }));
 }
 
+/** How often each address appears, lower-cased. */
+export type AddressCounts = Map<string, number>;
+
+/**
+ * What a mailbox's recent mail says about its own addresses: who its sent mail was from, and
+ * who the mail it received was to (To and Cc).
+ */
+export function getAddressEvidence(
+  accountId: string,
+  limit = 2000,
+): { sentFrom: AddressCounts; receivedAt: AddressCounts } {
+  const d = getDb();
+  const recent = (labelId: string) =>
+    d
+      .prepare(`
+        SELECT m.fromEmail, m.toField, m.cc FROM messages m
+          JOIN message_labels l
+            ON l.accountId = m.accountId AND l.messageId = m.id AND l.labelId = ?
+         WHERE m.accountId = ?
+         ORDER BY m.date DESC LIMIT ?
+      `)
+      .all(labelId, accountId, limit) as unknown as {
+      fromEmail: string;
+      toField: string;
+      cc: string | null;
+    }[];
+  const count = (counts: AddressCounts, email: string) => {
+    const key = email.trim().toLowerCase();
+    if (key.includes("@")) counts.set(key, (counts.get(key) ?? 0) + 1);
+  };
+  const sentFrom: AddressCounts = new Map();
+  for (const row of recent("SENT")) count(sentFrom, row.fromEmail);
+  const receivedAt: AddressCounts = new Map();
+  for (const row of recent("INBOX")) {
+    const list = row.cc ? `${row.toField},${row.cc}` : row.toField;
+    for (const entry of splitAddressEntries(list)) count(receivedAt, entry.email);
+  }
+  return { sentFrom, receivedAt };
+}
+
 export function upsertLabels(accountId: string, labels: MailLabel[]): void {
   const d = getDb();
   d.exec("BEGIN");

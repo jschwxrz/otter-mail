@@ -377,6 +377,10 @@ export const mailApi = {
   updateAccount: (params: UpdateAccountParams): Promise<MailAccount> =>
     ipc("gmail:updateAccount", params),
 
+  /** Addresses an IMAP mailbox's mail shows it uses besides the ones it has, to add to From. */
+  suggestSendAs: (accountId: string): Promise<string[]> =>
+    ipc("gmail:suggestSendAs", { accountId }),
+
   listLabels: (accountId: string): Promise<MailLabel[]> => ipc("gmail:listLabels", { accountId }),
 
   createLabel: (accountId: string, name: string): Promise<MailLabel> =>

@@ -17,6 +17,7 @@ import { capabilitiesOf, findProvider, isSignedIn, providerFor } from "../provid
 import { DraftChanged } from "../providers/provider.js";
 import {
   getAccount,
+  keepsSendAsOnDevice,
   listAccounts,
   providerKindOf,
   removeAccount as storeRemoveAccount,
@@ -51,6 +52,7 @@ import { preferenceChanged } from "../services/preferences.js";
 import { refreshProfiles } from "../services/google-profile.js";
 import { forgetRefusals } from "../services/connections.js";
 import { refreshSignatures, saveSendAs, saveSignature } from "../services/signatures.js";
+import { suggestSendAs } from "../services/send-as-suggestions.js";
 import * as viewsStore from "../services/views-store.js";
 import { ALL_MAIL_LABEL_ID } from "../types.js";
 import type { ComposeAttachment, ViewRule } from "../types.js";
@@ -1178,6 +1180,17 @@ export function registerMailHandlers(): void {
       console.log("[gmail:proxyImage] error", { error: String(err) });
       throw err;
     }
+  });
+
+  // gmail:suggestSendAs — addresses an IMAP mailbox's mail shows it uses besides its own, to offer in From.
+  handle("gmail:suggestSendAs", async (params: unknown) => {
+    const p = params as Record<string, unknown>;
+    const account = await getAccount(assertString(p?.accountId, "accountId"));
+    if (!account || !keepsSendAsOnDevice(account)) return [];
+    return suggestSendAs(
+      [account.email, ...(account.sendAs ?? [])],
+      mailStore.getAddressEvidence(account.id),
+    );
   });
 
   handle("gmail:suggestContacts", async (params: unknown) => {

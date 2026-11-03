@@ -14,42 +14,13 @@ import { fromBase64, sha256Hex, toBase64 } from "../bytes.js";
 import { logger } from "../logger.js";
 import { platform } from "../platform.js";
 import { findProvider } from "../providers/index.js";
+import { FREEMAIL_DOMAINS } from "./freemail.js";
 import { getKv, setKv } from "./mail-store.js";
 
 const HIT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const MISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_IMAGE_BYTES = 300 * 1024;
 const FETCH_TIMEOUT_MS = 6_000;
-
-/** Domains where a "company logo" would be wrong for a personal sender. */
-const FREEMAIL_DOMAINS = new Set([
-  "gmail.com",
-  "googlemail.com",
-  "outlook.com",
-  "hotmail.com",
-  "live.com",
-  "msn.com",
-  "yahoo.com",
-  "ymail.com",
-  "icloud.com",
-  "me.com",
-  "mac.com",
-  "proton.me",
-  "protonmail.com",
-  "pm.me",
-  "gmx.com",
-  "gmx.de",
-  "gmx.net",
-  "web.de",
-  "aol.com",
-  "mail.com",
-  "zoho.com",
-  "hey.com",
-  "fastmail.com",
-  "t-online.de",
-  "orange.fr",
-  "free.fr",
-]);
 
 type CacheEntry = { dataUrl: string | null; fetchedAt: number };
 
