@@ -213,6 +213,7 @@ function rowToSummary(row: MessageRow): MessageSummary {
 }
 
 interface ThreadRow extends MessageRow {
+  sortDate: number;
   threadCount: number;
   threadUnread: number;
   threadStarred: number;
@@ -222,6 +223,7 @@ interface ThreadRow extends MessageRow {
 function rowToThreadSummary(row: ThreadRow): MessageSummary {
   return {
     ...rowToSummary(row),
+    date: row.sortDate,
     threadCount: row.threadCount,
     threadUnread: row.threadUnread === 1,
     threadStarred: row.threadStarred === 1,
@@ -547,8 +549,15 @@ export function applyLabelChange(
  * view includes; rollups (count/unread/starred) and the representative row (the
  * thread's latest message) are computed over EVERY locally-cached message of
  * the thread, so e.g. an Inbox thread counts your sent replies like Gmail does.
+ * Outside the Drafts view a draft doesn't move its thread: the thread sorts and
+ * dates by its latest other message, as in Gmail.
  */
-function threadPageQuery(matchedSql: string): string {
+function threadPageQuery(matchedSql: string, draftsView = false): string {
+  const sortDate = draftsView
+    ? "MAX(t.date)"
+    : `COALESCE(MAX(CASE WHEN NOT EXISTS (SELECT 1 FROM message_labels td
+                     WHERE td.accountId = t.accountId AND td.messageId = t.id AND td.labelId = 'DRAFT')
+                   THEN t.date END), MAX(t.date))`;
   return `
     WITH matched AS (${matchedSql}),
     agg AS (
@@ -556,14 +565,15 @@ function threadPageQuery(matchedSql: string): string {
              COUNT(*) AS threadCount,
              MAX(t.unread) AS threadUnread,
              MAX(t.starred) AS threadStarred,
-             MAX(t.date) AS repDate
+             MAX(t.date) AS repDate,
+             ${sortDate} AS sortDate
         FROM messages t
         JOIN matched mt ON mt.accountId = t.accountId AND mt.threadId = t.threadId
        GROUP BY t.accountId, t.threadId
-       ORDER BY repDate DESC
+       ORDER BY sortDate DESC
        LIMIT ? OFFSET ?
     )
-    SELECT m.*, agg.threadCount AS threadCount,
+    SELECT m.*, agg.sortDate AS sortDate, agg.threadCount AS threadCount,
            agg.threadUnread AS threadUnread,
            agg.threadStarred AS threadStarred,
            -- CROSS JOIN pins the order: the thread's messages first (indexed by
@@ -576,7 +586,7 @@ function threadPageQuery(matchedSql: string): string {
       JOIN messages m
         ON m.accountId = agg.accountId AND m.threadId = agg.threadId AND m.date = agg.repDate
      GROUP BY agg.accountId, agg.threadId
-     ORDER BY agg.repDate DESC
+     ORDER BY agg.sortDate DESC
   `;
 }
 
@@ -605,13 +615,16 @@ export function getThreadsPage(
   const exclusion = labelId === "SPAM" || labelId === "TRASH" ? "" : `AND ${NOT_SPAM_TRASH}`;
   const rows = d
     .prepare(
-      threadPageQuery(`
+      threadPageQuery(
+        `
         SELECT DISTINCT m.accountId AS accountId, m.threadId AS threadId
           FROM messages m
           JOIN message_labels ml
             ON ml.accountId = m.accountId AND ml.messageId = m.id
          WHERE m.accountId = ? AND ml.labelId = ? ${exclusion}
-      `),
+      `,
+        labelId === "DRAFT",
+      ),
     )
     .all(accountId, labelId, limit + 1, offset) as unknown as ThreadRow[];
 
@@ -1019,11 +1032,14 @@ export function getCombinedThreadsByRules(
 
   const rows = d
     .prepare(
-      threadPageQuery(`
+      threadPageQuery(
+        `
         SELECT DISTINCT m.accountId AS accountId, m.threadId AS threadId
           FROM messages m
          WHERE ${clause}
-      `),
+      `,
+        rules.every((r) => r.allOf.includes("DRAFT")),
+      ),
     )
     .all(...params, limit + 1, offset) as unknown as ThreadRow[];
 
