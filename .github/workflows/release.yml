@@ -318,6 +318,34 @@ jobs:
           files: release-assets/*
           fail_on_unmatched_files: true
 
+  # Tells Sentry which commits the version holds, so an issue a commit says
+  # `Fixes <SHORT-ID>` to resolves with it. Bookkeeping: never fails the release.
+  sentry_release:
+    name: Sentry release
+    needs: [preflight, release]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.preflight.outputs.ref }}
+          fetch-depth: 0
+
+      - name: Create the release
+        uses: getsentry/action-release@v3
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+        with:
+          release: otter-mail@${{ needs.preflight.outputs.version }}
+          projects: otter-mail-desktop otter-mail-web
+          environment: ${{ needs.preflight.outputs.prerelease == 'true' && 'nightly' || 'stable' }}
+          set_commits: auto
+          ignore_missing: true
+          ignore_empty: true
+
   deploy_web:
     name: Deploy the web app
     needs: [preflight, release]

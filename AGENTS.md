@@ -112,7 +112,8 @@ when a feature lands or goes.
   their old addresses here redirect there.
 - Errors: Sentry, scrubbed, from the desktop app, the web app and the relay
   (`packages/shared/src/error-reports.ts`; docs/error-reports.md). Log with `logger.error`
-  or `logger.failure` and pass the Error: that's what gets reported.
+  or `logger.failure` and pass the Error: that's what gets reported. A fix for a reported issue
+  says `Fixes <SHORT-ID>` in its commit or PR, so Sentry resolves it with the release.
 - Deploys: Cloudflare Workers Builds deploys `infra/relay` on pushes to `main` that touch it;
   the Release workflow deploys `site/` with each release (below). GitHub Actions smoke-tests the
   relay every 6 hours (keyless Google Cloud access).
