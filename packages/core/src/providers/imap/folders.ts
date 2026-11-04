@@ -67,6 +67,10 @@ const SYSTEM_LABELS: Record<Role, string> = {
 
 export const FLAG_LABELS = ["UNREAD", "STARRED", "DRAFT"];
 
+export function isSystemLabel(labelId: string): boolean {
+  return Object.values(SYSTEM_LABELS).includes(labelId) || FLAG_LABELS.includes(labelId);
+}
+
 export class Folders {
   readonly synced: Folder[];
   readonly archive: Folder | undefined;
