@@ -18,6 +18,7 @@ const mac: BridgeFeatures = {
   tabWindows: true,
   dockBadge: true,
   translation: true,
+  phoneCalls: true,
 };
 
 const linux: BridgeFeatures = {
@@ -26,6 +27,7 @@ const linux: BridgeFeatures = {
   tabWindows: false,
   dockBadge: false,
   translation: false,
+  phoneCalls: false,
 };
 
 export function featuresFor(platform: NodeJS.Platform): BridgeFeatures {

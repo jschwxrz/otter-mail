@@ -23,6 +23,7 @@ struct HTMLBody: View {
         .clipShape(.rect(cornerRadius: cornerRadius))
         .task(id: html) {
             var configuration = WebPage.Configuration()
+            configuration.dataDetectorTypes = [.phoneNumber]
             configuration.urlSchemeHandlers[URLScheme("cid")!] = InlineImages(images: inline, load: load)
             let binding = $height
             configuration.userContentController.add(HeightObserver { value in

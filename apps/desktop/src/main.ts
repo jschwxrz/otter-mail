@@ -112,8 +112,13 @@ ipcMain.handle("nativeTheme:setThemeSource", async (_event, source: unknown) => 
   await fs.promises.writeFile(themeFile(), JSON.stringify({ themeSource: source }));
 });
 
+ipcMain.handle("app:region", () => app.getLocaleCountryCode() || undefined);
+
 ipcMain.handle("shell:openExternal", async (_event, url: unknown) => {
-  if (typeof url !== "string" || !/^(https?|mailto|x-apple\.systempreferences):/i.test(url)) {
+  if (
+    typeof url !== "string" ||
+    !/^(https?|mailto|tel|sms|x-apple\.systempreferences):/i.test(url)
+  ) {
     return false;
   }
   try {

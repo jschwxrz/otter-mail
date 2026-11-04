@@ -134,6 +134,8 @@ import { features } from "../features";
 import { openLink } from "../browser/store";
 import { AttachmentPreview, attachmentPreview, type PreviewFile } from "./attachment-preview";
 import { isModClick } from "../keybindings/keys";
+import { loadPhoneFinder, markPhones, usePhoneFinder, type FindPhones } from "./phone-numbers";
+import { usePhoneMenu, type PhoneAt } from "./phone-menu";
 
 type MessageReaderProps = {
   accountId: string;
@@ -233,6 +235,8 @@ body {
 }
 a { color: #e34500; }
 blockquote { border-left: 3px solid #d6d6d6; padding-left: 12px; margin: 4px 0; color: #555555; }
+[data-otter-phone] { cursor: pointer; border-radius: 4px; text-decoration: underline dotted rgb(128 128 128 / 70%); text-underline-offset: 3px; }
+[data-otter-phone]:hover { background: rgb(128 128 128 / 20%); box-shadow: 0 0 0 2px rgb(128 128 128 / 20%); }
 </style>`;
 
 const messageBodyPreludeDark = (fontSize: number) => `<style>
@@ -249,6 +253,8 @@ body {
 a { color: #7cacf8; }
 blockquote { border-left: 3px solid #3a3a3a; padding-left: 12px; margin: 4px 0; color: #a3a3a3; }
 hr { border: none; border-top: 1px solid #333333; }
+[data-otter-phone] { cursor: pointer; border-radius: 4px; text-decoration: underline dotted rgb(128 128 128 / 70%); text-underline-offset: 3px; }
+[data-otter-phone]:hover { background: rgb(128 128 128 / 20%); box-shadow: 0 0 0 2px rgb(128 128 128 / 20%); }
 </style>`;
 
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
@@ -567,6 +573,7 @@ function HtmlBody({
   const quoteRef = useLatest(onQuoteText);
   const inlineRef = useLatest(inlineImages);
   const linksRef = useLatest(bodyLinks ?? []);
+  const { openPhoneMenu, phoneMenu } = usePhoneMenu();
   const dark = useDarkAppearance();
   const bodyFontSize = (15 * useInterfaceSetting(INTERFACE_FONT_SIZE)) / 16;
   const adaptColors = (doc: Document | null | undefined) => {
@@ -707,8 +714,25 @@ function HtmlBody({
           iframe.contentWindow?.history.replaceState(null, "", " ");
         });
       }
+      void loadPhoneFinder().then((find) => {
+        if (!stopped && wired === doc) markPhones(doc, find);
+      });
       doc.addEventListener("click", (e) => {
-        const anchor = (e.target as Element | null)?.closest?.("a");
+        const target = e.target as Element | null;
+        const phone = target?.closest?.<HTMLElement>("[data-otter-phone], a[href^='tel:' i]");
+        if (phone) {
+          e.preventDefault();
+          const frame = iframe.getBoundingClientRect();
+          const linked = decodeURIComponent(phone.getAttribute("href")?.slice(4) ?? "");
+          openPhoneMenu({
+            number: phone.dataset.otterPhone ?? linked,
+            text: phone.dataset.otterPhone ? (phone.textContent ?? "") : linked,
+            x: frame.left + e.clientX,
+            y: frame.top + e.clientY,
+          });
+          return;
+        }
+        const anchor = target?.closest?.("a");
         if (!anchor) return;
         const raw = anchor.getAttribute("href") ?? "";
         if (raw.startsWith("#otter-ext:") && openLinkAnswer(raw)) {
@@ -822,6 +846,7 @@ function HtmlBody({
         title="Message body"
       />
       {hasQuote ? <QuoteToggle open={quoteOpen} onToggle={toggleQuote} /> : null}
+      {phoneMenu}
     </div>
   );
 }
@@ -848,12 +873,42 @@ function splitPlainQuote(text: string): [string, string] {
 
 const URL_RE = /\bhttps?:\/\/[^\s<>"]+[^\s<>".,;:!?)\]}'*]/g;
 
-function Linkified({ text }: { text: string }) {
+type PlainPhones = { find: FindPhones | null; open: (at: PhoneAt) => void };
+
+function WithPhones({ text, phones }: { text: string; phones: PlainPhones }) {
+  const matches = phones.find?.(text) ?? [];
+  if (matches.length === 0) return text;
+  const parts: ReactNode[] = [];
+  let last = 0;
+  for (const match of matches) {
+    parts.push(text.slice(last, match.start));
+    parts.push(
+      <span
+        key={match.start}
+        role="button"
+        tabIndex={-1}
+        onClick={(e) =>
+          phones.open({ number: match.number, text: match.text, x: e.clientX, y: e.clientY })
+        }
+        className="-mx-0.5 cursor-pointer rounded px-0.5 underline decoration-foreground/40 decoration-dotted underline-offset-[3px] hover:bg-foreground/10"
+      >
+        {match.text}
+      </span>,
+    );
+    last = match.end;
+  }
+  parts.push(text.slice(last));
+  return parts;
+}
+
+function Linkified({ text, phones }: { text: string; phones: PlainPhones }) {
   const parts: ReactNode[] = [];
   let last = 0;
   for (const match of text.matchAll(URL_RE)) {
     const url = match[0];
-    parts.push(text.slice(last, match.index));
+    parts.push(
+      <WithPhones key={`t${last}`} text={text.slice(last, match.index)} phones={phones} />,
+    );
     parts.push(
       <a
         key={match.index}
@@ -869,24 +924,28 @@ function Linkified({ text }: { text: string }) {
     );
     last = match.index + url.length;
   }
-  parts.push(text.slice(last));
+  parts.push(<WithPhones key={`t${last}`} text={text.slice(last)} phones={phones} />);
   return parts;
 }
 
 function PlainBody({ text }: { text: string }) {
   const [main, quote] = splitPlainQuote(text);
   const [open, setOpen] = useState(false);
+  const { openPhoneMenu, phoneMenu } = usePhoneMenu();
+  const find = usePhoneFinder();
+  const phones = { find, open: openPhoneMenu };
   return (
     <div>
       <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground/90 [overflow-wrap:anywhere]">
-        <Linkified text={main} />
+        <Linkified text={main} phones={phones} />
       </pre>
       {quote ? <QuoteToggle open={open} onToggle={() => setOpen((o) => !o)} /> : null}
       {quote && open ? (
         <pre className="mt-2 whitespace-pre-wrap border-l-2 border-border pl-3 font-sans text-sm leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
-          <Linkified text={quote} />
+          <Linkified text={quote} phones={phones} />
         </pre>
       ) : null}
+      {phoneMenu}
     </div>
   );
 }

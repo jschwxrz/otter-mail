@@ -30,6 +30,7 @@ const bridge: DesktopBridge = {
     const opened = (await ipcRenderer.invoke("shell:openExternal", url)) as boolean;
     if (!opened) throw new Error("Failed to open URL");
   },
+  region: () => ipcRenderer.invoke("app:region") as Promise<string | undefined>,
   nativeTheme: {
     getInfo: () => ipcRenderer.invoke("nativeTheme:getInfo") as Promise<NativeThemeInfo>,
     setThemeSource: (source: ThemeSource) =>

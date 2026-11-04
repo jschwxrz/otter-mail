@@ -308,6 +308,7 @@ export const webBridge: DesktopBridge = {
     externalAgent: false,
     localAgents: false,
     browser: false,
+    phoneCalls: /mac/i.test(navigator.platform),
   },
   invoke,
   on(channel, listener) {
@@ -317,6 +318,7 @@ export const webBridge: DesktopBridge = {
     return () => set.delete(listener);
   },
   openExternal: async (url) => void window.open(url, "_blank", "noopener"),
+  region: async () => new Intl.Locale(navigator.language).maximize().region,
   nativeTheme: {
     getInfo: async () => themeInfo(),
     async setThemeSource(source) {

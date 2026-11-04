@@ -63,6 +63,8 @@ export interface BridgeFeatures {
    * tabs, with Chrome Web Store extensions (a web page can't embed sites).
    */
   browser: boolean;
+  /** Calls and texts to a phone number in a message (tel:, sms:): FaceTime and Messages. */
+  phoneCalls: boolean;
 }
 
 export interface DesktopBridge {
@@ -71,6 +73,8 @@ export interface DesktopBridge {
   invoke<T = unknown>(channel: string, params?: unknown): Promise<T>;
   on(channel: string, listener: (params: unknown) => void): () => void;
   openExternal(url: string): Promise<void>;
+  /** The region set on the computer (DE, US), which can differ from its language's. */
+  region(): Promise<string | undefined>;
   nativeTheme: {
     getInfo(): Promise<NativeThemeInfo>;
     setThemeSource(source: ThemeSource): Promise<void>;
