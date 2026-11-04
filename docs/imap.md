@@ -114,7 +114,9 @@ mail in … too** switch (under the Send from addresses) is off. IMAP only for n
   `services/signatures.ts`); taking an address out of Send from takes its mailbox away. Its id
   (route, `mail:mailboxes`, a notification's `open.mailbox`) is its address lower-cased. Its
   default name is the address's local part, capitalized (me@ → "Me"); its default color comes
-  from the id, as an account's does.
+  from the id, as an account's does. A picture chosen for it is the parent's `aliasPictures[id]`,
+  kept with the parent's row on the relay (`alias_pictures`, at most 16) like a mailbox's own
+  picture, not in the capped preferences; it stays while its mailbox is off.
 - Order and on/off: the `mail:mailboxes` UI preference, keyed by its id. Its tab drags anywhere
   in the sidebar's row (`arrangeMailboxes` and `moveMailbox`, `apps/web/src/main/mailboxes.ts`);
   one not dragged yet follows its parent and the parent's others. Settings › Connections lists it

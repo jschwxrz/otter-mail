@@ -215,6 +215,16 @@ struct AliasMailboxTests {
         #expect(!mailbox(imap: false).isICloud)
     }
 
+    @Test func anAliasMailboxShowsThePictureChosenForIt() {
+        var cloud = mailbox()
+        cloud.customPicture = "data:image/webp;base64,UGFyZW50"
+        cloud.aliasPictures = [studio: "data:image/webp;base64,U3R1ZGlv"]
+        let store = store([], mailboxes: [cloud])
+        #expect(store.alias(studio)?.customPicture == "data:image/webp;base64,U3R1ZGlv")
+        // Without one, its initial on its color, not the parent's picture.
+        #expect(store.alias(me)?.customPicture == nil)
+    }
+
     @Test func flaggingFlagsEveryCopy() {
         let store = store([copies])
         store.toggleStar(copies.id)

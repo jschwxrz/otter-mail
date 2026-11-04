@@ -18,6 +18,8 @@ nonisolated struct Mailbox: Identifiable, Hashable, Codable {
     var hasArchive: Bool? = nil
     var picture: String? = nil
     var customPicture: String? = nil
+    /** Its alias mailboxes' pictures, by address lower-cased (chosen on the Mac or the web). */
+    var aliasPictures: [String: String]? = nil
     var signedOut = false
     var imap: ImapSettings? = nil
     var outlook: Bool? = nil

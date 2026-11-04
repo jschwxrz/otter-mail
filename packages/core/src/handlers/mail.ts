@@ -9,7 +9,7 @@ import {
 } from "../services/mail-schedule.js";
 
 import { GMAIL_CAPABILITIES, landLabelChange, type Landing } from "@otter-mail/contracts";
-import { isMailboxPicture } from "@otter-mail/contracts/relay";
+import { ALIAS_PICTURES_MAX, isMailboxPicture } from "@otter-mail/contracts/relay";
 
 import { fromBase64 } from "../bytes.js";
 import { SignInCancelledError } from "../google.js";
@@ -404,7 +404,27 @@ export function registerMailHandlers(): void {
       if (customPicture && !isMailboxPicture(customPicture)) {
         throw new Error("That picture is too large, or isn't an image.");
       }
-      let updated = await storeUpdateAccount(accountId, { displayName, color, customPicture });
+      // { address, picture }: one alias mailbox's; "" removes it.
+      const aliasPicture = p?.aliasPicture as { address?: unknown; picture?: unknown } | undefined;
+      let aliasPictures: Record<string, string> | undefined;
+      if (aliasPicture) {
+        const address = assertString(aliasPicture.address, "aliasPicture.address").toLowerCase();
+        const picture = asString(aliasPicture.picture) ?? "";
+        if (picture && !isMailboxPicture(picture)) {
+          throw new Error("That picture is too large, or isn't an image.");
+        }
+        const { [address]: _, ...others } = (await getAccount(accountId))?.aliasPictures ?? {};
+        aliasPictures = picture ? { ...others, [address]: picture } : others;
+        if (Object.keys(aliasPictures).length > ALIAS_PICTURES_MAX) {
+          throw new Error(`Up to ${ALIAS_PICTURES_MAX} addresses of a mailbox can have a picture.`);
+        }
+      }
+      let updated = await storeUpdateAccount(accountId, {
+        displayName,
+        color,
+        customPicture,
+        aliasPictures,
+      });
       if (signature !== undefined) updated = await saveSignature(updated, signature);
       if (Array.isArray(p?.sendAs)) updated = await saveSendAs(updated, p.sendAs);
       if (Array.isArray(p?.aliasMailboxes)) {
@@ -415,6 +435,7 @@ export function registerMailHandlers(): void {
         void accountEdited(updated, ["displayName", "color"]);
       }
       if (customPicture !== undefined) void accountEdited(updated, ["customPicture"]);
+      if (aliasPictures !== undefined) void accountEdited(updated, ["aliasPictures"]);
       updateDockBadge();
       return updated;
     } catch (err) {

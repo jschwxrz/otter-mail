@@ -19,6 +19,7 @@ export interface RelayAccount {
   displayName: string | null;
   color: string | null;
   customPicture: string | null;
+  aliasPictures: AliasPictures | null;
 }
 
 // A chosen picture is an inline data URL, never a link, so no device fetches it from anywhere.
@@ -29,6 +30,27 @@ export function isMailboxPicture(value: unknown): value is string {
     typeof value === "string" &&
     value.length <= MAILBOX_PICTURE_MAX_LENGTH &&
     /^data:image\/(?:webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/.test(value)
+  );
+}
+
+/** An IMAP mailbox's alias mailboxes' pictures, by address lower-cased. */
+export type AliasPictures = Record<string, string>;
+
+// Kept with the mailbox's row on the relay, which has a size limit.
+export const ALIAS_PICTURES_MAX = 16;
+
+export function isAliasPictures(value: unknown): value is AliasPictures {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const entries = Object.entries(value);
+  return (
+    entries.length <= ALIAS_PICTURES_MAX &&
+    entries.every(
+      ([address, picture]) =>
+        address.length <= 320 &&
+        address.includes("@") &&
+        address === address.toLowerCase() &&
+        isMailboxPicture(picture),
+    )
   );
 }
 
@@ -128,6 +150,7 @@ export interface PutAccountRequest {
   displayName?: string | null;
   color?: string | null;
   customPicture?: string | null;
+  aliasPictures?: AliasPictures | null;
 }
 
 export type Preferences = Record<string, unknown>;

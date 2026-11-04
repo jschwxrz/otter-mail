@@ -291,6 +291,8 @@ export type UpdateAccountParams = {
   displayName?: string;
   color?: string;
   customPicture?: string;
+  /** One alias mailbox's picture; "" removes it. */
+  aliasPicture?: { address: string; picture: string };
   signature?: string;
   /** The IMAP mailbox's other addresses it sends from (`capabilities.sendAs === "device"`). */
   sendAs?: string[];

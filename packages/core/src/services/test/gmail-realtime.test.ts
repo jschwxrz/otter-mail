@@ -34,6 +34,7 @@ const relayAccount = (account: MailAccount): RelayAccount => ({
   displayName: null,
   color: null,
   customPicture: null,
+  aliasPictures: null,
 });
 
 class FakeSocket {

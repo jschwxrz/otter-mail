@@ -18,6 +18,8 @@ export type MailAccount = {
   displayName?: string;
   color?: string;
   customPicture?: string;
+  /** Pictures chosen for its alias mailboxes, by address lower-cased. */
+  aliasPictures?: Record<string, string>;
   signature?: string;
   /** False while the signature is kept only here: this sign-in may not save it in Gmail. */
   signatureInGmail?: boolean;

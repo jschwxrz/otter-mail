@@ -162,6 +162,15 @@ export function useAccounts() {
   });
 }
 
+function withAliasPicture(
+  pictures: Record<string, string> | undefined,
+  { address, picture }: { address: string; picture: string },
+): Record<string, string> | undefined {
+  const { [address.toLowerCase()]: _, ...others } = pictures ?? {};
+  const next = picture ? { ...others, [address.toLowerCase()]: picture } : others;
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
 export function useUpdateAccount() {
   const qc = useQueryClient();
   return useMutation({
@@ -169,6 +178,7 @@ export function useUpdateAccount() {
       console.log("[hooks:useUpdateAccount] updating account", {
         ...params,
         customPicture: params.customPicture && "(picture)",
+        aliasPicture: params.aliasPicture && "(picture)",
       });
       return mailApi.updateAccount(params);
     },
@@ -190,6 +200,9 @@ export function useUpdateAccount() {
                 sendAs: params.sendAs !== undefined ? params.sendAs : a.sendAs,
                 aliasMailboxes:
                   params.aliasMailboxes !== undefined ? params.aliasMailboxes : a.aliasMailboxes,
+                aliasPictures: params.aliasPicture
+                  ? withAliasPicture(a.aliasPictures, params.aliasPicture)
+                  : a.aliasPictures,
               }
             : a,
         ),

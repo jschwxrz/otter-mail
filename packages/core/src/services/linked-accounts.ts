@@ -2,6 +2,7 @@
 
 import type { ImapSettings } from "@otter-mail/contracts";
 import type {
+  AliasPictures,
   ListAccountsResponse,
   PutAccountRequest,
   RelayAccount,
@@ -20,7 +21,14 @@ import type { MailAccount } from "../types.js";
 
 export type LocalAccount = Pick<
   MailAccount,
-  "email" | "name" | "picture" | "displayName" | "color" | "customPicture" | "imap"
+  | "email"
+  | "name"
+  | "picture"
+  | "displayName"
+  | "color"
+  | "customPicture"
+  | "aliasPictures"
+  | "imap"
 > & {
   signedIn: boolean;
 };
@@ -39,6 +47,12 @@ const key = (email: string) => email.toLowerCase();
 const sameServers = (a: ImapSettings, b: ImapSettings) =>
   a.imap.host.toLowerCase() === b.imap.host.toLowerCase() &&
   a.smtp.host.toLowerCase() === b.smtp.host.toLowerCase();
+
+const samePictures = (a: AliasPictures | null | undefined, b: AliasPictures | null) => {
+  const entries = (p: AliasPictures | null | undefined) =>
+    JSON.stringify(Object.entries(p ?? {}).sort());
+  return entries(a) === entries(b);
+};
 
 export function planReconcile(
   local: LocalAccount[],
@@ -66,6 +80,8 @@ export function planReconcile(
         // undefined: a relay from before pictures, which mustn't blank ours.
         (account.customPicture !== undefined &&
           (here.customPicture ?? null) !== account.customPicture) ||
+        (account.aliasPictures !== undefined &&
+          !samePictures(here.aliasPictures, account.aliasPictures)) ||
         (!fromGoogle && account.name !== null && here.name !== account.name) ||
         (!fromGoogle && account.picture !== null && (here.picture ?? null) !== account.picture)
       ) {
@@ -119,12 +135,17 @@ const profile = (account: MailAccount) => ({
   displayName: account.displayName ?? null,
   color: account.color ?? null,
   customPicture: account.customPicture ?? null,
+  aliasPictures: account.aliasPictures ?? null,
 });
 
-// This device may not have pulled the picture another device chose: linking mustn't clear it.
+// This device may not have pulled the pictures another device chose: linking mustn't clear them.
 function linkProfile(account: MailAccount) {
-  const { customPicture, ...rest } = profile(account);
-  return customPicture ? { ...rest, customPicture } : rest;
+  const { customPicture, aliasPictures, ...rest } = profile(account);
+  return {
+    ...rest,
+    ...(customPicture ? { customPicture } : {}),
+    ...(aliasPictures ? { aliasPictures } : {}),
+  };
 }
 
 /**
@@ -176,6 +197,7 @@ export function accountFromRelay(account: RelayAccount): MailAccount {
     displayName: account.displayName ?? undefined,
     color: account.color ?? undefined,
     customPicture: account.customPicture ?? undefined,
+    aliasPictures: account.aliasPictures ?? undefined,
   };
 }
 
@@ -261,6 +283,8 @@ export async function reconcileAccounts(
       color: account.color ?? "",
       customPicture:
         account.customPicture === undefined ? undefined : (account.customPicture ?? ""),
+      aliasPictures:
+        account.aliasPictures === undefined ? undefined : (account.aliasPictures ?? {}),
     });
   }
   for (const email of plan.moved) {

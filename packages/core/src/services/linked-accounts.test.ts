@@ -27,6 +27,7 @@ const local = (
     name?: string;
     picture?: string;
     customPicture?: string;
+    aliasPictures?: Record<string, string>;
     imap?: ImapSettings;
   } = {},
 ) => ({
@@ -38,6 +39,7 @@ const local = (
   displayName: extra.displayName,
   color: extra.color,
   customPicture: extra.customPicture,
+  aliasPictures: extra.aliasPictures,
 });
 
 const remote = (email: string, extra: Partial<RelayAccount> = {}): RelayAccount => ({
@@ -49,6 +51,7 @@ const remote = (email: string, extra: Partial<RelayAccount> = {}): RelayAccount 
   displayName: null,
   color: null,
   customPicture: null,
+  aliasPictures: null,
   ...extra,
 });
 
@@ -176,6 +179,26 @@ describe("planReconcile", () => {
     expect(plan).toEqual(none);
   });
 
+  it("takes alias mailboxes' pictures chosen elsewhere, whatever their order", () => {
+    const pictures = { "me@riverbank.example": PICTURE, "mail@riverbank.example": PICTURE };
+    const here = local("a@x.com", { aliasPictures: pictures });
+    const reordered = { "mail@riverbank.example": PICTURE, "me@riverbank.example": PICTURE };
+    expect(
+      planReconcile(
+        [here],
+        [remote("a@x.com", { aliasPictures: reordered })],
+        new Set(["a@x.com"]),
+      ),
+    ).toEqual(none);
+    const fewer = remote("a@x.com", { aliasPictures: { "me@riverbank.example": PICTURE } });
+    expect(planReconcile([here], [fewer], new Set(["a@x.com"]))).toEqual({
+      ...none,
+      update: [fewer],
+    });
+    const { aliasPictures: _, ...older } = remote("a@x.com");
+    expect(planReconcile([here], [older as RelayAccount], new Set(["a@x.com"]))).toEqual(none);
+  });
+
   it("compares addresses without case", () => {
     const plan = planReconcile([local("Me@X.com")], [remote("me@x.com")], new Set());
     expect(plan).toEqual(none);
@@ -243,6 +266,10 @@ describe("IMAP mailboxes", () => {
       PICTURE,
     );
     expect(accountFromRelay(remote("a@x.com")).customPicture).toBeUndefined();
+    const aliasPictures = { "me@riverbank.example": PICTURE };
+    expect(accountFromRelay(remote("a@x.com", { aliasPictures })).aliasPictures).toEqual(
+      aliasPictures,
+    );
   });
 
   it("links with its settings and no ID token", async () => {

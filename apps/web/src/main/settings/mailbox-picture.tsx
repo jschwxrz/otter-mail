@@ -1,5 +1,6 @@
 import { useRef, useState, type DragEvent } from "react";
 import { AccountPicture } from "../mail/account-picture";
+import type { AliasMailboxEntry } from "../mail/alias-mailboxes";
 import { useUpdateAccount } from "../mail/hooks";
 import { toast } from "../mail/toast";
 import type { MailAccount } from "../mail/types";
@@ -10,18 +11,31 @@ import { searchableSetting } from "./settings-search";
 
 const hasFiles = (event: DragEvent) => event.dataTransfer.types.includes("Files");
 
-export function MailboxPictureRow({ account }: { account: MailAccount }) {
+/** With `alias`, an alias mailbox's (`account` is its look), kept with its parent. */
+export function MailboxPictureRow({
+  account,
+  alias,
+}: {
+  account: MailAccount;
+  alias?: AliasMailboxEntry;
+}) {
   const updateAccount = useUpdateAccount();
   const input = useRef<HTMLInputElement>(null);
   const [reading, setReading] = useState(false);
   const [dropping, setDropping] = useState(false);
 
-  const save = (customPicture: string) =>
-    updateAccount.mutateAsync({ accountId: account.id, customPicture }).catch((err: unknown) => {
-      toast.error("Couldn't save the picture", {
-        description: err instanceof Error ? err.message : String(err),
+  const save = (picture: string) =>
+    updateAccount
+      .mutateAsync(
+        alias
+          ? { accountId: alias.parent.id, aliasPicture: { address: alias.id, picture } }
+          : { accountId: account.id, customPicture: picture },
+      )
+      .catch((err: unknown) => {
+        toast.error("Couldn't save the picture", {
+          description: err instanceof Error ? err.message : String(err),
+        });
       });
-    });
 
   const use = async (file: File | undefined) => {
     if (!file) return;

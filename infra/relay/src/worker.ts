@@ -10,6 +10,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
   GMAIL_SIGN_IN_CANCELLED,
+  isAliasPictures,
   isMailboxPicture,
   type ListAccountsResponse,
   type MeResponse,
@@ -523,6 +524,7 @@ authed.put(
       displayName: profileField,
       color: profileField,
       customPicture: z.string().refine(isMailboxPicture).nullable().optional(),
+      aliasPictures: z.record(z.string(), z.string()).refine(isAliasPictures).nullable().optional(),
     }),
     rejectInvalid,
   ),

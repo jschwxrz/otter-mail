@@ -17,6 +17,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import type { ImapSettings, MailProviderKind } from "@otter-mail/contracts/mail";
+import type { AliasPictures } from "@otter-mail/contracts/relay";
 import type { Chat, ChatProvider, ChatTab } from "@otter-mail/contracts/chats";
 
 const createdAt = () =>
@@ -108,6 +109,8 @@ export const linkedAccounts = sqliteTable(
     color: text(),
     // Here, not in preferences: that one document is capped and pulled whole on every change.
     customPicture: text(),
+    /** JSON, for IMAP mailboxes: its alias mailboxes' pictures, by address lower-cased. */
+    aliasPictures: text({ mode: "json" }).$type<AliasPictures>(),
     linkedAt: integer({ mode: "timestamp_ms" }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.email] }), index("linked_accounts_email").on(t.email)],
