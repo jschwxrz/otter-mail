@@ -65,7 +65,10 @@ export function FromPicker({
             aria-label="Send from"
             className="-ml-1 flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md px-1 py-0.5 text-sm text-foreground outline-none hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring"
           >
-            <AccountPicture account={lookOf(value, address)} className="size-4 rounded-[5px] text-[9px]" />
+            <AccountPicture
+              account={lookOf(value, address)}
+              className="size-4 rounded-[5px] text-[9px]"
+            />
             <span className="truncate">{address}</span>
             <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
           </button>
@@ -76,7 +79,10 @@ export function FromPicker({
               <DropdownMenuItem
                 key={`${account.id}:${each}`}
                 icon={
-                  <AccountPicture account={lookOf(account, each)} className="size-4 rounded-[5px] text-[9px]" />
+                  <AccountPicture
+                    account={lookOf(account, each)}
+                    className="size-4 rounded-[5px] text-[9px]"
+                  />
                 }
                 onSelect={() => onChange(account.id, each)}
               >

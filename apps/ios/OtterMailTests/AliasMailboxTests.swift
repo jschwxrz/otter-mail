@@ -182,6 +182,14 @@ struct AliasMailboxTests {
         #expect(store.thread(copies.id)?.messages.contains(where: \.starred) == false)
     }
 
+    @Test func onlyImapSendsFromTheSyncedAddresses() {
+        let gmail = mailbox("robin@gmail.example", imap: false)
+        let store = store([], mailboxes: [mailbox(), gmail])
+        store.otherAddresses.sendAs[gmail.email] = [studio]
+        #expect(store.addresses(of: gmail.email) == [gmail.email])
+        #expect(store.addresses(of: parent).contains(studio))
+    }
+
     @Test func anAliasMailboxIsOneOfTheAddressesItSendsFrom() {
         let other = mailbox("robin@mail.example")
         let store = store([], mailboxes: [mailbox(), other])

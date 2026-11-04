@@ -300,6 +300,14 @@ async function deleteComposerDraft(
 const logDraftLeft = (err: unknown) =>
   console.log("[gmail:sendMessage] sent; its draft is left", { error: String(err) });
 
+// IMAP keeps a copy of a message per address it was delivered to (alias mailboxes): the reader
+// shows it once, so reading, flagging and moving it take every copy.
+function copiesOf(accountId: string, messageId: string, sameFolder: boolean): string[] {
+  return providerKindOf(accountId) === "imap"
+    ? mailStore.getCopies(accountId, messageId, sameFolder)
+    : [messageId];
+}
+
 export function registerMailHandlers(): void {
   handle("gmail:listSchedules", () => listSchedules());
   handle("gmail:scheduleMessage", (params: unknown) => {
@@ -699,11 +707,10 @@ export function registerMailHandlers(): void {
       const messageId = assertString(p?.messageId, "messageId");
       const addLabelIds = asStringArray(p?.addLabelIds);
       const removeLabelIds = asStringArray(p?.removeLabelIds);
-      // The reader shows copies once (getThreadForReading), so they change together.
       const flagsOnly = [...(addLabelIds ?? []), ...(removeLabelIds ?? [])].every((id) =>
         ["UNREAD", "STARRED"].includes(id),
       );
-      const ids = mailStore.getCopies(accountId, messageId, !flagsOnly);
+      const ids = copiesOf(accountId, messageId, !flagsOnly);
       return await settleLabelWrite(
         "gmail:modifyMessage",
         accountId,
@@ -732,7 +739,7 @@ export function registerMailHandlers(): void {
     try {
       const accountId = assertString(p?.accountId, "accountId");
       const messageId = assertString(p?.messageId, "messageId");
-      const ids = mailStore.getCopies(accountId, messageId, true);
+      const ids = copiesOf(accountId, messageId, true);
       return await settleLabelWrite("gmail:trashMessage", accountId, ids, ["TRASH"], [], () =>
         Promise.all(ids.map((id) => providerFor(accountId).trashMessage(accountId, id))).then(() =>
           refreshMetadata(accountId, ids),
@@ -751,7 +758,9 @@ export function registerMailHandlers(): void {
       const accountId = assertString(p?.accountId, "accountId");
       const threadId = assertString(p?.threadId, "threadId");
       const alias = asString(p?.alias)?.toLowerCase();
-      return mailStore.getThreadForReading(accountId, threadId, alias);
+      return providerKindOf(accountId) === "imap"
+        ? mailStore.getThreadForReading(accountId, threadId, alias)
+        : mailStore.getThreadMessages(accountId, threadId);
     } catch (err) {
       console.log("[gmail:getThread] error", { error: String(err) });
       throw err;
@@ -834,7 +843,7 @@ export function registerMailHandlers(): void {
     try {
       const accountId = assertString(p?.accountId, "accountId");
       const messageId = assertString(p?.messageId, "messageId");
-      const ids = mailStore.getCopies(accountId, messageId, true);
+      const ids = copiesOf(accountId, messageId, true);
       return await settleLabelWrite("gmail:untrashMessage", accountId, ids, [], ["TRASH"], () =>
         Promise.all(ids.map((id) => providerFor(accountId).untrashMessage(accountId, id)))
           .then((copies) => copies.flat())

@@ -129,6 +129,8 @@ final class MailStore {
     func addresses(of email: String) -> [String] {
         let key = email.lowercased()
         var all = [key]
+        // Gmail and Outlook send only from addresses they verified; the synced Send from is IMAP's.
+        guard mailboxes.first(where: { $0.email.lowercased() == key })?.provider == .imap else { return all }
         for address in otherAddresses.sendAs[key] ?? [] {
             let address = address.trimmingCharacters(in: .whitespaces).lowercased()
             if address.contains("@") && !all.contains(address) { all.append(address) }
