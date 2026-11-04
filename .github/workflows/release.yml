@@ -346,15 +346,18 @@ jobs:
           ignore_missing: true
           ignore_empty: true
 
-  deploy_web:
-    name: Deploy the web app
-    needs: [preflight, release]
+  # A nightly's web app goes out once its checks pass, alongside the desktop builds;
+  # a stable one waits for its GitHub release.
+  deploy_web_nightly:
+    name: Deploy the web app (nightly)
+    needs: [preflight, quality]
+    if: needs.preflight.outputs.prerelease == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     concurrency:
-      group: deploy-web-${{ needs.preflight.outputs.prerelease == 'true' && 'nightly' || 'stable' }}
+      group: deploy-web-nightly
       cancel-in-progress: false
-    steps:
+    steps: &deploy_web_steps
       - name: Checkout
         uses: actions/checkout@v6
         with:
@@ -388,6 +391,17 @@ jobs:
           else
             pnpm exec wrangler deploy
           fi
+
+  deploy_web:
+    name: Deploy the web app
+    needs: [preflight, release]
+    if: needs.preflight.outputs.prerelease == 'false'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    concurrency:
+      group: deploy-web-stable
+      cancel-in-progress: false
+    steps: *deploy_web_steps
 
   finalize:
     name: Bump package versions on main

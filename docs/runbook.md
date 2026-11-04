@@ -36,9 +36,9 @@ the Google and GitHub settings that go with these URLs. D1 migrations run before
    prereleases; only stable changes GitHub's latest release and bumps package versions on main.
 4. Settings → General selects Stable or Nightly on this computer. Installed apps update
    themselves ("Restart to update" in the sidebar), and their icon follows the installed build.
-5. After the GitHub Release, the same run deploys the web app (job "Deploy the web app"): a
-   nightly to the `otter-mail-site-nightly` Worker, stable to `otter-mail-site`
-   (mail.otterware.app). Both answer at mail.otterware.app, so they share the browser's cache
+5. The same run deploys the web app: a nightly once its checks pass, beside the desktop builds
+   (job "Deploy the web app (nightly)"), to the `otter-mail-site-nightly` Worker; stable after
+   the GitHub Release (job "Deploy the web app") to `otter-mail-site` (mail.otterware.app). Both answer at mail.otterware.app, so they share the browser's cache
    and sign-in; Settings → General there sets a cookie that has the stable Worker hand requests
    to the nightly one. Open tabs check `version.json` and offer "Reload to update". It needs the
    `CLOUDFLARE_API_TOKEN` secret and `CLOUDFLARE_ACCOUNT_ID` variable. Roll back: Cloudflare →
