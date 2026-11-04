@@ -21,8 +21,11 @@ nonisolated struct Mailbox: Identifiable, Hashable, Codable {
     var signedOut = false
     var imap: ImapSettings? = nil
     var outlook: Bool? = nil
+    /** Set on an alias mailbox (`MailStore.aliases`), which is never in `MailStore.mailboxes`. */
+    var parent: String? = nil
 
     var id: String { email }
+    var source: String { parent ?? email }
     var me: Person { Person(name: name, email: email) }
     var provider: MailProviderKind { imap != nil ? .imap : outlook == true ? .outlook : .gmail }
     var capabilities: MailCapabilities {
@@ -42,6 +45,28 @@ nonisolated struct Mailbox: Identifiable, Hashable, Codable {
             case .allMail: !capabilities.archiveFolder
             case .archive: hasArchive == true
             default: true
+            }
+        }
+    }
+}
+
+nonisolated struct MailAddresses: Codable, Equatable {
+    // Both by the mailbox's lower-cased address.
+    var sendAs: [String: [String]] = [:]
+    var aliasMailboxes: [String: [AliasMailbox]] = [:]
+
+    init(sendAs: [String: [String]] = [:], aliasMailboxes: [String: [AliasMailbox]] = [:]) {
+        self.sendAs = sendAs
+        self.aliasMailboxes = aliasMailboxes
+    }
+
+    /** Malformed entries are skipped, as core's parseAliasMailboxes does, rather than failing the section. */
+    init(sendAs: Any?, aliasMailboxes: Any?) {
+        let text = { (value: Any?) in (value as? String).flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 } }
+        self.sendAs = ((sendAs as? [String: Any]) ?? [:]).mapValues { ($0 as? [Any] ?? []).compactMap(text) }
+        self.aliasMailboxes = ((aliasMailboxes as? [String: Any]) ?? [:]).mapValues { entries in
+            (entries as? [Any] ?? []).compactMap { $0 as? [String: Any] }.compactMap { entry in
+                text(entry["address"]).map { AliasMailbox(address: $0, name: text(entry["name"]), color: text(entry["color"]), signature: text(entry["signature"])) }
             }
         }
     }
@@ -105,8 +130,10 @@ nonisolated struct Message: Identifiable, Hashable, Codable {
     var unread: Bool
     var starred: Bool
     var draft: Bool
-    /** The ones replies and unsubscribing need: Message-ID, References, List-Unsubscribe. */
+    /** The ones replies, unsubscribing and alias mailboxes need: Message-ID, References, List-Unsubscribe, Original-Recipient, Delivered-To, X-Original-To. */
     var headers: [String: String]
+
+    var deliveredTo: [String] { AliasMailbox.deliveredTo { headers[$0] } }
 
     var snippet: String {
         // A one-line preview must not scan megabytes of newsletter or quoted history while scrolling.
@@ -131,6 +158,22 @@ nonisolated struct MailThread: Identifiable, Hashable, Codable {
     var hasAttachments: Bool { messages.contains { !$0.attachments.isEmpty } }
     var isDraft: Bool { messages.allSatisfy(\.draft) }
     var sent: [Message] { messages.filter { !$0.draft } }
+
+    /** iCloud files a copy for each address a message was delivered to; `address`'s (an alias mailbox's) is kept. */
+    func distinctMessages(preferring address: String? = nil) -> [Message] {
+        var kept: [String: Int] = [:]
+        var distinct: [Message] = []
+        for message in messages {
+            guard !message.draft, let id = message.headers["Message-ID"] else { distinct.append(message); continue }
+            if let i = kept[id] {
+                if let address, message.deliveredTo.contains(address), !distinct[i].deliveredTo.contains(address) { distinct[i] = message }
+            } else {
+                kept[id] = distinct.count
+                distinct.append(message)
+            }
+        }
+        return distinct
+    }
 
     /** Where mail is (the inbox, a folder) rather than how it is (flags, Outlook's categories). */
     static func isFolder(_ label: String) -> Bool {

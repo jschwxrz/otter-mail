@@ -82,6 +82,18 @@ add limited server grants (or an encrypted IMAP password), while mail content st
   the others are read, and each finished turn is written back after the chat's other turns,
   keeping what other devices wrote (it stays the relay's JSON).
 - `Mail/`: the model and `MailStore`, which screens render from. `DemoMail.swift` loads the demo.
+- Alias mailboxes (`NotificationShared/AliasMailbox.swift`, `MailStore.aliases`): an IMAP
+  mailbox's address with a mailbox of its own, made on the Mac and the web (the account's
+  `aliasMailboxes`; `sendAs` lists the mailbox's other addresses, which compose's From offers).
+  Each is a place over its parent's cached mail, not a mailbox, right after its parent (ordered
+  among its others). A received copy is its when one of the addresses it was delivered to (the
+  topmost Original-Recipient, Delivered-To and X-Original-To) is one of the parent's Send from
+  addresses: it's those aliases' alone. Otherwise (delivered to the mailbox's own address, as
+  Postfix's Delivered-To says, or to none; mail cached before those were fetched) To and Cc
+  decide. Sent and Drafts are what it wrote. Its list pages the parent until it has a page of
+  its own. New mail there and replies go from the alias, signed
+  with its signature (else the parent's); alerts are named after it and open it. The parent
+  shows everything, as before.
 - `Reports/`: error reports to Sentry (`otter-mail-ios`), scrubbed by the shared rules
   (`docs/error-reports.md`): crashes and the failures of sync, sign-in, the relay and sending, with a
   random report id; off in Settings › Support. Release builds report; Debug builds only with
@@ -100,7 +112,8 @@ pnpm dev:ios --relay local # against `pnpm dev`'s relay on :8787
 ```
 
 Or open `OtterMail.xcodeproj` in Xcode (27 or later). The welcome screen offers the demo mailbox,
-the same pretend mail as `pnpm dev:fake`; build and test against it rather than real accounts.
+the same pretend mail as `pnpm dev:fake`, plus an iCloud-style IMAP mailbox with two alias
+mailboxes (`DEMO_ALIAS_ACCOUNT` in `packages/shared`); build and test against it rather than real accounts.
 
 Debug builds are `dev.otterware.mail.dev`, release builds `dev.otterware.mail`. The Google "iOS"
 client is registered for the former. The project signs with team 838JVGY7W4; to run on your

@@ -11,6 +11,19 @@ nonisolated enum PushState {
         var mode: String
         var mailboxes: [String]
         var imapSettings: [String: ImapSettings]? = nil
+        var aliases: [String: [AliasMailbox]]? = nil
+        /** Set only when this iPhone shows more than one mailbox: alerts name it then. */
+        var names: [String: String]? = nil
+
+        func name(_ email: String, alias: AliasMailbox?) -> String? {
+            guard let names else { return nil }
+            return alias?.title ?? names[email.lowercased()]
+        }
+    }
+
+    static func subtitle(_ subject: String, mailbox: String?) -> String {
+        guard let mailbox, !mailbox.isEmpty else { return subject }
+        return subject.isEmpty ? mailbox : "\(mailbox) · \(subject)"
     }
 
     static func configuration() -> Configuration? { read("configuration") }

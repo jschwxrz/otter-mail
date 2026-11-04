@@ -10,6 +10,7 @@ struct ThreadRow: View {
     @Environment(\.palette) private var palette
     let thread: MailThread
     var mark = "star"
+    var mine: Set<String> = []
 
     var body: some View {
         let unread = thread.unread
@@ -59,8 +60,9 @@ struct ThreadRow: View {
                         .font(.inter(.caption2))
                         .foregroundStyle(palette.muted)
                 }
-                if thread.messages.count > 1 {
-                    Text("\(thread.messages.count)")
+                let count = thread.distinctMessages().count
+                if count > 1 {
+                    Text("\(count)")
                         .font(.inter(.footnote))
                         .foregroundStyle(palette.muted)
                         .monospacedDigit()
@@ -86,7 +88,7 @@ struct ThreadRow: View {
     private var senders: String {
         var names: [String] = []
         for message in thread.messages where !message.draft {
-            let name = message.from.isAddress(thread.mailbox)
+            let name = message.from.isAddress(thread.mailbox) || mine.contains(message.from.email.lowercased())
                 ? "me"
                 : message.from.label.split(separator: " ").first.map(String.init) ?? message.from.label
             if !names.contains(name) { names.append(name) }

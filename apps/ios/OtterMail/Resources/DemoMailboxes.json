@@ -1197,5 +1197,330 @@
         ]
       }
     ]
+  },
+  {
+    "email": "robin.otter@icloud.example",
+    "name": "Robin Otter",
+    "displayName": "iCloud",
+    "color": "#64748b",
+    "signature": "<div>Robin</div>",
+    "labels": [
+      {
+        "name": "Receipts"
+      }
+    ],
+    "imap": {
+      "username": "robin.otter@icloud.example",
+      "imap": {
+        "host": "imap.icloud.example",
+        "port": 993,
+        "security": "tls"
+      },
+      "smtp": {
+        "host": "smtp.icloud.example",
+        "port": 587,
+        "security": "starttls"
+      }
+    },
+    "sendAs": ["me@robinotter.example", "mail@robinotter.example", "accounts@robinotter.example"],
+    "aliasMailboxes": [
+      {
+        "address": "me@robinotter.example"
+      },
+      {
+        "address": "mail@robinotter.example",
+        "name": "Studio",
+        "color": "#f97316",
+        "signature": "<div>Robin Otter · Otter Studio</div>"
+      }
+    ],
+    "threads": [
+      {
+        "subject": "Studio open day: save the date",
+        "labels": ["INBOX"],
+        "messages": [
+          {
+            "from": {
+              "name": "Inês Duarte",
+              "email": "ines@duarte.example"
+            },
+            "to": [
+              {
+                "name": "Robin Otter",
+                "email": "mail@robinotter.example"
+              }
+            ],
+            "hoursAgo": 1.5,
+            "unread": true,
+            "text": "Hi Robin,\n\nThe open day is on the 14th, from ten. Could the studio show the new prints?\n\nInês",
+            "headers": {
+              "Message-ID": "<open-day-1@duarte.example>",
+              "Original-Recipient": "rfc822;mail@robinotter.example"
+            },
+            "attachments": []
+          },
+          {
+            "from": {
+              "name": "Inês Duarte",
+              "email": "ines@duarte.example"
+            },
+            "to": [
+              {
+                "name": "Robin Otter",
+                "email": "mail@robinotter.example"
+              }
+            ],
+            "hoursAgo": 1.5,
+            "unread": true,
+            "text": "Hi Robin,\n\nThe open day is on the 14th, from ten. Could the studio show the new prints?\n\nInês",
+            "headers": {
+              "Message-ID": "<open-day-1@duarte.example>",
+              "Original-Recipient": "rfc822;me@robinotter.example"
+            },
+            "attachments": []
+          }
+        ]
+      },
+      {
+        "subject": "Dinner on Saturday?",
+        "labels": ["INBOX", "SENT"],
+        "messages": [
+          {
+            "from": {
+              "name": "Sam Rivera",
+              "email": "sam.rivera@example.net"
+            },
+            "to": [
+              {
+                "name": "Robin Otter",
+                "email": "me@robinotter.example"
+              }
+            ],
+            "hoursAgo": 30,
+            "text": "Robin! Are you free on Saturday? We're trying the new place by the river.\n\nSam",
+            "headers": {
+              "Message-ID": "<dinner-1@example.net>",
+              "Original-Recipient": "rfc822;me@robinotter.example"
+            },
+            "attachments": []
+          },
+          {
+            "from": {
+              "name": "Robin Otter",
+              "email": "me@robinotter.example"
+            },
+            "to": [
+              {
+                "name": "Sam Rivera",
+                "email": "sam.rivera@example.net"
+              }
+            ],
+            "hoursAgo": 29,
+            "text": "I'd love to. Eight?\n\nRobin",
+            "headers": {
+              "Message-ID": "<dinner-2@robinotter.example>"
+            },
+            "attachments": []
+          },
+          {
+            "from": {
+              "name": "Sam Rivera",
+              "email": "sam.rivera@example.net"
+            },
+            "to": [
+              {
+                "name": "Robin Otter",
+                "email": "me@robinotter.example"
+              }
+            ],
+            "hoursAgo": 3,
+            "unread": true,
+            "text": "Eight it is. I'll book a table by the window.\n\nSam",
+            "headers": {
+              "Message-ID": "<dinner-3@example.net>",
+              "Original-Recipient": "rfc822;me@robinotter.example"
+            },
+            "attachments": []
+          }
+        ]
+      },
+      {
+        "subject": "Frames for the open day",
+        "labels": ["INBOX"],
+        "messages": [
+          {
+            "from": {
+              "name": "Kai Lindqvist",
+              "email": "kai@lindqvist.example"
+            },
+            "to": [
+              {
+                "name": "Inês Duarte",
+                "email": "ines@duarte.example"
+              }
+            ],
+            "cc": [
+              {
+                "name": "Robin Otter",
+                "email": "me@robinotter.example"
+              }
+            ],
+            "hoursAgo": 6,
+            "unread": true,
+            "text": "Inês, Robin,\n\nI can bring twelve oak frames on the 13th. Tell me the sizes and I'll cut them this week.\n\nKai",
+            "headers": {
+              "Message-ID": "<frames-1@lindqvist.example>"
+            },
+            "attachments": []
+          }
+        ]
+      },
+      {
+        "subject": "Invoice 2041",
+        "labels": ["INBOX", "Receipts"],
+        "messages": [
+          {
+            "from": {
+              "name": "Northwind Print",
+              "email": "billing@northwind.example"
+            },
+            "to": [
+              {
+                "name": "Robin Otter",
+                "email": "accounts@robinotter.example"
+              }
+            ],
+            "hoursAgo": 20,
+            "unread": true,
+            "text": "Hello,\n\nInvoice 2041 for 40 A3 prints is attached to your account. It's due in 14 days.\n\nNorthwind Print",
+            "headers": {
+              "Message-ID": "<invoice-2041@northwind.example>",
+              "Original-Recipient": "rfc822;accounts@robinotter.example"
+            },
+            "attachments": []
+          }
+        ]
+      },
+      {
+        "subject": "Photos from the coast",
+        "labels": ["INBOX"],
+        "messages": [
+          {
+            "from": {
+              "name": "Mum",
+              "email": "helen.otter@example.net"
+            },
+            "to": [
+              {
+                "name": "Robin Otter",
+                "email": "robin.otter@icloud.example"
+              }
+            ],
+            "hoursAgo": 50,
+            "text": "Here are the ones from Sunday. The lighthouse came out well!\n\nLove, Mum",
+            "headers": {
+              "Message-ID": "<coast-1@example.net>",
+              "Original-Recipient": "rfc822;robin.otter@icloud.example"
+            },
+            "attachments": []
+          }
+        ]
+      },
+      {
+        "subject": "Otter Studio newsletter: October",
+        "labels": ["SENT"],
+        "messages": [
+          {
+            "from": {
+              "name": "Robin Otter",
+              "email": "mail@robinotter.example"
+            },
+            "to": [
+              {
+                "name": "Studio friends",
+                "email": "friends@robinotter.example"
+              }
+            ],
+            "hoursAgo": 72,
+            "text": "Hello friends,\n\nNew prints, an open day on the 14th, and frames by Kai. See you there!\n\nRobin Otter · Otter Studio",
+            "headers": {
+              "Message-ID": "<newsletter-10@robinotter.example>"
+            },
+            "attachments": []
+          }
+        ]
+      },
+      {
+        "subject": "Lighthouse print",
+        "labels": ["SENT"],
+        "messages": [
+          {
+            "from": {
+              "name": "Robin Otter",
+              "email": "robin.otter@icloud.example"
+            },
+            "to": [
+              {
+                "name": "Mum",
+                "email": "helen.otter@example.net"
+              }
+            ],
+            "hoursAgo": 48,
+            "text": "I'll print the lighthouse one for you.\n\nRobin",
+            "headers": {
+              "Message-ID": "<lighthouse-1@icloud.example>"
+            },
+            "attachments": []
+          }
+        ]
+      },
+      {
+        "subject": "Price list for the open day",
+        "labels": [],
+        "messages": [
+          {
+            "from": {
+              "name": "Robin Otter",
+              "email": "mail@robinotter.example"
+            },
+            "to": [
+              {
+                "name": "Inês Duarte",
+                "email": "ines@duarte.example"
+              }
+            ],
+            "hoursAgo": 4,
+            "draft": true,
+            "text": "Inês,\n\nPrints are 40 each, framed 65.\n\nRobin Otter · Otter Studio",
+            "attachments": []
+          }
+        ]
+      },
+      {
+        "subject": "Your studio booking",
+        "labels": ["ARCHIVE"],
+        "messages": [
+          {
+            "from": {
+              "name": "Harbour Rooms",
+              "email": "bookings@harbour.example"
+            },
+            "to": [
+              {
+                "name": "Robin Otter",
+                "email": "mail@robinotter.example"
+              }
+            ],
+            "hoursAgo": 216,
+            "text": "Your room is booked for the 14th, 9:00 to 18:00.\n\nHarbour Rooms",
+            "headers": {
+              "Message-ID": "<booking-77@harbour.example>",
+              "Original-Recipient": "rfc822;mail@robinotter.example"
+            },
+            "attachments": []
+          }
+        ]
+      }
+    ]
   }
 ]
