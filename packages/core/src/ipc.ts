@@ -1,6 +1,10 @@
+import type { ReportTags } from "@otter-mail/shared/error-reports";
+
 import { SignInCancelledError, SignInTimedOutError } from "./google.js";
 import { logger } from "./logger.js";
 import { platform } from "./platform.js";
+import { imapHostOf, isAccountId, providerKindOf } from "./services/account-store.js";
+import { knownImapServer } from "./services/imap-discovery.js";
 
 export type Handler = (params: unknown) => unknown;
 
@@ -34,7 +38,15 @@ export async function callHandler(
     const message = err instanceof Error ? err.message : String(err);
     if (err instanceof SignInTimedOutError) logger.info("handlers", `${channel}: ${message}`);
     else if (!(err instanceof SignInCancelledError))
-      logger.failure("handlers", `${channel} failed`, err);
+      logger.failure("handlers", `${channel} failed`, err, reportTags(params));
     return { error: message };
   }
+}
+
+function reportTags(params: unknown): ReportTags | undefined {
+  const accountId = (params as { accountId?: unknown } | null)?.accountId;
+  if (typeof accountId !== "string" || !isAccountId(accountId)) return undefined;
+  const provider = providerKindOf(accountId);
+  if (provider !== "imap") return { provider };
+  return { provider, server: knownImapServer(imapHostOf(accountId)) };
 }

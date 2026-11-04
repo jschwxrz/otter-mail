@@ -86,6 +86,14 @@ describe("support snapshot", () => {
       expect(exported).not.toContain(privateValue);
   });
 
+  it("reads a tagged failure's error, not the wrapper around it", async () => {
+    recordSupportError("error", "handlers", "gmail:listLabels failed", {
+      error: new Error("HTTP 503 from the server"),
+      tags: { provider: "imap", server: "other" },
+    });
+    expect((await collectSupportDiagnostics()).errors.at(-1)?.httpStatus).toBe(503);
+  });
+
   it("still prepares app details when metadata or the cache cannot be read", async () => {
     fixtures.sync.mockImplementation(() => {
       throw new Error("Private database error");

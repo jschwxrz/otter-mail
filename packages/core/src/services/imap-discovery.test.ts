@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { setPlatform, type Platform } from "../platform.ts";
-import { discoverImap, parseAutoconfig } from "./imap-discovery.ts";
+import { discoverImap, knownImapServer, parseAutoconfig } from "./imap-discovery.ts";
 
 const GMX = `<clientConfig version="1.1">
   <emailProvider id="gmx.net">
@@ -234,5 +234,15 @@ describe("discoverImap", () => {
       }),
     });
     expect(await discoverImap("me@spam.dev")).toBeNull();
+  });
+});
+
+describe("knownImapServer", () => {
+  it("names the providers it knows and nothing else", () => {
+    expect(knownImapServer("imap.mail.me.com")).toBe("imap.mail.me.com");
+    expect(knownImapServer("IMAP.Fastmail.com")).toBe("imap.fastmail.com");
+    expect(knownImapServer("imap.googlemail.com")).toBe("imap.gmail.com");
+    expect(knownImapServer("mail.smith-family.com")).toBe("other");
+    expect(knownImapServer(null)).toBe("other");
   });
 });

@@ -323,6 +323,28 @@ describe("Deleting a folder over IMAP", () => {
   });
 });
 
+describe("Renaming a folder over IMAP", () => {
+  it("says so when the folder is gone, and refuses system folders, renaming nothing", async () => {
+    server = new PretendServer("IMAP4rev1 MOVE UIDPLUS SPECIAL-USE LIST-EXTENDED", {
+      INBOX: "",
+      Sent: "\\Sent",
+      Projects: "",
+    });
+    const { accountId } = await mailbox("Sent");
+    server.boxes.delete("Projects");
+
+    await expect(
+      provider.updateLabel(accountId, { labelId: "Projects", name: "Plans" }),
+    ).rejects.toThrow("That folder isn't on the server any more.");
+    for (const labelId of ["SENT", "Sent", "TRASH"]) {
+      await expect(provider.updateLabel(accountId, { labelId, name: "Plans" })).rejects.toThrow(
+        "Only your own folders can be renamed.",
+      );
+    }
+    expect(server.commands.some((c) => c.startsWith("RENAME"))).toBe(false);
+  });
+});
+
 describe("Finding the archive", () => {
   const folder = (path: string, specialUse: SpecialUse | null = null): ImapFolder => ({
     path,

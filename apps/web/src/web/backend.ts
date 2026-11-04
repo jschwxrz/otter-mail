@@ -209,7 +209,12 @@ export function connectBackend(page: PageHandlers) {
           break;
         }
         case "report":
-          reportLog(message.level, message.scope, message.message, message.error);
+          reportLog(
+            message.level,
+            message.scope,
+            message.message,
+            message.tags ? { error: message.error, tags: message.tags } : message.error,
+          );
           break;
       }
     });
