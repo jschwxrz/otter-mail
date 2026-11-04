@@ -687,7 +687,17 @@ export function registerMailHandlers(): void {
       const messageId = assertString(p?.messageId, "messageId");
       const cached = mailStore.getMessageDetail(accountId, messageId);
       if (cached) return cached;
-      const detail = await providerFor(accountId).getMessage(accountId, messageId);
+      const provider = providerFor(accountId);
+      // Deleted or moved elsewhere since the list was cached: gone, not a failure.
+      const detail = await provider.getMessage(accountId, messageId).catch((err: unknown) => {
+        if (provider.errorKind(err) !== "notFound") throw err;
+        return null;
+      });
+      if (!detail) {
+        console.log("[gmail:getMessage] gone", { accountId, messageId });
+        mailSync.forgetMessage(accountId, messageId);
+        return null;
+      }
       mailStore.upsertMessageDetail(accountId, detail);
       return detail;
     } catch (err) {

@@ -567,7 +567,7 @@ export function useThreads(
 }
 
 export function useMessage(accountId: string | null, messageId: string | null) {
-  return useQuery<MessageDetail>({
+  return useQuery<MessageDetail | null>({
     queryKey: queryKeys.message(accountId ?? "", messageId ?? ""),
     queryFn: () => {
       console.log("[hooks:useMessage] fetching message", {
