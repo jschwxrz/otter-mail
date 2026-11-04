@@ -412,7 +412,8 @@ export const mailApi = {
   countCombinedMessages: (params: { rules: ViewRule[] }): Promise<CombinedCounts> =>
     ipc("gmail:countCombinedMessages", params),
 
-  getMessage: (accountId: string, messageId: string): Promise<MessageDetail> =>
+  /** null: the mailbox no longer has it. */
+  getMessage: (accountId: string, messageId: string): Promise<MessageDetail | null> =>
     ipc("gmail:getMessage", { accountId, messageId }),
 
   modifyMessage: (params: ModifyMessageParams): Promise<{ ok: boolean }> =>

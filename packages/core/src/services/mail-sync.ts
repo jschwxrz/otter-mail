@@ -46,6 +46,11 @@ function bumpRevision(accountId: string): void {
   status.revision += 1;
 }
 
+/** A message the server no longer has leaves the cache, and lists refresh. */
+export function forgetMessage(accountId: string, messageId: string): void {
+  if (store.deleteMessage(accountId, messageId)) bumpRevision(accountId);
+}
+
 export function getSyncStatus(accountId: string): SyncStatus {
   const status = ensureStatus(accountId);
   return { ...status, download: status.download ? { ...status.download } : null };
@@ -485,7 +490,7 @@ async function downloadBodies(accountId: string, provider: MailProvider): Promis
             }
             return;
           } else if (kind === "notFound") {
-            if (store.deleteMessage(accountId, id)) bumpRevision(accountId);
+            forgetMessage(accountId, id);
           } else {
             logger.info(
               "mail-sync",

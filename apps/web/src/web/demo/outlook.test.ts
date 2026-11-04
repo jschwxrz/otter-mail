@@ -462,6 +462,38 @@ describe("core's Outlook provider on the demo mailbox", () => {
     });
   });
 
+  it("opening a message deleted elsewhere drops it from the cache instead of failing", async () => {
+    const { core, invoke } = await boot();
+    await until(() => core.mailStore.countAllMessages(EMAIL) === 25, "initial mailbox");
+    const [gone, refused] = core.mailStore
+      .getMessageIdsForLabel(EMAIL, "INBOX")
+      .filter((id) => !core.mailStore.getMessageDetail(EMAIL, id));
+    const answer = globalThis.fetch;
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input instanceof Request ? input.url : input);
+      const error = (status: number, code: string) =>
+        new Response(JSON.stringify({ error: { code, message: code } }), { status });
+      if (url.includes(`/messages/${gone}`))
+        return Promise.resolve(error(404, "ErrorItemNotFound"));
+      if (url.includes(`/messages/${refused}`)) return Promise.resolve(error(400, "BadRequest"));
+      return answer(input, init);
+    });
+    const revision = (
+      await invoke<{ revision: number }>("gmail:getSyncStatus", { accountId: EMAIL })
+    ).revision;
+
+    expect(await invoke("gmail:getMessage", { accountId: EMAIL, messageId: gone })).toBeNull();
+    expect(core.mailStore.getMessageIdsForLabel(EMAIL, "INBOX")).not.toContain(gone);
+    expect(
+      (await invoke<{ revision: number }>("gmail:getSyncStatus", { accountId: EMAIL })).revision,
+    ).toBeGreaterThan(revision);
+
+    await expect(
+      invoke("gmail:getMessage", { accountId: EMAIL, messageId: refused }),
+    ).rejects.toThrow(/400/);
+    expect(core.mailStore.getMessageIdsForLabel(EMAIL, "INBOX")).toContain(refused);
+  });
+
   it("category edits keep messages in their folder, while folder moves keep categories", async () => {
     const { core, invoke } = await boot();
     await until(() => core.mailStore.countAllMessages(EMAIL) === 25, "initial mailbox");
