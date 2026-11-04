@@ -5,7 +5,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { ChevronDownIcon, XIcon } from "lucide-react";
 import { useSendMessage } from "./hooks";
 import { normalizeAddressList, parseAddressEntry, splitAddressList } from "./address";
-import { getAccountColor } from "./account-style";
+import { AccountPicture } from "./account-picture";
 import { IconBtn, HintTooltip } from "./ui";
 import {
   CcBccToggles,
@@ -55,10 +55,7 @@ export function FromPicker({
             aria-label="Send from"
             className="-ml-1 flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md px-1 py-0.5 text-sm text-foreground outline-none hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring"
           >
-            <span
-              className="size-2 shrink-0 rounded-full"
-              style={{ backgroundColor: getAccountColor(value) }}
-            />
+            <AccountPicture account={value} className="size-4 rounded-[5px] text-[9px]" />
             <span className="truncate">{address}</span>
             <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
           </button>
@@ -69,11 +66,7 @@ export function FromPicker({
               <DropdownMenuItem
                 key={`${account.id}:${each}`}
                 icon={
-                  <span
-                    className="size-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: getAccountColor(account) }}
-                    aria-hidden
-                  />
+                  <AccountPicture account={account} className="size-4 rounded-[5px] text-[9px]" />
                 }
                 onSelect={() => onChange(account.id, each)}
               >

@@ -103,6 +103,7 @@ export async function updateAccount(
     picture?: string;
     displayName?: string;
     color?: string;
+    customPicture?: string;
     signature?: string;
     signatureInGmail?: boolean;
     sendAs?: string[];
@@ -121,6 +122,10 @@ export async function updateAccount(
       displayName:
         patch.displayName !== undefined ? patch.displayName || undefined : current.displayName,
       color: patch.color !== undefined ? patch.color || undefined : current.color,
+      customPicture:
+        patch.customPicture !== undefined
+          ? patch.customPicture || undefined
+          : current.customPicture,
       signature: patch.signature !== undefined ? patch.signature || undefined : current.signature,
       signatureInGmail: patch.signatureInGmail ?? current.signatureInGmail,
       sendAs: patch.sendAs !== undefined ? patch.sendAs : current.sendAs,

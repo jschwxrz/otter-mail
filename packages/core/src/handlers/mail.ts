@@ -9,6 +9,7 @@ import {
 } from "../services/mail-schedule.js";
 
 import { GMAIL_CAPABILITIES, landLabelChange, type Landing } from "@otter-mail/contracts";
+import { isMailboxPicture } from "@otter-mail/contracts/relay";
 
 import { fromBase64 } from "../bytes.js";
 import { SignInCancelledError } from "../google.js";
@@ -384,13 +385,19 @@ export function registerMailHandlers(): void {
       const displayName = asString(p?.displayName);
       const color = asString(p?.color);
       const signature = asString(p?.signature);
-      let updated = await storeUpdateAccount(accountId, { displayName, color });
+      // "" removes it.
+      const customPicture = asString(p?.customPicture);
+      if (customPicture && !isMailboxPicture(customPicture)) {
+        throw new Error("That picture is too large, or isn't an image.");
+      }
+      let updated = await storeUpdateAccount(accountId, { displayName, color, customPicture });
       if (signature !== undefined) updated = await saveSignature(updated, signature);
       if (Array.isArray(p?.sendAs)) updated = await saveSendAs(updated, p.sendAs);
       broadcast("gmail:accounts-changed");
       if (displayName !== undefined || color !== undefined) {
         void accountEdited(updated, ["displayName", "color"]);
       }
+      if (customPicture !== undefined) void accountEdited(updated, ["customPicture"]);
       updateDockBadge();
       return updated;
     } catch (err) {

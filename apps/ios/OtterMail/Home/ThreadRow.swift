@@ -103,12 +103,35 @@ struct MailboxMark: View {
     var size: CGFloat = 16
 
     var body: some View {
-        Text(mailbox.displayName.prefix(1).uppercased())
-            .font(.inter(size: size * 0.6, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(Color(hex: mailbox.color), in: .rect(cornerRadius: size * 0.28))
-            .accessibilityLabel(mailbox.displayName)
+        if let picture = mailbox.customImage {
+            Image(uiImage: picture)
+                .resizable().scaledToFill()
+                .frame(width: size, height: size)
+                .clipShape(.rect(cornerRadius: size * 0.28))
+                .accessibilityLabel(mailbox.displayName)
+        } else {
+            Text(mailbox.displayName.prefix(1).uppercased())
+                .font(.inter(size: size * 0.6, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: size, height: size)
+                .background(Color(hex: mailbox.color), in: .rect(cornerRadius: size * 0.28))
+                .accessibilityLabel(mailbox.displayName)
+        }
+    }
+}
+
+private let customImages = NSCache<NSString, UIImage>()
+
+extension Mailbox {
+    var customImage: UIImage? {
+        guard let customPicture else { return nil }
+        if let image = customImages.object(forKey: customPicture as NSString) { return image }
+        guard let comma = customPicture.firstIndex(of: ","),
+              let data = Data(base64Encoded: String(customPicture[customPicture.index(after: comma)...])),
+              let image = UIImage(data: data)
+        else { return nil }
+        customImages.setObject(image, forKey: customPicture as NSString)
+        return image
     }
 }
 

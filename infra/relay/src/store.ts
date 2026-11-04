@@ -43,6 +43,7 @@ const accountFields = {
   picture: linkedAccounts.picture,
   displayName: linkedAccounts.displayName,
   color: linkedAccounts.color,
+  customPicture: linkedAccounts.customPicture,
 };
 
 export function listAccounts(

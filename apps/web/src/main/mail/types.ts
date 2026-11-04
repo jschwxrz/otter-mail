@@ -12,6 +12,7 @@ export type MailAccount = {
   picture?: string;
   displayName?: string;
   color?: string;
+  customPicture?: string;
   signature?: string;
   /** False while the signature is kept only here: this sign-in may not save it in Gmail. */
   signatureInGmail?: boolean;

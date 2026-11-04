@@ -10,6 +10,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
   GMAIL_SIGN_IN_CANCELLED,
+  isMailboxPicture,
   type ListAccountsResponse,
   type MeResponse,
   type OutlookWatchResponse,
@@ -521,6 +522,7 @@ authed.put(
       picture: profileField,
       displayName: profileField,
       color: profileField,
+      customPicture: z.string().refine(isMailboxPicture).nullable().optional(),
     }),
     rejectInvalid,
   ),

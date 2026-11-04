@@ -54,6 +54,12 @@ enum DemoMail {
                 ))
             }
         }
+        #if DEBUG
+        // OTTER_DEMO_MAILBOX_PICTURE=<data URL> at launch shows a chosen picture on the first mailbox.
+        if let picture = ProcessInfo.processInfo.environment["OTTER_DEMO_MAILBOX_PICTURE"], !mailboxes.isEmpty {
+            mailboxes[0].customPicture = picture
+        }
+        #endif
         return (mailboxes, threads)
     }
 

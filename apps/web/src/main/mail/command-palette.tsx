@@ -35,6 +35,7 @@ import {
   SunMoonIcon,
 } from "lucide-react";
 import { AgentIcon } from "./agent-icon";
+import { AccountPicture } from "./account-picture";
 import { useDebouncedValue, useSearchMessages } from "./hooks";
 import { getAccountColor, getAccountDisplayName } from "./account-style";
 import { senderLabel } from "./address";
@@ -438,7 +439,7 @@ export function CommandPalette({
 
     const mailboxes: PaletteItem[] = accounts.map((account, i) => ({
       id: `mailbox:${account.id}`,
-      icon: <Dot color={getAccountColor(account)} />,
+      icon: <AccountPicture account={account} className="size-4 rounded-[5px] text-[9px]" />,
       title: getAccountDisplayName(account),
       description: account.email,
       shortcut: jump(i + 1),

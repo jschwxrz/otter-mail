@@ -106,6 +106,8 @@ export const linkedAccounts = sqliteTable(
     picture: text(),
     displayName: text(),
     color: text(),
+    // Here, not in preferences: that one document is capped and pulled whole on every change.
+    customPicture: text(),
     linkedAt: integer({ mode: "timestamp_ms" }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.email] }), index("linked_accounts_email").on(t.email)],

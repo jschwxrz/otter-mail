@@ -61,6 +61,7 @@ account offers each kind.
 | Sidebar hidden: hover the window's edge to peek                                                             | ✓                  | ✓                                   | —                       |
 | Rename and color a mailbox (synced)                                                                         | ✓                  | ✓                                   | ✓                       |
 | Google profile picture per mailbox                                                                          | ✓ (kept current)   | ✓ (kept current)                    | —                       |
+| Your own picture for a mailbox (Settings › Connections; synced, over Google's)                              | ✓                  | ✓                                   | shown                   |
 | Remove a mailbox (unlinks it everywhere)                                                                    | ✓                  | ✓                                   | ✓                       |
 | Mailbox linked elsewhere shows "signed out"                                                                 | ✓                  | ✓                                   | ✓                       |
 | Sync health at the foot of the sidebar, Sync now                                                            | ✓                  | ✓                                   | ✓ (tap to sync)         |

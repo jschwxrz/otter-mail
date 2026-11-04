@@ -26,7 +26,7 @@ import type {
   PreferencesResponse,
   RelayEvent,
 } from "@otter-mail/contracts/relay";
-import { TUNNEL_CLOSE } from "@otter-mail/contracts/relay";
+import { MAILBOX_PICTURE_MAX_LENGTH, TUNNEL_CLOSE } from "@otter-mail/contracts/relay";
 import type {
   OutlookSignInResult,
   OutlookTokenResponse,
@@ -807,6 +807,7 @@ describe("linked accounts", () => {
         picture: null,
         displayName: "Job",
         color: "#f00",
+        customPicture: null,
       },
       {
         email: "home@example.com",
@@ -815,8 +816,38 @@ describe("linked accounts", () => {
         picture: null,
         displayName: null,
         color: null,
+        customPicture: null,
       },
     ]);
+  });
+
+  it("keeps a mailbox's own picture: a small inline image, never a URL", async () => {
+    const { token } = await signIn("pictures@example.com");
+    await link(token, "pictured@example.com", { picture: "https://example.com/google.jpg" });
+    const route = "/v1/accounts/pictured%40example.com";
+    const picture = `data:image/webp;base64,${"A".repeat(400)}`;
+    expect((await call("PUT", route, token, { customPicture: picture })).status).toBe(204);
+    expect((await call("PUT", route, token, { displayName: "Pictured" })).status).toBe(204);
+    expect(await listAccounts(token)).toMatchObject([
+      {
+        picture: "https://example.com/google.jpg",
+        displayName: "Pictured",
+        customPicture: picture,
+      },
+    ]);
+
+    for (const refused of [
+      "https://example.com/tracker.png",
+      "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=",
+      "data:text/html;base64,PGI+PC9iPg==",
+      `data:image/png;base64,${"A".repeat(MAILBOX_PICTURE_MAX_LENGTH)}`,
+    ]) {
+      expect((await call("PUT", route, token, { customPicture: refused })).status).toBe(400);
+    }
+    expect(await listAccounts(token)).toMatchObject([{ customPicture: picture }]);
+
+    expect((await call("PUT", route, token, { customPicture: null })).status).toBe(204);
+    expect(await listAccounts(token)).toMatchObject([{ customPicture: null }]);
   });
 
   it("refuses to link without proof, or with proof for another address", async () => {
@@ -882,6 +913,7 @@ describe("IMAP mailboxes", () => {
         picture: null,
         displayName: "Fastmail",
         color: null,
+        customPicture: null,
       },
     ]);
   });
@@ -1007,6 +1039,7 @@ describe("Outlook mailboxes", () => {
         picture: null,
         displayName: null,
         color: null,
+        customPicture: null,
       })),
     );
     expect(await listAccounts(token)).toEqual([]);

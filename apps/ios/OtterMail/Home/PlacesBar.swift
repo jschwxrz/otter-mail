@@ -248,7 +248,12 @@ struct MailboxAvatar: View {
     var size: CGFloat = 30
 
     var body: some View {
-        if let mailbox, let url = mailbox.picture.flatMap(URL.init(string:)) {
+        if let mailbox, let picture = mailbox.customImage {
+            Image(uiImage: picture)
+                .resizable().scaledToFill()
+                .frame(width: size, height: size)
+                .clipShape(.circle)
+        } else if let mailbox, let url = mailbox.picture.flatMap(URL.init(string:)) {
             AsyncImage(url: url) { image in
                 image.resizable().scaledToFill()
             } placeholder: {

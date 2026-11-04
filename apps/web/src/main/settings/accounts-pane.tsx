@@ -39,6 +39,7 @@ import {
   ACCOUNT_COLOR_PALETTE,
   getAccountColor,
   getAccountDisplayName,
+  getAccountPicture,
 } from "../mail/account-style";
 import type { MailAccount, SyncStatus } from "../mail/types";
 import { StatusText, accountStatus, needsSignIn, takeRequestedMailbox } from "../mail/sync-health";
@@ -53,6 +54,7 @@ import {
   TextInput,
 } from "./settings-ui";
 import { searchableSetting } from "./settings-search";
+import { MailboxPictureRow } from "./mailbox-picture";
 
 function useSyncStatusOnly(accountId: string) {
   return useQuery<SyncStatus>({
@@ -128,11 +130,12 @@ function AccountAvatar({
   size?: "small" | "medium";
 }) {
   const displayName = getAccountDisplayName(account);
+  const picture = getAccountPicture(account);
   return (
     <span className="relative shrink-0">
       <Avatar size={size}>
-        {account.picture ? (
-          <AvatarImage src={account.picture} alt={displayName} referrerPolicy="no-referrer" />
+        {picture ? (
+          <AvatarImage src={picture} alt={displayName} referrerPolicy="no-referrer" />
         ) : null}
         <AvatarFallback>{(displayName[0] ?? "?").toUpperCase()}</AvatarFallback>
       </Avatar>
@@ -471,6 +474,7 @@ function AccountEditor({ account }: { account: MailAccount }) {
             />
           }
         />
+        <MailboxPictureRow account={account} />
       </SettingsSection>
 
       <MailboxAccess account={account} />

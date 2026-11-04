@@ -159,7 +159,10 @@ export function useUpdateAccount() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (params: UpdateAccountParams) => {
-      console.log("[hooks:useUpdateAccount] updating account", params);
+      console.log("[hooks:useUpdateAccount] updating account", {
+        ...params,
+        customPicture: params.customPicture && "(picture)",
+      });
       return mailApi.updateAccount(params);
     },
     onMutate: async (params) => {
@@ -172,6 +175,10 @@ export function useUpdateAccount() {
                 ...a,
                 displayName: params.displayName !== undefined ? params.displayName : a.displayName,
                 color: params.color !== undefined ? params.color : a.color,
+                customPicture:
+                  params.customPicture !== undefined
+                    ? params.customPicture || undefined
+                    : a.customPicture,
                 signature: params.signature !== undefined ? params.signature : a.signature,
                 sendAs: params.sendAs !== undefined ? params.sendAs : a.sendAs,
               }
