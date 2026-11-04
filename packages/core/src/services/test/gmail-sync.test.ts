@@ -460,7 +460,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("Gmail sync", () => {
+// Real background syncs: well under a second alone, seconds on a busy CI runner.
+describe("Gmail sync", { timeout: 15_000 }, () => {
   it("brings new mail while the first sync is still filling the mailbox", async () => {
     for (let i = 1; i <= 8; i++) deliver(`old${i}`, ["INBOX"], Date.now() - i * 60_000);
     let release!: () => void;

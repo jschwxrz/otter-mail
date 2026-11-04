@@ -498,7 +498,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("Outlook sync", () => {
+// Real background syncs: well under a second alone, seconds on a busy CI runner.
+describe("Outlook sync", { timeout: 15_000 }, () => {
   it("lists every folder of a new mailbox, as labels", async () => {
     deliver("a", "inbox", { flagged: true, categories: ["Finance"] });
     deliver("b", "archive", { isRead: true, importance: "high" });
