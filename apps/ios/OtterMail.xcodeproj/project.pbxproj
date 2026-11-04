@@ -513,7 +513,7 @@
 			repositoryURL = "https://github.com/getsentry/sentry-cocoa-binaries";
 			requirement = {
 				kind = exactVersion;
-				version = 9.29.2;
+				version = 9.31.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
