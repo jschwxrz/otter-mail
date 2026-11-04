@@ -85,15 +85,18 @@ add limited server grants (or an encrypted IMAP password), while mail content st
 - Alias mailboxes (`NotificationShared/AliasMailbox.swift`, `MailStore.aliases`): an IMAP
   mailbox's address with a mailbox of its own, made on the Mac and the web (the account's
   `aliasMailboxes`; `sendAs` lists the mailbox's other addresses, which compose's From offers).
-  Each is a place over its parent's cached mail, not a mailbox, right after its parent (ordered
-  among its others). A received copy is its when one of the addresses it was delivered to (the
+  Each is a place over its parent's cached mail, not a mailbox. `mail:mailboxes` orders it among
+  every mailbox (`arrangedScopes`; a new one starts after its parent), and Settings › Mailboxes
+  lists it under its parent until Edit, where anything drags anywhere. A received copy is its when one of the addresses it was delivered to (the
   topmost Original-Recipient, Delivered-To and X-Original-To) is one of the parent's Send from
   addresses: it's those aliases' alone. Otherwise (delivered to the mailbox's own address, as
   Postfix's Delivered-To says, or to none; mail cached before those were fetched) To and Cc
   decide. Sent and Drafts are what it wrote. Its list pages the parent until it has a page of
   its own. New mail there and replies go from the alias, signed
   with its signature (else the parent's); alerts are named after it and open it. The parent
-  shows everything, as before.
+  shows everything unless its "Their mail in … too" switch is off (`mail:alias-mail-apart`):
+  then its lists and counts leave out the mail of its alias mailboxes that are turned on
+  (`MailStore.isRest`), while the app's badge still counts it.
 - `Reports/`: error reports to Sentry (`otter-mail-ios`), scrubbed by the shared rules
   (`docs/error-reports.md`): crashes and the failures of sync, sign-in, the relay and sending, with a
   random report id; off in Settings › Support. Release builds report; Debug builds only with
