@@ -120,11 +120,11 @@ mail in … too** switch (under the Send from addresses) is off. IMAP only for n
   one not dragged yet follows its parent and the parent's others. Settings › Connections lists it
   under its parent either way. Turned off, or with its parent off, it isn't shown.
 - The parent without their mail: the `mail:alias-mail-apart` UI preference lists the parents
-  (addresses, lower-cased) whose switch is off, and core follows it
-  (`followAliasMailApart`). Their tab then lists what no alias mailbox of theirs has
-  (`RestScope`, `services/mail-store.ts`), and its folder counts are the server's less theirs
-  (`withoutAliasMail`), since the server counts mail not cached yet. Searching the parent still
-  finds all of its mail.
+  (addresses, lower-cased) whose switch is off, and core follows it (`followAliasMailApart`). Their
+  tab then lists what none of their alias mailboxes that are turned on has (`RestScope`,
+  `services/mail-store.ts`; a turned-off one's mail stays, or it would be nowhere), and its folder
+  counts are the server's less theirs (`withoutAliasMail`), since the server counts mail not cached
+  yet. Searching the parent still finds all of its mail.
 - Which mail is its own (`aliasWhere`, `services/mail-store.ts`). Each copy keeps every
   address it was delivered to: the topmost `Original-Recipient` (`rfc822;` stripped; iCloud
   stamps it on every delivered copy), `Delivered-To` and `X-Original-To` (Postfix with virtual

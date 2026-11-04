@@ -134,6 +134,9 @@ export function followMailboxArrangement(value: string | undefined): void {
   turnedOff = new Set(off);
   for (const id of turnedOff) stopWatch(id);
   for (const id of was) if (!turnedOff.has(id) && isAccountId(id)) syncAccount(id, { force: true });
+  // An alias mailbox turned on or off changes what its parent's tab may leave out (`restScope`).
+  const toggled = [...was, ...turnedOff].filter((id) => was.has(id) !== turnedOff.has(id));
+  if (toggled.some((id) => !isAccountId(id))) broadcast("gmail:mail-changed");
   updateDockBadge();
 }
 

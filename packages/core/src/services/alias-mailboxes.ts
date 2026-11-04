@@ -3,6 +3,7 @@ import { validAliasMailboxes, type AliasMailbox } from "@otter-mail/contracts";
 import { broadcast } from "../ipc.js";
 import { getAccount, isAccountId, listAccounts } from "./account-store.js";
 import { addressList, type AliasScope, type MailboxScope, type RestScope } from "./mail-store.js";
+import { turnedOffMailboxes } from "./mail-sync.js";
 import type { MailAccount, MessageSummary } from "../types.js";
 
 export function parseAliasMailboxes(value: unknown): AliasMailbox[] {
@@ -74,12 +75,18 @@ export function followAliasMailApart(value: string | undefined): void {
   if (changed) broadcast("gmail:mail-changed");
 }
 
-/** The parent's tab without its alias mailboxes' mail, when it's set apart and has any. */
+/**
+ * The parent's tab without its alias mailboxes' mail, when it's set apart and has any turned on:
+ * a turned-off one's mail stays in the parent, or it would be nowhere.
+ */
 export async function restScope(accountId: string): Promise<RestScope | undefined> {
   const account = await getAccount(accountId);
   if (!account || !apart.has(account.email.toLowerCase())) return undefined;
   const emails = (await listAccounts()).map((a) => a.email);
-  const aliases = validAliasMailboxes(account, emails).map((a) => a.address.toLowerCase());
+  const off = turnedOffMailboxes();
+  const aliases = validAliasMailboxes(account, emails)
+    .map((a) => a.address.toLowerCase())
+    .filter((id) => !off.has(id));
   if (aliases.length === 0) return undefined;
   return { aliases, sendAs: (account.sendAs ?? []).map((a) => a.toLowerCase()) };
 }
