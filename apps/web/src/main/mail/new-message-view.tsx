@@ -124,7 +124,6 @@ export function NewMessageView({
   const [subject, setSubject] = useState(prefill?.subject ?? "");
   const [text, setText] = useState(prefill?.body ?? "");
   const [attachments, setAttachments] = useState<ComposeAttachment[]>([]);
-  const [formatting, setFormatting] = useState(false);
   const toRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<RichTextRef>(null);
   const sendMessage = useSendMessage();
@@ -200,6 +199,7 @@ export function NewMessageView({
       const el = e.target as Element | null;
       if (el && typeof el.closest === "function" && el.closest('[role="dialog"]')) return;
       if (el && typeof el.closest === "function" && el.closest('[data-ac-open="true"]')) return;
+      if (el && typeof el.closest === "function" && el.closest("[data-keybinding-capture]")) return;
       e.preventDefault();
       e.stopPropagation();
       onClose();
@@ -336,7 +336,6 @@ export function NewMessageView({
               placeholder="Write your message…"
               ariaLabel="Message"
               onTextChange={setText}
-              showToolbar={formatting}
               minHeightClass="min-h-[40vh]"
               maxHeightClass="max-h-none"
               initialHTML={prefill?.body ? textToHtml(prefill.body) : undefined}
@@ -352,8 +351,6 @@ export function NewMessageView({
           footer={
             <ComposerFooter
               onAttach={attach}
-              formatting={formatting}
-              onToggleFormatting={() => setFormatting((f) => !f)}
               onDiscard={discard}
               status={draftStatus(draft)}
               statusTone={draft.saveState === "error" ? "error" : "muted"}

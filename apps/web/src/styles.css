@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@fontsource-variable/inter";
+@import "@fontsource-variable/inter/wght-italic.css";
 
 @source "./**/*.{ts,tsx}";
 @source "../../../extensions/*/ui/**/*.{ts,tsx}";
@@ -782,6 +783,31 @@ html[data-theme-switching] *::after {
   padding-left: 0.75em;
   margin: 0.15em 0;
   color: var(--muted-foreground);
+}
+[data-rt] li > ul,
+[data-rt] li > ol {
+  margin: 0;
+}
+[data-rt] ul ul {
+  list-style: circle;
+}
+[data-rt] ul ul ul {
+  list-style: square;
+}
+[data-rt] ol ol {
+  list-style: lower-alpha;
+}
+[data-rt] ol ol ol {
+  list-style: lower-roman;
+}
+[data-rt] img {
+  display: inline;
+  max-width: 100%;
+}
+[data-rt] .ProseMirror-selectednode {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 @keyframes tooltip-in {

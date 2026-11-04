@@ -604,7 +604,6 @@ function AccountEditor({ account }: { account: MailAccount }) {
           ariaLabel={`Signature for ${account.email}`}
           minHeightClass="min-h-[96px]"
           initialHTML={shown}
-          textStyles
         />
       </SettingsSection>
 
@@ -908,7 +907,6 @@ function AliasMailboxEditor({ entry, onStop }: { entry: AliasMailboxEntry; onSto
           ariaLabel={`Signature for ${alias.address}`}
           minHeightClass="min-h-[96px]"
           initialHTML={alias.signature ?? ""}
-          textStyles
         />
       </SettingsSection>
     </>
