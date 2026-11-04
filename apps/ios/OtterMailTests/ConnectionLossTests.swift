@@ -10,6 +10,7 @@ struct ConnectionLossTests {
         #expect(error?.code == .networkConnectionLost)
         #expect(error?.userInfo[NSUnderlyingErrorKey] as? NWError == .posix(.ECONNABORTED))
         #expect((NWTransport.lost(.posix(.ECONNRESET)) as? URLError)?.code == .networkConnectionLost)
+        #expect((NWTransport.lost(.posix(POSIXErrorCode(rawValue: 57)!)) as? URLError)?.code == .networkConnectionLost)
     }
 
     @Test func offlineAndTimeout() {
