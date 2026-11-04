@@ -59,10 +59,30 @@ jobs:
             echo "translator=$(changed '^(native/translator/|\.github/actions/select-xcode/|\.github/workflows/ci\.yml$)')"
           } | tee -a "$GITHUB_OUTPUT"
 
+  # A runner each: on one they slowed each other down, enough to time out tests.
   check:
-    name: Check
+    name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Lint
+            run: |
+              vp run fmt:check
+              vp run lint
+              node --test scripts/release.test.ts .github/scripts/release-source.test.cjs
+              node scripts/resolve-release-version.ts --bump patch
+              node scripts/build-desktop-artifact.ts --help > /dev/null
+              node scripts/dev-runner.ts dev --dry-run
+              node scripts/dev-runner.ts dev:desktop --dry-run
+          - name: Typecheck
+            run: vp run typecheck
+          - name: Test
+            run: vp run test
+          - name: Build
+            run: vp run build
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -74,35 +94,8 @@ jobs:
           cache: true
           run-install: true
 
-      - name: Format
-        run: vp run fmt:check
-
-      - name: Lint
-        run: vp run lint
-
-      - name: Typecheck, test and build
-        run: |
-          vp run typecheck &
-          typecheck_pid=$!
-          vp run test &
-          test_pid=$!
-          vp run build &
-          build_pid=$!
-
-          # Wait for every check; a failure in any of them must fail CI.
-          status=0
-          for pid in "$typecheck_pid" "$test_pid" "$build_pid"; do
-            if ! wait "$pid"; then status=1; fi
-          done
-          exit "$status"
-
-      - name: Check release scripts
-        run: |
-          node --test scripts/release.test.ts .github/scripts/release-source.test.cjs
-          node scripts/resolve-release-version.ts --bump patch
-          node scripts/build-desktop-artifact.ts --help > /dev/null
-          node scripts/dev-runner.ts dev --dry-run
-          node scripts/dev-runner.ts dev:desktop --dry-run
+      - name: ${{ matrix.name }}
+        run: ${{ matrix.run }}
 
   # Apple Translation's TranslationSession(installedSource:target:) is macOS 26
   # API, so the translator needs Xcode 26+ (Swift 6, macOS 26 SDK). No Node
