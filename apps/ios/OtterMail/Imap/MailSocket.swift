@@ -18,8 +18,11 @@ nonisolated final class MailSocket {
     let transport: any MailTransport
     private var buffer = Data()
     private var literalLimit = MailSocket.maxLiteral
+    /** How long a read or write may wait on the server before the connection closes (nil: no limit). */
+    var timeout: Duration?
+    private var timedOut = false
 
-    private init(_ transport: any MailTransport) {
+    init(_ transport: any MailTransport) {
         self.transport = transport
     }
 
@@ -48,20 +51,20 @@ nonisolated final class MailSocket {
                 return Data(line)
             }
             guard buffer.count <= Self.maxLine else { throw ImapError.protocolError("The mail server sent a line too long to read.") }
-            buffer.append(try await transport.receive())
+            buffer.append(try await receive())
         }
     }
 
     func read(_ count: Int) async throws -> Data {
         guard count <= literalLimit else { throw ImapError.protocolError("The mail server sent too much at once.") }
-        while buffer.count < count { buffer.append(try await transport.receive()) }
+        while buffer.count < count { buffer.append(try await receive()) }
         let bytes = buffer.prefix(count)
         buffer = Data(buffer.dropFirst(count))
         return Data(bytes)
     }
 
-    func write(_ text: String) async throws { try await transport.send(Data(text.utf8)) }
-    func write(_ data: Data) async throws { try await transport.send(data) }
+    func write(_ text: String) async throws { try await write(Data(text.utf8)) }
+    func write(_ data: Data) async throws { try await timed { try await transport.send(data) } }
 
     func startTLS() async throws {
         buffer = Data()
@@ -69,6 +72,31 @@ nonisolated final class MailSocket {
     }
 
     func close() { transport.close() }
+
+    private func receive() async throws -> Data { try await timed { try await transport.receive() } }
+
+    /**
+     * Closing the connection is the only way to stop a pending read or write,
+     * and that fails it as cancelled (NWError ECANCELED, URLError.cancelled):
+     * say it timed out instead, so it isn't taken for something the user did.
+     */
+    private func timed<T>(_ io: () async throws -> T) async throws -> T {
+        if timedOut { throw ImapError.timedOut }
+        guard let timeout else { return try await io() }
+        let timer = Task { [transport] in
+            guard (try? await Task.sleep(for: timeout)) != nil else { return false }
+            transport.close()
+            return true
+        }
+        let result: Result<T, Error>
+        do { result = .success(try await io()) } catch { result = .failure(error) }
+        timer.cancel()
+        if await timer.value {
+            timedOut = true
+            throw ImapError.timedOut
+        }
+        return try result.get()
+    }
 }
 
 nonisolated protocol MailTransport: AnyObject, Sendable {

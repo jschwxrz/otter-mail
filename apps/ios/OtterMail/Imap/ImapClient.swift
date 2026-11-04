@@ -13,8 +13,9 @@ nonisolated enum MailAuth: Sendable {
     }
 }
 
-nonisolated enum ImapError: LocalizedError {
+nonisolated enum ImapError: LocalizedError, Equatable {
     case closed
+    case timedOut
     case signedOut
     case authentication(String)
     case server(String)
@@ -32,6 +33,7 @@ nonisolated enum ImapError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .closed: "The mail server closed the connection."
+        case .timedOut: "The mail server stopped answering."
         case .signedOut: "Enter the password for this mailbox in Settings › Mailboxes."
         case .authentication(let text): text.isEmpty ? "The server didn't accept the username or password." : text
         case .server(let text), .unavailable(let text), .protocolError(let text): text
@@ -67,6 +69,8 @@ actor ImapClient {
     }
 
     private init(_ socket: MailSocket) {
+        // A server that stops answering mid-command would hold its caller forever.
+        socket.timeout = .seconds(90)
         self.socket = socket
         transport = socket.transport
     }
@@ -152,13 +156,6 @@ actor ImapClient {
         } else {
             try await socket.write("\(tag) \(text)\r\n")
         }
-        // A server that stops answering mid-command would hold its caller forever.
-        let watchdog = Task { [transport] in
-            try? await Task.sleep(for: .seconds(90))
-            if !Task.isCancelled { transport.close() }
-        }
-        defer { watchdog.cancel() }
-
         var untagged: [ImapResponse] = []
         while true {
             let line = try await readResponse()
@@ -333,6 +330,9 @@ actor ImapClient {
         let tag = "A\(tag)"
         try await socket.write("\(tag) IDLE\r\n")
         idleOpen = true
+        let timeout = socket.timeout
+        socket.timeout = nil
+        defer { socket.timeout = timeout }
         let timer = Task { [weak self] in
             try? await Task.sleep(for: duration)
             if !Task.isCancelled { await self?.endIdle() }
