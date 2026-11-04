@@ -83,7 +83,7 @@ nonisolated private func isLocal(_ host: String) -> Bool {
     ["localhost", "127.0.0.1", "::1"].contains(host.lowercased())
 }
 
-nonisolated private final class NWTransport: MailTransport, @unchecked Sendable {
+nonisolated final class NWTransport: MailTransport, @unchecked Sendable {
     private let connection: NWConnection
     private let queue = DispatchQueue(label: "dev.otterware.mail.socket")
 
@@ -134,7 +134,7 @@ nonisolated private final class NWTransport: MailTransport, @unchecked Sendable 
                 if let data, !data.isEmpty {
                     continuation.resume(returning: data)
                 } else {
-                    continuation.resume(throwing: error ?? ImapError.closed)
+                    continuation.resume(throwing: error.map(Self.lost) ?? ImapError.closed)
                 }
             }
         }
@@ -143,7 +143,7 @@ nonisolated private final class NWTransport: MailTransport, @unchecked Sendable 
     func send(_ data: Data) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             connection.send(content: data, completion: .contentProcessed { error in
-                if let error { continuation.resume(throwing: error) } else { continuation.resume() }
+                if let error { continuation.resume(throwing: Self.lost(error)) } else { continuation.resume() }
             })
         }
     }
@@ -151,6 +151,24 @@ nonisolated private final class NWTransport: MailTransport, @unchecked Sendable 
     func startTLS() async throws { throw ImapError.protocolError("Already using TLS.") }
 
     func close() { connection.cancel() }
+
+    /**
+     * The network going away under a connection, as URLSession (the STARTTLS
+     * transport) reports it. iOS aborts a suspended app's sockets
+     * (ECONNABORTED), and Wi-Fi handing over to cellular resets them. Any
+     * other error, ECANCELED included, stays as it is.
+     */
+    static func lost(_ error: NWError) -> Error {
+        guard case .posix(let code) = error else { return error }
+        let lost: URLError.Code? = switch code {
+        case .ECONNABORTED, .ECONNRESET, .ENETRESET, .ENOTCONN, .EPIPE, .EHOSTDOWN, .EHOSTUNREACH: .networkConnectionLost
+        case .ENETDOWN, .ENETUNREACH: .notConnectedToInternet
+        case .ETIMEDOUT: .timedOut
+        default: nil
+        }
+        guard let lost else { return error }
+        return URLError(lost, userInfo: [NSUnderlyingErrorKey: error])
+    }
 }
 
 nonisolated private final class StreamTransport: NSObject, MailTransport, URLSessionTaskDelegate, @unchecked Sendable {
