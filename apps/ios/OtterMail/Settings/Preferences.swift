@@ -72,6 +72,13 @@ final class Preferences {
             ui("mail:mailboxes", Self.json(arrangement))
         }
     }
+    /** Mailboxes (addresses, lower-cased) whose list leaves out their alias mailboxes' mail. */
+    var aliasMailApart: [String] {
+        didSet {
+            guard aliasMailApart != oldValue else { return }
+            ui("mail:alias-mail-apart", Self.json(aliasMailApart))
+        }
+    }
     /** Themes made on the Mac or the web (`CustomThemes`): worn and picked here, never written (so not in `uiSection`). */
     private(set) var customThemes: [Theme]
     var notifications: Notifications { didSet { setting("notificationsMode", notifications.rawValue) } }
@@ -89,8 +96,8 @@ final class Preferences {
         if !applying { onChange("settings") }
     }
 
-    private static func json(_ arrangement: Arrangement) -> String {
-        (try? JSONEncoder().encode(arrangement)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+    private static func json(_ value: some Encodable) -> String {
+        (try? JSONEncoder().encode(value)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
     }
 
     var uiSection: [String: String] {
@@ -103,6 +110,7 @@ final class Preferences {
             "otter:full-width-messages": String(fullWidthMessages),
             "gmail:advance-direction": advance.rawValue,
             "mail:mailboxes": Self.json(arrangement),
+            "mail:alias-mail-apart": Self.json(aliasMailApart),
         ]
     }
 
@@ -132,6 +140,10 @@ final class Preferences {
            let decoded = try? JSONDecoder().decode(Arrangement.self, from: value), decoded != arrangement {
             arrangement = decoded
         }
+        if let value = (ui["mail:alias-mail-apart"] as? String)?.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode([String].self, from: value), decoded != aliasMailApart {
+            aliasMailApart = decoded
+        }
         if let value = (settings["notificationsMode"] as? String).flatMap(Notifications.init), value != notifications {
             notifications = value
         }
@@ -150,6 +162,8 @@ final class Preferences {
         advance = defaults.string(forKey: "gmail:advance-direction").flatMap(Advance.init) ?? .next
         arrangement = defaults.string(forKey: "mail:mailboxes")?.data(using: .utf8)
             .flatMap { try? JSONDecoder().decode(Arrangement.self, from: $0) } ?? Arrangement()
+        aliasMailApart = defaults.string(forKey: "mail:alias-mail-apart")?.data(using: .utf8)
+            .flatMap { try? JSONDecoder().decode([String].self, from: $0) } ?? []
         customThemes = CustomThemes.themes(defaults.string(forKey: "otter:themes:v1"))
         notifications = defaults.string(forKey: "settings.notificationsMode").flatMap(Notifications.init) ?? .inbox
         readLanguages = defaults.stringArray(forKey: "settings.readLanguages") ?? []
