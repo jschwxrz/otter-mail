@@ -217,11 +217,12 @@ async function compose(args: ToolArgs, account: MailAccount, ctx: ToolContext): 
   if (replyTo && forward) throw new Error(`Use "replyTo" or "forward", not both.`);
   const sourceId = replyTo ?? forward;
   const source = sourceId
-    ? await invoke<MessageDetail>("gmail:getMessage", {
+    ? await invoke<MessageDetail | null>("gmail:getMessage", {
         accountId: account.id,
         messageId: sourceId,
       })
     : null;
+  if (sourceId && !source) throw new Error(`Message ${sourceId} was deleted.`);
 
   let to = optStr(args, "to");
   let cc = optStr(args, "cc");
@@ -521,44 +522,50 @@ export const mailTools: AgentTool[] = [
         );
       const quoted = optBool(args, "includeQuoted") ?? false;
       const labels = await labelsOf(account);
-      const messages = await Promise.all(
-        summaries.map(async (m) => {
-          const d = await invoke<MessageDetail>("gmail:getMessage", {
+      const details = await Promise.all(
+        summaries.map((m) =>
+          invoke<MessageDetail | null>("gmail:getMessage", {
             accountId: account.id,
             messageId: m.id,
-          });
-          const draft = d.labelIds.includes("DRAFT")
-            ? (
-                await invoke<{ draftId: string | null }>("gmail:getDraftForMessage", {
-                  accountId: account.id,
-                  messageId: d.id,
-                  threadId,
-                })
-              ).draftId
-            : null;
-          const text = bodyText(d);
-          return {
-            messageId: d.id,
-            date: localTime(d.date),
-            from: address(d.fromName, d.fromEmail),
-            to: d.to,
-            ...(d.cc ? { cc: d.cc } : {}),
-            ...(d.subject !== summaries[0].subject ? { subject: d.subject } : {}),
-            ...(d.unread ? { unread: true } : {}),
-            ...(draft ? { draftId: draft } : {}),
-            body: clip(quoted ? text : withoutQuote(text), BODY_LIMIT),
-            ...(d.attachments.length
-              ? {
-                  attachments: d.attachments.map((a) => ({
-                    attachmentId: a.id,
-                    filename: a.filename,
-                    mimeType: a.mimeType,
-                    size: a.size,
-                  })),
-                }
-              : {}),
-          };
-        }),
+          }),
+        ),
+      );
+      const messages = await Promise.all(
+        details
+          .filter((d) => d !== null)
+          .map(async (d) => {
+            const draft = d.labelIds.includes("DRAFT")
+              ? (
+                  await invoke<{ draftId: string | null }>("gmail:getDraftForMessage", {
+                    accountId: account.id,
+                    messageId: d.id,
+                    threadId,
+                  })
+                ).draftId
+              : null;
+            const text = bodyText(d);
+            return {
+              messageId: d.id,
+              date: localTime(d.date),
+              from: address(d.fromName, d.fromEmail),
+              to: d.to,
+              ...(d.cc ? { cc: d.cc } : {}),
+              ...(d.subject !== summaries[0].subject ? { subject: d.subject } : {}),
+              ...(d.unread ? { unread: true } : {}),
+              ...(draft ? { draftId: draft } : {}),
+              body: clip(quoted ? text : withoutQuote(text), BODY_LIMIT),
+              ...(d.attachments.length
+                ? {
+                    attachments: d.attachments.map((a) => ({
+                      attachmentId: a.id,
+                      filename: a.filename,
+                      mimeType: a.mimeType,
+                      size: a.size,
+                    })),
+                  }
+                : {}),
+            };
+          }),
       );
       const row = threadRow(
         { ...summaries[0], threadLabelIds: [...new Set(summaries.flatMap((m) => m.labelIds))] },
@@ -595,10 +602,11 @@ export const mailTools: AgentTool[] = [
       const account = await mailbox(args);
       const messageId = str(args, "messageId");
       const attachmentId = str(args, "attachmentId");
-      const detail = await invoke<MessageDetail>("gmail:getMessage", {
+      const detail = await invoke<MessageDetail | null>("gmail:getMessage", {
         accountId: account.id,
         messageId,
       });
+      if (!detail) throw new Error(`Message ${messageId} was deleted.`);
       const meta = detail.attachments.find((a) => a.id === attachmentId);
       if (!meta) throw new Error(`Message ${messageId} has no attachment ${attachmentId}.`);
       const bytes = await getAttachmentBytes(account.id, messageId, attachmentId);

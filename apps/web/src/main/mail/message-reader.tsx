@@ -1447,8 +1447,8 @@ export function ExpandedRow({
     () => matchInlineImages(detail?.bodyHtml ?? null, detail?.attachments ?? []),
     [detail],
   );
-  const body = useExtensionMessageBody(accountId, detail);
-  const bodyLinks = useExtensionBodyLinks(summary.id, detail);
+  const body = useExtensionMessageBody(accountId, detail ?? undefined);
+  const bodyLinks = useExtensionBodyLinks(summary.id, detail ?? undefined);
 
   return (
     <div className="group px-6 py-5">
@@ -1563,7 +1563,9 @@ export function ExpandedRow({
               />
             </>
           ) : (
-            <span className="text-sm text-muted-foreground">Could not load this message.</span>
+            <span className="text-sm text-muted-foreground">
+              {detail === null ? "This message was deleted." : "Could not load this message."}
+            </span>
           )}
         </div>
       </div>
@@ -1761,7 +1763,7 @@ function InlineComposer({
       ? account.email
       : lastDetail
         ? replyAddress(account, lastDetail, aliasAddress)
-        : lastDetailQuery.isError || ownAddress(account, aliasAddress)
+        : lastDetailQuery.isError || lastDetail === null || ownAddress(account, aliasAddress)
           ? replyAddress(account, lastMessage, aliasAddress)
           : undefined;
   const sender =
@@ -2214,7 +2216,11 @@ export function MessageReader({
   const message = messageQuery.data;
   const threadId = message?.threadId || null;
 
-  const conversation = useExtensionConversation({ accountId, messageId, message });
+  const conversation = useExtensionConversation({
+    accountId,
+    messageId,
+    message: message ?? undefined,
+  });
   const threadQuery = useThread(messageId ? accountId : null, threadId, alias?.id);
   const threadMessages = threadQuery.data ?? [];
   const isThread = !single && threadMessages.length > 1;
@@ -2316,8 +2322,12 @@ export function MessageReader({
         <EmptyState
           className="flex-1"
           media={<MailWarningIcon className="size-10 stroke-[1.25] text-muted-foreground" />}
-          title="Could not load message"
-          description="The message could not be retrieved. Try again."
+          title={message === null ? "Message deleted" : "Could not load message"}
+          description={
+            message === null
+              ? "It's no longer in this mailbox."
+              : "The message could not be retrieved. Try again."
+          }
         />
       </ReaderShell>
     );
