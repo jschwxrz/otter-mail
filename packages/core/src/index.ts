@@ -12,6 +12,7 @@ import { registerSupportHandlers } from "./handlers/support.js";
 import { activateExtensions, type CoreExtension } from "./extensions.js";
 import { broadcast, handle } from "./ipc.js";
 import { setPlatform, type Platform } from "./platform.js";
+import { followAliasMailApart } from "./services/alias-mailboxes.js";
 import { pruneAttachmentCache } from "./services/attachment-cache.js";
 import { loadImapPasswords } from "./services/imap-passwords.js";
 import { readKeybindings, writeKeybindings } from "./services/keybindings-store.js";
@@ -71,7 +72,9 @@ export async function startCore(
     return result;
   });
 
-  followMailboxArrangement((await getUiPreferences())["mail:mailboxes"]);
+  const ui = await getUiPreferences();
+  followMailboxArrangement(ui["mail:mailboxes"]);
+  followAliasMailApart(ui["mail:alias-mail-apart"]);
   void syncAllAccounts({ force: true });
   configureAutoSync((await getSettings()).syncIntervalSeconds);
   void pruneAttachmentCache();

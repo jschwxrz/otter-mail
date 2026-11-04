@@ -130,6 +130,36 @@ describe("an alias mailbox's mail", () => {
   });
 });
 
+describe("the parent's tab, its alias mailboxes' mail set apart", () => {
+  // Me has a mailbox of its own; Mail is only an address the parent sends from.
+  const rest = { aliases: [ME], sendAs: [ME, MAIL] };
+  const own = (labelId: string) =>
+    store.getThreadsPage(account, labelId, 0, 50, rest).messages.map((m) => m.id);
+
+  it("has the rest of its mail", () => {
+    put(["INBOX", "UNREAD"], { to: ME, deliveredTo: [ME] });
+    put(["INBOX"], { to: "list@mail.example", deliveredTo: [account, ME] });
+    const forMail = put(["INBOX", "UNREAD"], { to: MAIL, deliveredTo: [MAIL] });
+    const forParent = put(["INBOX"], { to: account, deliveredTo: [account] });
+    put(["SENT"], { fromEmail: ME, to: "ana@mail.example" });
+    const fromParent = put(["SENT"], { fromEmail: account, to: ME });
+    expect(own("INBOX").toSorted()).toEqual([forMail.id, forParent.id].toSorted());
+    expect(own("SENT")).toEqual([fromParent.id]);
+  });
+
+  it("counts without it, taken off the server's counts (they include mail not cached yet)", () => {
+    put(["INBOX", "UNREAD"], { deliveredTo: [ME] });
+    put(["INBOX"], { deliveredTo: [ME], unread: false });
+    put(["INBOX", "UNREAD"], { deliveredTo: [MAIL] });
+    const inbox = { id: "INBOX", name: "INBOX", type: "system" as const, unread: 7, total: 40 };
+    const receipts = { id: "folder:Receipts", name: "Receipts", type: "user" as const, unread: 2 };
+    expect(store.withoutAliasMail(account, [inbox, receipts], rest)).toEqual([
+      { ...inbox, unread: 6, total: 38 },
+      receipts,
+    ]);
+  });
+});
+
 describe("copies of one message", () => {
   // Sent To: mail@ with Bcc: me@, it arrives twice, alike but for where it was delivered.
   const bcc = () => {

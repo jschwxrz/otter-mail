@@ -23,6 +23,7 @@ const SYNCED_KEYS = [
   "assistant:hidden-models",
   "assistant:follow-up-behavior",
   "mail:mailboxes",
+  "mail:alias-mail-apart",
   "otter:extensions:disabled",
   "calendar:week-start",
   "calendar:show-weekends",

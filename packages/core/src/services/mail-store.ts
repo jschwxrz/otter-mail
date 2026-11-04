@@ -623,6 +623,9 @@ const NOT_SPAM_TRASH =
 
 /** Lower-cased; `sendAs` is the parent's whole Send from list. */
 export type AliasScope = { address: string; sendAs: string[] };
+/** A parent's own mail: without what its alias mailboxes (`aliases`, lower-cased) have. */
+export type RestScope = { aliases: string[]; sendAs: string[] };
+export type MailboxScope = AliasScope | RestScope;
 
 const inSet = (column: string) => `instr(COALESCE(${column}, ''), '<' || ? || '>') > 0`;
 const SENT_BY = "lower(m.fromEmail) = ?";
@@ -655,15 +658,35 @@ function aliasWhere(
   };
 }
 
+function anyAliasWhere(
+  labelId: string | undefined,
+  { aliases, sendAs }: RestScope,
+): { clause: string; params: string[] } {
+  const each = aliases.map((address) => aliasWhere(labelId, { address, sendAs }));
+  return {
+    clause: `(${each.map((e) => e.clause).join(" OR ") || "0"})`,
+    params: each.flatMap((e) => e.params),
+  };
+}
+
+function scopeWhere(
+  labelId: string | undefined,
+  scope: MailboxScope,
+): { clause: string; params: string[] } {
+  if ("address" in scope) return aliasWhere(labelId, scope);
+  const theirs = anyAliasWhere(labelId, scope);
+  return { clause: `NOT ${theirs.clause}`, params: theirs.params };
+}
+
 export function getThreadsPage(
   accountId: string,
   labelId: string,
   offset: number,
   limit: number,
-  alias?: AliasScope,
+  scope?: MailboxScope,
 ): { messages: MessageSummary[]; hasMore: boolean } {
   const d = getDb();
-  const own = alias ? aliasWhere(labelId, alias) : null;
+  const own = scope ? scopeWhere(labelId, scope) : null;
   const ownSql = own ? `AND ${own.clause}` : "";
   const ownParams = own?.params ?? [];
   if (labelId === ALL_MAIL_LABEL_ID) {
@@ -700,21 +723,47 @@ export function getThreadsPage(
 
 const ALIAS_FOLDERS = ["INBOX", "STARRED", "SENT", "DRAFT", ARCHIVE_LABEL_ID, "SPAM", "TRASH"];
 
+function countWhere(
+  accountId: string,
+  labelId: string,
+  own: { clause: string; params: string[] },
+): { total: number; unread: number } {
+  const exclusion = labelId === "SPAM" || labelId === "TRASH" ? "" : `AND ${NOT_SPAM_TRASH}`;
+  return getDb()
+    .prepare(`
+      SELECT COUNT(*) AS total, COALESCE(SUM(m.unread), 0) AS unread
+        FROM message_labels ml
+        JOIN messages m ON m.accountId = ml.accountId AND m.id = ml.messageId
+       WHERE ml.accountId = ? AND ml.labelId = ? ${exclusion} AND ${own.clause}
+    `)
+    .get(accountId, labelId, ...own.params) as unknown as { total: number; unread: number };
+}
+
 export function getAliasLabels(accountId: string, alias: AliasScope): MailLabel[] {
-  const d = getDb();
   const parent = new Set(getLabels(accountId).map((l) => l.id));
   return ALIAS_FOLDERS.filter((id) => parent.has(id)).map((id) => {
-    const own = aliasWhere(id, alias);
-    const exclusion = id === "SPAM" || id === "TRASH" ? "" : `AND ${NOT_SPAM_TRASH}`;
-    const row = d
-      .prepare(`
-        SELECT COUNT(*) AS total, COALESCE(SUM(m.unread), 0) AS unread
-          FROM message_labels ml
-          JOIN messages m ON m.accountId = ml.accountId AND m.id = ml.messageId
-         WHERE ml.accountId = ? AND ml.labelId = ? ${exclusion} AND ${own.clause}
-      `)
-      .get(accountId, id, ...own.params) as unknown as { total: number; unread: number };
-    return { id, name: id, type: "system", unread: row.unread, total: row.total };
+    const { total, unread } = countWhere(accountId, id, aliasWhere(id, alias));
+    return { id, name: id, type: "system", unread, total };
+  });
+}
+
+/**
+ * The parent's folders, counting without its alias mailboxes' mail. The server counts what
+ * isn't cached yet too, so theirs is taken off its counts rather than counted afresh.
+ */
+export function withoutAliasMail(
+  accountId: string,
+  labels: MailLabel[],
+  rest: RestScope,
+): MailLabel[] {
+  return labels.map((label) => {
+    if (!ALIAS_FOLDERS.includes(label.id)) return label;
+    const theirs = countWhere(accountId, label.id, anyAliasWhere(label.id, rest));
+    return {
+      ...label,
+      ...(label.unread !== undefined ? { unread: Math.max(0, label.unread - theirs.unread) } : {}),
+      ...(label.total !== undefined ? { total: Math.max(0, label.total - theirs.total) } : {}),
+    };
   });
 }
 
@@ -1244,7 +1293,7 @@ function toFtsMatch(query: string): string | null {
 
 export type SearchScope = {
   labelId?: string;
-  alias?: AliasScope;
+  mailbox?: MailboxScope;
   rules?: ViewRule[];
   starred?: boolean;
   important?: boolean;
@@ -1297,8 +1346,8 @@ export function searchMessages(
   } else {
     conds.push(NOT_SPAM_TRASH);
   }
-  if (scope?.alias) {
-    const own = aliasWhere(scope.labelId, scope.alias);
+  if (scope?.mailbox) {
+    const own = scopeWhere(scope.labelId, scope.mailbox);
     conds.push(own.clause);
     params.push(...own.params);
   }
