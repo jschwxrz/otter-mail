@@ -99,6 +99,9 @@ class PretendServer {
         this.create(args[1]!, this.capabilities.includes("CREATE-SPECIAL-USE") ? use : "");
         return `${tag} OK done\r\n`;
       }
+      case "DELETE":
+        this.boxes.delete(args[1]!);
+        return `${tag} OK done\r\n`;
       case "LOGOUT":
         return `* BYE bye\r\n${tag} OK done\r\n`;
       default:
@@ -260,6 +263,63 @@ describe("Archiving over IMAP", () => {
     expect(undo).toContain("UID COPY 1 INBOX");
     expect(undo.some((c) => /MOVE|STORE|EXPUNGE/.test(c))).toBe(false);
     expect(thread(accountId)[1]).toEqual({ path: "INBOX", labels: ["INBOX", "UNREAD"] });
+  });
+});
+
+describe("Deleting a folder over IMAP", () => {
+  const destructive = (command: string) =>
+    /^(SELECT|DELETE|UID (MOVE|COPY|STORE|EXPUNGE))/.test(command);
+
+  it("deletes your own folder", async () => {
+    server = new PretendServer("IMAP4rev1 MOVE UIDPLUS SPECIAL-USE LIST-EXTENDED", {
+      INBOX: "",
+      Sent: "\\Sent",
+      Projects: "",
+    });
+    const { accountId } = await mailbox("Sent");
+
+    await provider.deleteLabel(accountId, "Projects");
+    expect(server.commands).toContain('DELETE "Projects"');
+    expect(server.boxes.has("Projects")).toBe(false);
+  });
+
+  it("takes a folder already deleted elsewhere as deleted, touching nothing", async () => {
+    server = new PretendServer("IMAP4rev1 MOVE UIDPLUS SPECIAL-USE LIST-EXTENDED", {
+      INBOX: "",
+      Sent: "\\Sent",
+      Projects: "",
+    });
+    const { accountId } = await mailbox("Sent");
+    expect((await provider.listLabels(accountId)).map((l) => l.id)).toContain("Projects");
+    server.boxes.delete("Projects");
+    const sent = server.commands.length;
+
+    await provider.deleteLabel(accountId, "Projects");
+    expect(server.commands.slice(sent).filter(destructive)).toEqual([]);
+    expect((await provider.listLabels(accountId)).map((l) => l.id)).not.toContain("Projects");
+    expect(thread(accountId)).toEqual([
+      { path: "INBOX", labels: ["INBOX", "UNREAD"] },
+      { path: "Sent", labels: ["SENT"] },
+    ]);
+  });
+
+  it("never deletes a system folder, by label or by path, even one the server lacks", async () => {
+    server = new PretendServer("IMAP4rev1 MOVE UIDPLUS SPECIAL-USE LIST-EXTENDED", {
+      INBOX: "",
+      Sent: "\\Sent",
+      Kept: "\\Archive",
+      Junk: "",
+    });
+    const { accountId } = await mailbox("Sent");
+    const sent = server.commands.length;
+
+    for (const labelId of ["INBOX", "SENT", "Sent", "ARCHIVE", "Kept", "SPAM", "Junk", "TRASH"]) {
+      await expect(provider.deleteLabel(accountId, labelId)).rejects.toThrow(
+        "Only your own folders can be deleted.",
+      );
+    }
+    expect(server.commands.slice(sent).filter(destructive)).toEqual([]);
+    expect([...server.boxes.keys()]).toEqual(["INBOX", "Sent", "Kept", "Junk"]);
   });
 });
 

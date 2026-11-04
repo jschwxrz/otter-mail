@@ -23,6 +23,7 @@ import {
   ensureFolder,
   FLAG_LABELS,
   foldersOf,
+  isSystemLabel,
   listFolders,
   messageId,
   parseMessageId,
@@ -387,7 +388,11 @@ export async function deleteLabel(accountId: string, labelId: string): Promise<v
   await withImap(accountId, async (client) => {
     const folders = await listFolders(accountId, client);
     const folder = folders.get(labelId);
-    if (!folder || folder.role) throw new Error("Only your own folders can be deleted.");
+    if (isSystemLabel(labelId) || folder?.role) {
+      throw new Error("Only your own folders can be deleted.");
+    }
+    // Deleted or renamed elsewhere since the sidebar listed it: it's gone either way.
+    if (!folder) return;
     const mailbox = await selectFolder(client, folder.path);
     const uids = await client.search("ALL");
     if (uids.length > 0) {
