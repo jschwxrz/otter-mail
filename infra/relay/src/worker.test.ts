@@ -2008,7 +2008,7 @@ const pushRegistration = (token: string, mailboxes: string[]) => ({
   mode: "inbox",
 });
 
-describe("notification connection failures", () => {
+describe.concurrent("notification connection failures", () => {
   async function callbackFor(token: string, email: string) {
     const response = await call("POST", "/v1/notification-connections/authorize", token, {
       email,
@@ -2033,7 +2033,9 @@ describe("notification connection failures", () => {
     };
     return result.connections.find((c) => c.email === email)?.status;
   }
-  it("shows a setup error when the first refreshed grant has broader Gmail permissions", async () => {
+  it("shows a setup error when the first refreshed grant has broader Gmail permissions", async ({
+    expect,
+  }) => {
     const owner = await signIn("notification-scope-owner@example.com"),
       email = "notification-scope-mail@example.com";
     await link(owner.token, email);
@@ -2050,7 +2052,7 @@ describe("notification connection failures", () => {
   it(
     "stops a connected grant if later refresh broadens its scopes",
     { timeout: 10_000 },
-    async () => {
+    async ({ expect }) => {
       const owner = await signIn("notification-later-scope-owner@example.com"),
         email = "notification-later-scope-mail@example.com";
       await link(owner.token, email);
@@ -2067,7 +2069,7 @@ describe("notification connection failures", () => {
   it(
     "starts a reconnected grant from the mailbox's current state",
     { timeout: 20_000 },
-    async () => {
+    async ({ expect }) => {
       const owner = await signIn("notification-reconnect-owner@example.com"),
         email = "notification-reconnect-mail@example.com",
         token = "5c".repeat(32);
@@ -2099,7 +2101,7 @@ describe("notification connection failures", () => {
   it(
     "retries a Gmail 403 rate limit after its backoff, without requiring new consent",
     { timeout: 40_000 },
-    async () => {
+    async ({ expect }) => {
       const owner = await signIn("notification-quota-owner@example.com"),
         email = "notification-quota-mail@example.com";
       await link(owner.token, email);
@@ -2107,7 +2109,7 @@ describe("notification connection failures", () => {
       const result = await callbackFor(owner.token, email);
       expect(await result.text()).toContain("ottermail-notifications://complete?result=success");
       expect(await statusFor(owner.token, email)).toBe("retry");
-      await call("PUT", "/v1/push/device", owner.token, pushRegistration("ab".repeat(32), [email]));
+      await call("PUT", "/v1/push/device", owner.token, pushRegistration("ef".repeat(32), [email]));
       const reads = notificationReads.filter((r) => r.email === email).length;
       for (const historyId of ["101", "102", "103"]) await push({ emailAddress: email, historyId });
       await new Promise((resolve) => setTimeout(resolve, 4000));
@@ -2118,11 +2120,11 @@ describe("notification connection failures", () => {
   );
 });
 
-describe("iPhone push registration and lifecycle", () => {
+describe.concurrent("iPhone push registration and lifecycle", () => {
   it(
     "watches IMAP via IDLE, verifies unread UIDs and suppresses copied/read messages",
     { timeout: 45_000 },
-    async () => {
+    async ({ expect }) => {
       notificationImapMessages.length = 0;
       const owner = await signIn("imap-push-owner@example.com"),
         address = "imap-push-mail@example.com",
@@ -2199,7 +2201,7 @@ describe("iPhone push registration and lifecycle", () => {
   it(
     "never alerts from an unverified change marker or a mailbox with no server grant",
     { timeout: 10_000 },
-    async () => {
+    async ({ expect }) => {
       const owner = await signIn("push-unverified@example.com"),
         address = "push-unverified-mail@example.com",
         token = "12".repeat(32);
@@ -2216,7 +2218,7 @@ describe("iPhone push registration and lifecycle", () => {
   it(
     "rechecks unread state before submission and never fetches content on the server",
     { timeout: 20_000 },
-    async () => {
+    async ({ expect }) => {
       const owner = await signIn("push-read-race@example.com"),
         address = "push-read-race-mail@example.com",
         token = "34".repeat(32);
@@ -2245,7 +2247,7 @@ describe("iPhone push registration and lifecycle", () => {
   it(
     "routes confirmed Outlook arrivals through APNs with only basic mail permission",
     { timeout: 20_000 },
-    async () => {
+    async ({ expect }) => {
       const owner = await signIn("outlook-push-owner@example.com"),
         address = "outlook-push-mail@contoso.test",
         token = "56".repeat(32);
@@ -2321,7 +2323,9 @@ describe("iPhone push registration and lifecycle", () => {
       ).toHaveLength(0);
     },
   );
-  it("requires a session, linked Gmail ownership, allowed topic/environment and metadata-only input", async () => {
+  it("requires a session, linked Gmail ownership, allowed topic/environment and metadata-only input", async ({
+    expect,
+  }) => {
     const owner = await signIn("native-push-owner@example.com");
     const stranger = await signIn("native-push-stranger@example.com");
     await link(owner.token, "native-inbox@example.com");
@@ -2344,7 +2348,9 @@ describe("iPhone push registration and lifecycle", () => {
     expect(pushRows("push_mailboxes", owner.user.id)).toHaveLength(0);
   });
 
-  it("rotates tokens and transfers a phone to another account without retaining the old owner's routes", async () => {
+  it("rotates tokens and transfers a phone to another account without retaining the old owner's routes", async ({
+    expect,
+  }) => {
     const first = await signIn("push-transfer-first@example.com");
     const second = await signIn("push-transfer-second@example.com");
     await link(first.token, "push-transfer-a@example.com");
@@ -2375,7 +2381,9 @@ describe("iPhone push registration and lifecycle", () => {
     expect(pushRows("push_devices", second.user.id)).toHaveLength(1);
   });
 
-  it("unlinks routes and removes registrations on sign-out, remote revocation, and account deletion", async () => {
+  it("unlinks routes and removes registrations on sign-out, remote revocation, and account deletion", async ({
+    expect,
+  }) => {
     const owner = await signIn("push-cleanup@example.com", "push-cleanup-sub");
     const other = await signIn("push-cleanup@example.com", "push-cleanup-sub");
     await link(owner.token, "push-cleanup-mail@example.com");
@@ -2430,7 +2438,7 @@ describe("iPhone push registration and lifecycle", () => {
   it(
     "coalesces bursts/repeated deliveries in the real UserHub and obeys Off before delivery",
     { timeout: 40_000 },
-    async () => {
+    async ({ expect }) => {
       const owner = await signIn("push-delivery@example.com");
       const email = "push-delivery-mail@example.com",
         token = "ab".repeat(32);

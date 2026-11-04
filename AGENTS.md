@@ -171,8 +171,8 @@ The iPhone app releases separately, with its own version:
   selects Stable or Nightly on this computer; updates offer "Restart to update" in the sidebar.
   Both channels use the same app identity and data; their icons change with the installed build.
   A release never needs a changelog note: don't write one, or ask about one, unless the user asks.
-- Web: each release deploys it too, after its GitHub Release: a nightly to the
-  `otter-mail-site-nightly` Worker, a stable release to mail.otterware.app. Both answer at
+- Web: each release deploys it too: a nightly, once its checks pass, to the
+  `otter-mail-site-nightly` Worker; a stable release, after its GitHub Release, to mail.otterware.app. Both answer at
   mail.otterware.app (one browser cache and sign-in): Settings → General's channel sets a
   cookie the stable Worker routes on (`site/src/worker.ts`); open tabs offer "Reload to update".
 - iPhone: run the Release iPhone workflow from `main` when `apps/ios` (or what it bundles from

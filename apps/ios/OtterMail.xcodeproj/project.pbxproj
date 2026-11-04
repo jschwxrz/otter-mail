@@ -16,7 +16,7 @@
 		0B0000000000000000000022 /* ImapClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000000000000000000021; };
 		0B0000000000000000000032 /* ImapParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000000000000000000031; };
 		0B0000000000000000000042 /* MailSocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000000000000000000041; };
-		0C0000000000000000000001 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = 0C0000000000000000000002 /* Sentry */; };
+		0C0000000000000000000001 /* Sentry-Static in Frameworks */ = {isa = PBXBuildFile; productRef = 0C0000000000000000000002 /* Sentry-Static */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -75,7 +75,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0C0000000000000000000001 /* Sentry in Frameworks */,
+				0C0000000000000000000001 /* Sentry-Static in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -134,7 +134,7 @@
 			);
 			name = OtterMail;
 			packageProductDependencies = (
-				0C0000000000000000000002 /* Sentry */,
+				0C0000000000000000000002 /* Sentry-Static */,
 			);
 			productName = OtterMail;
 			productReference = 0A0000000000000000000001 /* Otter Mail.app */;
@@ -202,7 +202,7 @@
 			mainGroup = 0A0000000000000000000004;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				0C0000000000000000000003 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
+				0C0000000000000000000003 /* XCRemoteSwiftPackageReference "sentry-cocoa-binaries" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0A0000000000000000000005 /* Products */;
@@ -508,9 +508,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		0C0000000000000000000003 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
+		0C0000000000000000000003 /* XCRemoteSwiftPackageReference "sentry-cocoa-binaries" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/getsentry/sentry-cocoa";
+			repositoryURL = "https://github.com/getsentry/sentry-cocoa-binaries";
 			requirement = {
 				kind = exactVersion;
 				version = 9.29.2;
@@ -519,10 +519,10 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		0C0000000000000000000002 /* Sentry */ = {
+		0C0000000000000000000002 /* Sentry-Static */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 0C0000000000000000000003 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
-			productName = Sentry;
+			package = 0C0000000000000000000003 /* XCRemoteSwiftPackageReference "sentry-cocoa-binaries" */;
+			productName = "Sentry-Static";
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

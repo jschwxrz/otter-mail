@@ -1,15 +1,9 @@
 import type { ImapSettings } from "@otter-mail/contracts";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vite-plus/test";
+import { afterAll, beforeAll, expect, it, vi } from "vite-plus/test";
 
 import { searchMail } from "../../../handlers/search.ts";
 import { connectImap, ImapClient, SmtpClient, SmtpError } from "../../../protocols/index.ts";
 import { nodeConnect } from "../../../protocols/test/node-stream.ts";
-import {
-  dockerAvailable,
-  startDovecot,
-  startGreenMail,
-  type Container,
-} from "../../../protocols/test/servers.ts";
 import * as accounts from "../../../services/account-store.ts";
 import { setImapPassword } from "../../../services/imap-passwords.ts";
 import * as store from "../../../services/mail-store.ts";
@@ -20,7 +14,6 @@ import { threadIdOf } from "../messages.ts";
 import { connectionCount, resumeNow, useNodePlatform } from "./node-platform.ts";
 
 useNodePlatform();
-const docker = dockerAvailable();
 const provider = imapProvider;
 
 let counter = 0;
@@ -101,7 +94,7 @@ const waitFor = async <T>(check: () => T | undefined, ms = 15_000): Promise<T> =
   }
 };
 
-function providerScenario(
+export function providerScenario(
   server: () => { accountId: string; settings: ImapSettings; password: string; smtp: boolean },
 ) {
   let accountId: string;
@@ -497,10 +490,11 @@ function providerScenario(
     return seed.search({ header: { name: "Subject", value: subject }, deleted: false });
   };
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-  /** Sent's copies, once filing (checks at 1 and 4 seconds, then an APPEND) is surely done. */
+  /** Sent's copies, once filing (checks at 1 and 4 seconds after the send, then an APPEND) is surely done. */
   const filedOnce = async (subject: string) => {
+    const done = Date.now() + 5000;
     for (let i = 0; i < 60 && (await inSent(subject)).length === 0; i++) await sleep(200);
-    await sleep(5000);
+    await sleep(done - Date.now());
     return inSent(subject);
   };
 
@@ -731,45 +725,3 @@ function providerScenario(
     }
   }, 30_000);
 }
-
-describe.skipIf(!docker)("IMAP provider on Dovecot (QRESYNC)", () => {
-  let container: Container;
-  beforeAll(async () => {
-    container = await startDovecot();
-  }, 300_000);
-  afterAll(async () => {
-    await container?.stop();
-  });
-
-  providerScenario(() => ({
-    accountId: "ann@example.com",
-    password: "pass",
-    smtp: false,
-    settings: {
-      username: "ann@example.com",
-      imap: { host: container.host, port: container.port(31993), security: "tls" },
-      smtp: { host: container.host, port: 1, security: "tls" },
-    },
-  }));
-});
-
-describe.skipIf(!docker)("IMAP provider on GreenMail (no mod-sequences)", () => {
-  let container: Container;
-  beforeAll(async () => {
-    container = await startGreenMail();
-  }, 300_000);
-  afterAll(async () => {
-    await container?.stop();
-  });
-
-  providerScenario(() => ({
-    accountId: "alice@example.com",
-    password: "secret",
-    smtp: true,
-    settings: {
-      username: "alice@example.com",
-      imap: { host: container.host, port: container.port(3993), security: "tls" },
-      smtp: { host: container.host, port: container.port(3465), security: "tls" },
-    },
-  }));
-});
