@@ -504,6 +504,79 @@ function providerScenario(
     return inSent(subject);
   };
 
+  it("keeps where each copy was delivered, and reads it for mail cached before", async () => {
+    const message = (subject: string, header: string, delivery: string[]) =>
+      [
+        ...delivery,
+        "From: Bob <bob@example.com>",
+        "To: Mail <mail@riverbank.example>",
+        "Cc: Ann <ann@example.com>",
+        `Subject: ${subject}`,
+        `Message-ID: ${header}`,
+        `Date: ${new Date().toUTCString()}`,
+        "MIME-Version: 1.0",
+        "Content-Type: text/plain; charset=utf-8",
+        "",
+        "Picnic?",
+        "",
+      ].join("\r\n");
+    // Sent To: mail@ with Bcc: me@, a message arrives twice, alike but for Original-Recipient.
+    const bcc = `<bcc${counter++}@example.com>`;
+    for (const to of ["mail@riverbank.example", "me@riverbank.example"]) {
+      const delivery = [`Original-Recipient: rfc822;${to}`, `Delivered-To: ${accountId}`];
+      await seed.append("INBOX", message("Saturday", bcc, delivery), { flags: ["\\Seen"] });
+    }
+    // Postfix delivers an alias's mail to the mailbox's own address, the alias in X-Original-To.
+    const postfix = `<postfix${counter++}@example.com>`;
+    const delivery = [`Delivered-To: ${accountId}`, "X-Original-To: me@riverbank.example"];
+    await seed.append("INBOX", message("Sunday", postfix, delivery), { flags: ["\\Seen"] });
+    await sync(accountId);
+
+    const cached = (header: string) =>
+      store
+        .getMessageIdsWithPrefix(accountId, "")
+        .filter((id) => store.getStoredReplyHeaders(accountId, id).messageIdHeader === header);
+    expect(cached(bcc)).toHaveLength(2);
+    const sendAs = ["me@riverbank.example", "mail@riverbank.example"];
+    const inbox = (alias?: string) =>
+      store
+        .getThreadsPage(accountId, "INBOX", 0, 50, alias ? { address: alias, sendAs } : undefined)
+        .messages.filter((m) => m.subject === "Saturday" || m.subject === "Sunday")
+        .map((m) => m.subject)
+        .sort();
+    expect(inbox("me@riverbank.example")).toEqual(["Saturday", "Sunday"]);
+    expect(inbox("mail@riverbank.example")).toEqual(["Saturday"]);
+    expect(inbox()).toEqual(["Saturday", "Sunday"]);
+    const saturday = store
+      .getThreadsPage(accountId, "INBOX", 0, 50)
+      .messages.find((m) => m.subject === "Saturday")!;
+    expect(saturday).toMatchObject({ threadCount: 1, cc: "Ann <ann@example.com>" });
+    expect(
+      store.getThreadForReading(accountId, saturday.threadId, "me@riverbank.example"),
+    ).toHaveLength(1);
+
+    // As if cached before summaries fetched the delivery headers: the backfill reads them.
+    const ids = [...cached(bcc), ...cached(postfix)];
+    store.setDeliveredTo(
+      accountId,
+      ids.map((id) => ({ id, deliveredTo: [] })),
+    );
+    store.setKv(`imapDeliveredTo:${accountId}`, "");
+    // To and Cc alone: everything To mail@ is Mail's.
+    expect(inbox("me@riverbank.example")).toEqual([]);
+    expect(inbox("mail@riverbank.example")).toEqual(["Saturday", "Sunday"]);
+    expect(provider.needsBackfill!(accountId)).toBe(true);
+    await provider.backfill!(accountId, {
+      update: () => {},
+      bumpRevision: () => {},
+      assertActive: () => {},
+      newMail: async () => {},
+    });
+    expect(provider.needsBackfill!(accountId)).toBe(false);
+    expect(inbox("me@riverbank.example")).toEqual(["Saturday", "Sunday"]);
+    expect(inbox("mail@riverbank.example")).toEqual(["Saturday"]);
+  });
+
   it("sends, filing it in Sent (and, sent to yourself, it arrives)", async ({ skip }) => {
     if (!server().smtp) skip();
     const subject = `Note to self ${counter++}`;

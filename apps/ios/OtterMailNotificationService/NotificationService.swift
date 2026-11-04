@@ -41,11 +41,11 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
                     if let message {
                         content.title = String(message.sender.prefix(200))
                         if content.title.isEmpty { content.title = "New mail" }
-                        content.subtitle = String(message.subject.prefix(300))
+                        content.subtitle = PushState.subtitle(String(message.subject.prefix(300)), mailbox: config.name(event.email, alias: message.alias))
                         content.body = String(message.preview.prefix(500))
                         content.sound = .default
                         content.threadIdentifier = event.email + ":" + (message.threadId ?? message.id)
-                        content.userInfo["mailbox"] = event.email
+                        content.userInfo["mailbox"] = message.alias?.id ?? event.email
                         content.userInfo["message"] = message.id
                         if let thread = message.threadId { content.userInfo["thread"] = thread }
                     }

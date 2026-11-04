@@ -117,16 +117,23 @@ export function useExternalMailChanges(): void {
   );
 }
 
+// An alias mailbox's keys extend its account's, so prefix invalidations and patches reach them.
 export const queryKeys = {
   accounts: () => ["gmail:accounts"] as const,
   labels: (accountId: string) => ["gmail:labels", accountId] as const,
-  messages: (accountId: string, labelId?: string) =>
-    ["gmail:messages", accountId, labelId] as const,
+  aliasLabels: (accountId: string, alias: string) => ["gmail:labels", accountId, alias] as const,
+  messages: (accountId: string, labelId?: string, alias?: string) =>
+    alias
+      ? (["gmail:messages", accountId, labelId, alias] as const)
+      : (["gmail:messages", accountId, labelId] as const),
   search: (accountId: string, q: string, scope?: SearchScope | null) =>
     ["gmail:searchMessages", accountId, q, scope ?? null] as const,
   message: (accountId: string, messageId: string) =>
     ["gmail:message", accountId, messageId] as const,
-  thread: (accountId: string, threadId: string) => ["gmail:thread", accountId, threadId] as const,
+  thread: (accountId: string, threadId: string, alias?: string) =>
+    alias
+      ? (["gmail:thread", accountId, threadId, alias] as const)
+      : (["gmail:thread", accountId, threadId] as const),
   combinedMessages: (viewId: string, rules: ViewRule[]) =>
     ["gmail:combinedMessages", viewId, rules] as const,
   combinedCounts: (viewId: string, rules: ViewRule[]) =>
@@ -181,6 +188,8 @@ export function useUpdateAccount() {
                     : a.customPicture,
                 signature: params.signature !== undefined ? params.signature : a.signature,
                 sendAs: params.sendAs !== undefined ? params.sendAs : a.sendAs,
+                aliasMailboxes:
+                  params.aliasMailboxes !== undefined ? params.aliasMailboxes : a.aliasMailboxes,
               }
             : a,
         ),
@@ -196,12 +205,14 @@ export function useUpdateAccount() {
   });
 }
 
-export function useLabels(accountId: string | null) {
+export function useLabels(accountId: string | null, alias?: string) {
   return useQuery<MailLabel[]>({
-    queryKey: queryKeys.labels(accountId ?? ""),
+    queryKey: alias
+      ? queryKeys.aliasLabels(accountId ?? "", alias)
+      : queryKeys.labels(accountId ?? ""),
     queryFn: () => {
-      console.log("[hooks:useLabels] fetching labels", { accountId });
-      return mailApi.listLabels(accountId!);
+      console.log("[hooks:useLabels] fetching labels", { accountId, alias: Boolean(alias) });
+      return mailApi.listLabels(accountId!, alias);
     },
     enabled: accountId != null,
     staleTime: STALE_TIME,
@@ -314,7 +325,7 @@ export function usePruneThreadRows() {
   };
 }
 
-export function useMessages(accountId: string | null, labelId?: string) {
+export function useMessages(accountId: string | null, labelId?: string, alias?: string) {
   return useInfiniteQuery<
     ListMessagesResult,
     Error,
@@ -322,16 +333,18 @@ export function useMessages(accountId: string | null, labelId?: string) {
     ReturnType<typeof queryKeys.messages>,
     string | undefined
   >({
-    queryKey: queryKeys.messages(accountId ?? "", labelId),
+    queryKey: queryKeys.messages(accountId ?? "", labelId, alias),
     queryFn: ({ pageParam }) => {
       console.log("[hooks:useMessages] fetching messages", {
         accountId,
         labelId,
+        alias: Boolean(alias),
         pageToken: pageParam,
       });
       return mailApi.listMessages({
         accountId: accountId!,
         labelIds: labelId ? [labelId] : undefined,
+        alias,
         pageToken: pageParam,
         maxResults: 50,
       });
@@ -525,10 +538,10 @@ export function useLabelResolver(
   return (accountId, labelId) => (accountId ? map.get(`${accountId}:${labelId}`) : undefined);
 }
 
-export function useThread(accountId: string | null, threadId: string | null) {
+export function useThread(accountId: string | null, threadId: string | null, alias?: string) {
   return useQuery<MessageSummary[]>({
-    queryKey: queryKeys.thread(accountId ?? "", threadId ?? ""),
-    queryFn: () => mailApi.getThread(accountId!, threadId!),
+    queryKey: queryKeys.thread(accountId ?? "", threadId ?? "", alias),
+    queryFn: () => mailApi.getThread(accountId!, threadId!, alias),
     enabled: accountId != null && threadId != null,
     staleTime: STALE_TIME,
   });
@@ -536,11 +549,12 @@ export function useThread(accountId: string | null, threadId: string | null) {
 
 export function useThreads(
   threads: { accountId: string; threadId: string }[],
+  alias?: string,
 ): Map<string, MessageSummary[]> {
   const results = useQueries({
     queries: threads.map((t) => ({
-      queryKey: queryKeys.thread(t.accountId, t.threadId),
-      queryFn: () => mailApi.getThread(t.accountId, t.threadId),
+      queryKey: queryKeys.thread(t.accountId, t.threadId, alias),
+      queryFn: () => mailApi.getThread(t.accountId, t.threadId, alias),
       staleTime: STALE_TIME,
     })),
   });
@@ -1151,7 +1165,7 @@ export function useModifyThread() {
         (old: InfiniteData<ListMessagesResult> | undefined) =>
           patchMessagesInInfiniteData(old, inThread, applyPatch),
       );
-      qc.setQueryData<MessageSummary[]>(threadKey, (old) => old?.map(applyPatch));
+      qc.setQueriesData<MessageSummary[]>({ queryKey: threadKey }, (old) => old?.map(applyPatch));
 
       // Thread-scoped removals also drop the row from lists the thread can no
       // longer match, so archive/move/junk clear the view instantly like trash.
@@ -1234,6 +1248,8 @@ export function useModifyThread() {
       for (const [key, data] of context.prevMailSearchQueries) qc.setQueryData(key, data);
       for (const [key, data] of context.prevMessageQueries) qc.setQueryData(key, data);
       if (context.prevThread) qc.setQueryData(context.threadKey, context.prevThread);
+      // The alias mailboxes' copies were patched by prefix too.
+      void qc.invalidateQueries({ queryKey: context.threadKey });
       if (context.prevLabels) qc.setQueryData(context.labelsKey, context.prevLabels);
     },
     onSuccess: (_data, params) => {

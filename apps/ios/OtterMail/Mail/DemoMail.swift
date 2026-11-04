@@ -7,15 +7,16 @@ import Foundation
  * the mail always looks recent.
  */
 enum DemoMail {
-    static func load(now: Date = .now) -> (mailboxes: [Mailbox], threads: [MailThread]) {
+    static func load(now: Date = .now) -> (mailboxes: [Mailbox], threads: [MailThread], addresses: MailAddresses) {
         guard
             let url = Bundle.main.url(forResource: "DemoMailboxes", withExtension: "json"),
             let data = try? Data(contentsOf: url),
             let seed = try? JSONDecoder().decode([SeedAccount].self, from: data)
-        else { return ([], []) }
+        else { return ([], [], MailAddresses()) }
 
         var mailboxes: [Mailbox] = []
         var threads: [MailThread] = []
+        var addresses = MailAddresses()
         for account in seed {
             let me = Person(name: account.name, email: account.email)
             mailboxes.append(Mailbox(
@@ -24,8 +25,12 @@ enum DemoMail {
                 displayName: account.displayName,
                 color: account.color,
                 signature: account.signature,
-                labels: account.labels.map { MailLabel(id: $0.name, name: $0.name, color: $0.color?.backgroundColor) }
+                labels: account.labels.map { MailLabel(id: $0.name, name: $0.name, color: $0.color?.backgroundColor) },
+                hasArchive: account.imap == nil ? nil : true,
+                imap: account.imap
             ))
+            if let sendAs = account.sendAs { addresses.sendAs[account.email.lowercased()] = sendAs }
+            if let aliases = account.aliasMailboxes { addresses.aliasMailboxes[account.email.lowercased()] = aliases }
             for (t, thread) in account.threads.enumerated() {
                 let firstSender = thread.messages.compactMap(\.from).first
                 let threadID = "\(account.email)/\(t)"
@@ -60,7 +65,7 @@ enum DemoMail {
             mailboxes[0].customPicture = picture
         }
         #endif
-        return (mailboxes, threads)
+        return (mailboxes, threads, addresses)
     }
 
     private struct SeedAccount: Decodable {
@@ -71,6 +76,9 @@ enum DemoMail {
         var signature: String
         var labels: [SeedLabel]
         var threads: [SeedThread]
+        var imap: ImapSettings?
+        var sendAs: [String]?
+        var aliasMailboxes: [AliasMailbox]?
     }
 
     private struct SeedLabel: Decodable {

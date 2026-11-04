@@ -60,6 +60,7 @@ import {
   useAllAccountLabels,
   useDeleteThreadsForever,
   useLabelResolver,
+  useLabels,
   useSyncAccountLabels,
   useAccounts,
 } from "./hooks";
@@ -98,6 +99,7 @@ type MessageListProps = {
   renderFloatingReader?: (navigation: ReactNode, title: string) => ReactNode;
   headerLeading?: ReactNode;
   accountId: string;
+  alias?: string;
   labelId: string;
   combined: CombinedList | null;
   accountIds: string[];
@@ -782,6 +784,7 @@ export function MessageList({
   headerTrailing,
   renderFloatingReader,
   accountId,
+  alias,
   labelId,
   combined,
   accountIds,
@@ -816,7 +819,7 @@ export function MessageList({
   const searching = globalSearching;
   const searchQuery = search?.query ?? "";
 
-  const accountMessages = useMessages(isCombined || searching ? null : accountId, labelId);
+  const accountMessages = useMessages(isCombined || searching ? null : accountId, labelId, alias);
   const combinedMessages = useCombinedMessages(
     combined?.rules ?? [],
     combined?.viewId ?? "",
@@ -848,7 +851,10 @@ export function MessageList({
     isCombined ? (combined?.viewId ?? "") : `${accountId}:${ALL_MAIL_LABEL_ID}`,
     isCombined || allMailRules.length > 0,
   );
-  const activeLabel = resolveLabel(accountId, labelId);
+  const aliasLabels = useLabels(alias && !isCombined ? accountId : null, alias).data;
+  const activeLabel = alias
+    ? aliasLabels?.find((l) => l.id === labelId)
+    : resolveLabel(accountId, labelId);
   useLayoutEffect(() => {
     if (viewQueryRef && !search) {
       const nameOf = (owner: string, id: string) => resolveLabel(owner, id)?.name ?? null;
@@ -924,6 +930,7 @@ export function MessageList({
       accountId: m.accountId ?? accountId,
       threadId: m.threadId || m.id,
     })),
+    alias,
   );
   const threadMessagesOf = (m: MessageSummary): MessageSummary[] =>
     expanded.has(threadKey(m)) ? (threadsByKey.get(threadKey(m)) ?? []).toReversed() : [];

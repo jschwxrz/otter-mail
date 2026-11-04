@@ -13,6 +13,8 @@
  * offered to copy (its Copy & trash button: the mail goes once the code is used).
  */
 
+import { aliasMailboxName, validAliasMailboxes } from "@otter-mail/contracts";
+
 import {
   findVerificationCode,
   mentionsVerificationCode,
@@ -20,7 +22,8 @@ import {
 import { logger } from "../logger.js";
 import { platform } from "../platform.js";
 import { providerFor } from "../providers/index.js";
-import { getAccount } from "./account-store.js";
+import { getAccount, listAccounts } from "./account-store.js";
+import { aliasMailboxFor } from "./alias-mailboxes.js";
 import { turnedOffMailboxes } from "./mail-sync.js";
 import { getSettings } from "./settings-store.js";
 import * as mailStore from "./mail-store.js";
@@ -31,6 +34,19 @@ const MAX_INDIVIDUAL_NOTIFICATIONS = 3;
 
 function accountLabel(account: MailAccount): string {
   return account.displayName?.trim() || account.name || account.email;
+}
+
+/** Message-IDs notified lately: copies of one message arrive seconds apart, maybe in two syncs. */
+const notified = new Map<string, number>();
+const NOTIFIED_MS = 15 * 60_000;
+
+export function firstCopy(accountId: string, m: MessageSummary, now = Date.now()): boolean {
+  for (const [key, at] of notified) if (now - at > NOTIFIED_MS) notified.delete(key);
+  if (!m.messageIdHeader) return true;
+  const key = `${accountId}:${m.messageIdHeader}`;
+  if (notified.has(key)) return false;
+  notified.set(key, now);
+  return true;
 }
 
 async function codeIn(accountId: string, m: MessageSummary): Promise<string | undefined> {
@@ -61,28 +77,39 @@ export async function notifyNewMail(
     const account = await getAccount(accountId);
     if (!account) return;
 
-    const ownEmail = account.email.toLowerCase();
+    const own = new Set([account.email, ...(account.sendAs ?? [])].map((a) => a.toLowerCase()));
     const cutoff = prevLastSyncAt ?? 0;
     const fresh = added.filter(
       (m) =>
         m.date > cutoff &&
         m.unread &&
-        m.fromEmail.toLowerCase() !== ownEmail &&
-        (settings.notificationsMode === "all" || m.labelIds.includes("INBOX")),
+        !own.has(m.fromEmail.toLowerCase()) &&
+        (settings.notificationsMode === "all" || m.labelIds.includes("INBOX")) &&
+        firstCopy(accountId, m),
     );
     if (fresh.length === 0) return;
 
+    const off = turnedOffMailboxes();
+    const aliases = validAliasMailboxes(
+      account,
+      (await listAccounts()).map((a) => a.email),
+    ).filter((alias) => !off.has(alias.address.toLowerCase()));
     const subtitle = accountLabel(account);
     if (fresh.length <= MAX_INDIVIDUAL_NOTIFICATIONS) {
       for (const m of fresh) {
         const about = m.subject || m.snippet;
         const code = await codeIn(accountId, m);
+        const alias = aliasMailboxFor(aliases, m);
         platform().notify({
           title: m.fromName || m.fromEmail,
-          subtitle,
+          subtitle: alias ? aliasMailboxName(alias) : subtitle,
           // The code in the text too, for notifications without buttons (Linux, browsers).
           body: code && !about.includes(code) ? `${about}\n${code}` : about,
-          open: { accountId, messageId: m.id },
+          open: {
+            accountId,
+            messageId: m.id,
+            ...(alias ? { mailbox: alias.address.toLowerCase() } : {}),
+          },
           code,
         });
       }

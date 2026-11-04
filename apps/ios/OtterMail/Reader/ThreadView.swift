@@ -38,8 +38,9 @@ struct ThreadView: View {
                     .padding(.bottom, 20)
                     .padding(.horizontal, MessageView.inset)
 
-                ForEach(thread.messages) { message in
-                    let open = message.id == thread.messages.last?.id || message.unread || expanded.contains(message.id)
+                let messages = thread.distinctMessages(preferring: store.alias(place.scope)?.email)
+                ForEach(messages) { message in
+                    let open = message.id == messages.last?.id || message.unread || expanded.contains(message.id)
                     MessageView(message: message, mailbox: mailbox, open: open) {
                         if message.draft {
                             draft = .resume(message, in: thread)
@@ -47,7 +48,7 @@ struct ThreadView: View {
                             withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) { _ = expanded.insert(message.id) }
                         }
                     }
-                    if message.id != thread.messages.last?.id {
+                    if message.id != messages.last?.id {
                         Spacer().frame(height: 20)
                     }
                 }
@@ -73,14 +74,14 @@ struct ThreadView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu("More", systemImage: "ellipsis") {
                     Button("Reply all", systemImage: "arrowshape.turn.up.left.2") {
-                        draft = .reply(to: thread, in: mailbox, all: true)
+                        draft = store.reply(to: thread, in: place.scope, all: true)
                     }
                     Button("Forward", systemImage: "arrowshape.turn.up.right") {
-                        draft = .forward(thread, in: mailbox)
+                        draft = store.forward(thread, in: place.scope)
                     }
                     if let unsubscribe = Unsubscribe(thread.sent.last?.headers ?? [:]) {
                         Button("Unsubscribe", systemImage: "hand.raised") {
-                            Task { await unsubscribe.run(from: mailbox, compose: { draft = $0 }) }
+                            Task { await unsubscribe.run(from: shown(mailbox), compose: { draft = $0 }) }
                         }
                     }
                     Divider()
@@ -105,12 +106,16 @@ struct ThreadView: View {
         }
     }
 
+    private func shown(_ mailbox: Mailbox) -> Mailbox {
+        store.alias(place.scope).flatMap { $0.source == mailbox.email ? $0 : nil } ?? mailbox
+    }
+
     @ViewBuilder
     private func labels(_ thread: MailThread, _ mailbox: Mailbox) -> some View {
         let userLabels = mailbox.labels.filter { thread.labels.contains($0.id) }
         HStack(spacing: 6) {
-            Circle().fill(Color(hex: mailbox.color)).frame(width: 7, height: 7)
-            Text(mailbox.displayName)
+            Circle().fill(Color(hex: shown(mailbox).color)).frame(width: 7, height: 7)
+            Text(shown(mailbox).displayName)
                 .font(.inter(.footnote))
                 .foregroundStyle(palette.muted)
                 .padding(.trailing, 2)
@@ -155,7 +160,7 @@ struct ThreadView: View {
             Spacer()
 
             Button("Reply to \(replyName(thread, mailbox))", systemImage: "arrowshape.turn.up.left") {
-                draft = .reply(to: thread, in: mailbox, all: false)
+                draft = store.reply(to: thread, in: place.scope, all: false)
             }
             .labelStyle(.iconOnly)
             .font(.system(size: 19))
@@ -164,13 +169,13 @@ struct ThreadView: View {
             .glassEffect(.regular.interactive(), in: .circle)
             .contextMenu {
                 Button("Reply", systemImage: "arrowshape.turn.up.left") {
-                    draft = .reply(to: thread, in: mailbox, all: false)
+                    draft = store.reply(to: thread, in: place.scope, all: false)
                 }
                 Button("Reply all", systemImage: "arrowshape.turn.up.left.2") {
-                    draft = .reply(to: thread, in: mailbox, all: true)
+                    draft = store.reply(to: thread, in: place.scope, all: true)
                 }
                 Button("Forward", systemImage: "arrowshape.turn.up.right") {
-                    draft = .forward(thread, in: mailbox)
+                    draft = store.forward(thread, in: place.scope)
                 }
             }
             .accessibilityHint("Touch and hold for Reply all or Forward")
@@ -181,7 +186,7 @@ struct ThreadView: View {
 
     private func replyName(_ thread: MailThread, _ mailbox: Mailbox) -> String {
         let last = thread.sent.last ?? thread.latest
-        let person = last.from.isAddress(mailbox.email) ? last.to.first ?? last.from : last.from
+        let person = store.isMine(last.from, in: mailbox.email) ? last.to.first ?? last.from : last.from
         return person.label.split(separator: " ").first.map(String.init) ?? person.label
     }
 

@@ -7,7 +7,7 @@ import { closeImap, FolderChanged, failedServer, tier } from "./connection.js";
 import { forgetFolders } from "./folders.js";
 import * as reads from "./reads.js";
 import * as send from "./send.js";
-import { readLabels, syncImap } from "./sync.js";
+import { backfillDeliveredTo, needsDeliveredTo, readLabels, syncImap } from "./sync.js";
 import { watchInbox } from "./watch.js";
 import * as writes from "./writes.js";
 
@@ -58,6 +58,8 @@ export const imapProvider: MailProvider = {
   },
 
   sync: syncImap,
+  needsBackfill: needsDeliveredTo,
+  backfill: backfillDeliveredTo,
   background: (lane, fn) => tier().run(lane, fn),
   errorKind,
   describeError,

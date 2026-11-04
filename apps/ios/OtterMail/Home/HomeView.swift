@@ -30,7 +30,7 @@ struct HomeView: View {
 
     var body: some View {
         mail
-            .onChange(of: store.shownMailboxes.map(\.email), initial: true) { _, shown in
+            .onChange(of: store.shownScopes.map(\.email), initial: true) { _, shown in
                 if !shown.contains(place.scope) { place = Place(scope: shown.first ?? "") }
             }
             .onChange(of: session.opening, initial: true) { _, _ in openNotification() }
@@ -155,7 +155,7 @@ struct HomeView: View {
     }
 
     private func compose(to: String = "") {
-        let mailbox = store.mailbox(place.scope) ?? store.shownMailboxes.first
+        let mailbox = store.mailbox(for: place.scope) ?? store.shownMailboxes.first
         guard let mailbox else { return }
         setMenu(open: false)
         draft = .new(from: mailbox, to: to)
@@ -168,14 +168,17 @@ struct HomeView: View {
             guard session.opening == destination else { return }
             session.opening = nil
             guard destination.userId == nil || destination.userId == session.user?.id else { return }
-            if let email = destination.email, let mailbox = store.mailboxes.first(where: { $0.email.lowercased() == email.lowercased() }) {
-                place = Place(scope: mailbox.email)
+            // An alias mailbox turned off since opens in its parent.
+            let mailbox = destination.email.flatMap { email in
+                store.mailboxes.first { $0.email.lowercased() == email.lowercased() }
+                    ?? store.alias(email).flatMap { alias in store.shownScopes.contains(alias) ? alias : store.mailbox(alias.source) }
             }
+            if let mailbox { place = Place(scope: mailbox.email) }
             setMenu(open: false)
             agentOpen = false
             searchOpen = false
             if let thread = destination.thread, let loaded = store.thread(thread),
-               destination.email == nil || loaded.mailbox.lowercased() == destination.email?.lowercased() {
+               destination.email == nil || loaded.mailbox.lowercased() == (mailbox?.source ?? destination.email)?.lowercased() {
                 path = [thread]
             } else { path = [] }
         }

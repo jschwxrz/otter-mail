@@ -18,6 +18,7 @@ nonisolated enum VerifiedNotification {
         var sender: String
         var subject: String
         var preview: String
+        var alias: AliasMailbox? = nil
     }
 
     static func enrich(_ metadata: Metadata, configuration: PushState.Configuration,
@@ -37,7 +38,8 @@ nonisolated enum VerifiedNotification {
         case "imap":
             guard let settings = configuration.imapSettings?[metadata.email.lowercased()],
                   let password = Keychain.get("imap-password:" + metadata.email.lowercased()) else { return nil }
-            return try await imap(metadata, settings: settings, password: password)
+            return try await imap(metadata, settings: settings, password: password,
+                                  aliases: configuration.aliases?[metadata.email.lowercased()] ?? [])
         default: return nil
         }
     }
@@ -90,7 +92,7 @@ nonisolated enum VerifiedNotification {
         guard list.count > 6, list[0].text?.uppercased() == "TEXT", ["PLAIN", "HTML"].contains(list[1].text?.uppercased() ?? "") else { return [] }
         return [.init(path: path.isEmpty ? "TEXT" : path, html: list[1].text?.uppercased() == "HTML", encoding: list[5].text ?? "", charset: list[2].pairs["CHARSET"]?.text)]
     }
-    private static func imap(_ metadata: Metadata, settings: ImapSettings, password: String) async throws -> Message? {
+    private static func imap(_ metadata: Metadata, settings: ImapSettings, password: String, aliases: [AliasMailbox]) async throws -> Message? {
         guard let uid = UInt32(metadata.messageId), uid > 0, let validity = metadata.uidValidity,
               let folder = metadata.folder, !folder.isEmpty else { return nil }
         let client = try await ImapClient.connect(settings.imap, username: settings.username, auth: .password(password), maxResponseBytes: 65_536)
@@ -98,7 +100,8 @@ nonisolated enum VerifiedNotification {
         return try await withTaskCancellationHandler {
             let selected = try await client.select(folder, readOnly: true)
             guard selected.uidValidity == validity else { return nil }
-            let responses = try await client.fetch(String(uid), "(UID FLAGS ENVELOPE BODYSTRUCTURE)")
+            let delivered = aliases.isEmpty ? "" : " BODY.PEEK[HEADER.FIELDS (\(deliveredToFields))]"
+            let responses = try await client.fetch(String(uid), "(UID FLAGS ENVELOPE BODYSTRUCTURE\(delivered))")
             guard let fields = responses.first(where: { $0.kind == "FETCH" })?.values.first?.pairs,
                   fields["UID"]?.number == UInt64(uid) else { return nil }
             let flags = Set(fields["FLAGS"]?.list.compactMap { $0.text?.lowercased() } ?? [])
@@ -126,7 +129,18 @@ nonisolated enum VerifiedNotification {
                     }
                 }
             }
-            return .init(id: "\(validity):\(uid):\(folder)", threadId: nil, sender: sender, subject: subject, preview: preview)
+            return .init(id: "\(validity):\(uid):\(folder)", threadId: nil, sender: sender, subject: subject, preview: preview,
+                         alias: alias(envelope, fields, among: aliases))
         } onCancel: { client.close() }
+    }
+
+    static let deliveredToFields = "ORIGINAL-RECIPIENT DELIVERED-TO X-ORIGINAL-TO"
+
+    static func alias(_ envelope: [ImapValue], _ fields: [String: ImapValue], among aliases: [AliasMailbox]) -> AliasMailbox? {
+        guard !aliases.isEmpty else { return nil }
+        let addresses = { (i: Int) in i < envelope.count ? imapAddresses(envelope[i]).map(\.email) : [] }
+        let block = fields.first { $0.key.hasPrefix("BODY[HEADER") }?.value.text ?? ""
+        let deliveredTo = AliasMailbox.deliveredTo { MailDecoding.header($0, in: block) }
+        return AliasMailbox.announced(to: addresses(5), cc: addresses(6), deliveredTo: deliveredTo, among: aliases)
     }
 }

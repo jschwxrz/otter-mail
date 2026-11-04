@@ -3,6 +3,8 @@ import Foundation
 nonisolated struct Draft: Identifiable, Hashable, Codable {
     var id = UUID()
     var from: String
+    /** The From address, lower-cased, when it isn't `from` (the mailbox, whose server sends it). */
+    var address: String? = nil
     var to = ""
     var cc = ""
     var bcc = ""
@@ -60,20 +62,24 @@ nonisolated struct Draft: Identifiable, Hashable, Codable {
     }
 
     @MainActor static func new(from mailbox: Mailbox, to: String = "") -> Draft {
-        Draft(from: mailbox.email, to: to, body: signatureBlock(mailbox))
+        Draft(from: mailbox.source, address: mailbox.parent == nil ? nil : mailbox.email, to: to, body: signatureBlock(mailbox))
     }
 
-    @MainActor static func reply(to thread: MailThread, in mailbox: Mailbox, all: Bool) -> Draft {
+    @MainActor static func reply(to thread: MailThread, in mailbox: Mailbox, address: String? = nil, mine: Set<String> = [], all: Bool) -> Draft {
         let last = thread.sent.last ?? thread.latest
-        let mine = last.from.isAddress(mailbox.email)
-        var to = mine ? last.to : [last.from]
+        let address = (address ?? mailbox.email).lowercased()
+        let mine = mine.union([address, mailbox.source.lowercased()])
+        let isMine = { (person: Person) in mine.contains(person.email.lowercased()) }
+        let fromMe = isMine(last.from)
+        var to = fromMe ? last.to : [last.from]
         var cc: [Person] = []
         if all {
-            let others = (last.to + last.cc).filter { $0.email != mailbox.email && !to.contains($0) }
-            if mine { to += others } else { cc = others }
+            let others = (last.to + last.cc).filter { !isMine($0) && !to.contains($0) }
+            if fromMe { to += others } else { cc = others }
         }
         return Draft(
-            from: mailbox.email,
+            from: mailbox.source,
+            address: address == mailbox.source.lowercased() ? nil : address,
             to: to.map(format).joined(separator: ", "),
             cc: cc.map(format).joined(separator: ", "),
             subject: thread.subject.hasPrefix("Re:") ? thread.subject : "Re: \(thread.subject)",
@@ -82,7 +88,12 @@ nonisolated struct Draft: Identifiable, Hashable, Codable {
         )
     }
 
-    @MainActor static func forward(_ thread: MailThread, in mailbox: Mailbox) -> Draft {
+    static func replyAddress(_ message: Message, _ addresses: [String]) -> String? {
+        let candidates = [message.from.email] + message.to.map(\.email) + message.cc.map(\.email) + message.deliveredTo
+        return candidates.map { $0.lowercased() }.first(where: addresses.contains) ?? addresses.first
+    }
+
+    @MainActor static func forward(_ thread: MailThread, in mailbox: Mailbox, address: String? = nil) -> Draft {
         let last = thread.sent.last ?? thread.latest
         let header = """
             ---------- Forwarded message ---------
@@ -90,8 +101,10 @@ nonisolated struct Draft: Identifiable, Hashable, Codable {
             Date: \(last.date.formatted(date: .abbreviated, time: .shortened))
             Subject: \(thread.subject)
             """
+        let address = (address ?? mailbox.email).lowercased()
         return Draft(
-            from: mailbox.email,
+            from: mailbox.source,
+            address: address == mailbox.source.lowercased() ? nil : address,
             files: last.attachments.map { DraftFile(filename: $0.filename, mimeType: $0.mimeType, size: $0.size, original: $0, messageID: last.id, sourceMailbox: thread.mailbox) },
             subject: thread.subject.hasPrefix("Fwd:") ? thread.subject : "Fwd: \(thread.subject)",
             body: signatureBlock(mailbox) + "\n\n\(header)\n\n\(last.text)"
@@ -101,6 +114,7 @@ nonisolated struct Draft: Identifiable, Hashable, Codable {
     static func resume(_ message: Message, in thread: MailThread) -> Draft {
         Draft(
             from: thread.mailbox,
+            address: message.from.email.isEmpty || message.from.isAddress(thread.mailbox) ? nil : message.from.email.lowercased(),
             to: message.to.map(format).joined(separator: ", "),
             cc: message.cc.map(format).joined(separator: ", "),
             bcc: message.headers["Bcc"] ?? "",

@@ -140,12 +140,22 @@ struct ComposeView: View {
         VStack(spacing: 8) {
             HStack(spacing: 10) {
                 Text("From").foregroundStyle(palette.muted).frame(width: 44, alignment: .leading)
-                if store.shownMailboxes.count > 1 && draft.messageID == nil && draft.threadID == nil {
-                    Picker("From", selection: $draft.from) {
-                        ForEach(store.shownMailboxes) { Text($0.email).tag($0.email) }
+                let senders = senders
+                if senders.count > 1 {
+                    Picker("From", selection: Binding(get: { sender(in: senders) }, set: pick)) {
+                        let mailboxes = senders.map(\.mailbox).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+                        if mailboxes.count > 1 {
+                            ForEach(mailboxes, id: \.self) { mailbox in
+                                Section(store.mailbox(mailbox)?.displayName ?? mailbox) {
+                                    ForEach(senders.filter { $0.mailbox == mailbox }, id: \.self) { Text($0.address).tag($0) }
+                                }
+                            }
+                        } else {
+                            ForEach(senders, id: \.self) { Text($0.address).tag($0) }
+                        }
                     }
                     .labelsHidden().tint(palette.text).padding(.leading, -11)
-                } else { Text(draft.from).foregroundStyle(palette.text) }
+                } else { Text(draft.address ?? draft.from).foregroundStyle(palette.text) }
                 Spacer()
             }.frame(minHeight: 46)
             Divider().overlay(palette.border)
@@ -157,6 +167,35 @@ struct ComposeView: View {
                 if !showCc && draft.cc.isEmpty { Button("Cc") { showCc = true } }
                 if !showBcc && draft.bcc.isEmpty { Button("Bcc") { showBcc = true } }
             }.font(.inter(.subheadline)).foregroundStyle(palette.muted)
+        }
+    }
+
+    private struct Sender: Hashable {
+        var mailbox: String
+        var address: String
+    }
+
+    private var senders: [Sender] {
+        let mailboxes = draft.messageID == nil && draft.threadID == nil ? store.shownMailboxes : store.mailbox(draft.from).map { [$0] } ?? []
+        return mailboxes.flatMap { mailbox in store.addresses(of: mailbox.email).map { Sender(mailbox: mailbox.email, address: $0) } }
+    }
+
+    private func sender(in senders: [Sender]) -> Sender {
+        let picked = Sender(mailbox: draft.from, address: (draft.address ?? draft.from).lowercased())
+        return senders.contains(picked) ? picked : Sender(mailbox: draft.from, address: draft.from.lowercased())
+    }
+
+    /** A signature not in the body yet goes where `Draft.new` puts it, while the body is untouched. */
+    private func pick(_ sender: Sender) {
+        let before = Signature.plainText(store.signature(of: draft))
+        draft.from = sender.mailbox
+        draft.address = sender.address == sender.mailbox.lowercased() ? nil : sender.address
+        let after = Signature.plainText(store.signature(of: draft))
+        guard before != after else { return }
+        if !before.isEmpty, let range = draft.body.range(of: before) {
+            draft.body.replaceSubrange(range, with: after)
+        } else if before.isEmpty, draft.body == initialDraft.body {
+            draft.body = "\n\n\(after)" + draft.body
         }
     }
 

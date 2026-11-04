@@ -24,7 +24,10 @@ import {
 import { AgentIcon } from "./agent-icon";
 import { IconBtn, HintTooltip, cn } from "./ui";
 import { getAccountDisplayName } from "./account-style";
-import { useAllAccountLabels } from "./hooks";
+import { useQueries } from "@tanstack/react-query";
+import { aliasMailboxLook, type AliasMailboxEntry } from "./alias-mailboxes";
+import { mailApi } from "./api";
+import { queryKeys, useAllAccountLabels } from "./hooks";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,7 +38,8 @@ import {
 import { allWorkspaces } from "../extensions/workspaces";
 import { useRecentlyViewed, type RecentIcon } from "../recently-viewed";
 import { OtterCalendarIcon } from "./app-icons";
-import type { MailAccount } from "./types";
+import type { MailAccount, MailLabel } from "./types";
+import type { MailboxTab } from "../mailboxes";
 import type { KeybindingCommand } from "../keybindings/commands";
 import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
 import { features } from "../features";
@@ -296,25 +300,34 @@ export type MailboxOption = {
   shortcut: string;
 };
 
-export function useMailboxOptions(accounts: MailAccount[]): MailboxOption[] {
+export function useMailboxOptions(tabs: MailboxTab[]): MailboxOption[] {
   const { resolved: keybindings } = useKeybindingsState();
   const jump = (digit: number) =>
     shortcutLabelFor(keybindings, `mailbox.jump.${digit}` as KeybindingCommand) ?? "";
-  return accounts.map((account, i) => ({
-    id: account.id,
-    account,
-    name: getAccountDisplayName(account),
+  return tabs.map((tab, i) => ({
+    id: tab.id,
+    account: tab.alias ? aliasMailboxLook(tab.alias) : tab.account,
+    name: tab.alias ? tab.alias.name : getAccountDisplayName(tab.account),
     shortcut: jump(i + 1),
   }));
 }
 
-export function useInboxUnread(accounts: MailAccount[]): Record<string, number> {
-  return Object.fromEntries(
-    useAllAccountLabels(accounts.map((a) => a.id)).map(({ accountId, labels }) => [
+export function useInboxUnread(accounts: MailAccount[], aliases: AliasMailboxEntry[] = []) {
+  const inbox = (labels: MailLabel[]) => labels.find((l) => l.id === "INBOX")?.unread ?? 0;
+  const aliasLabels = useQueries({
+    queries: aliases.map((alias) => ({
+      queryKey: queryKeys.aliasLabels(alias.parent.id, alias.id),
+      queryFn: () => mailApi.listLabels(alias.parent.id, alias.id),
+      staleTime: 30_000,
+    })),
+  });
+  return Object.fromEntries([
+    ...useAllAccountLabels(accounts.map((a) => a.id)).map(({ accountId, labels }) => [
       accountId,
-      labels.find((l) => l.id === "INBOX")?.unread ?? 0,
+      inbox(labels),
     ]),
-  );
+    ...aliases.map((alias, i) => [alias.id, inbox(aliasLabels[i]?.data ?? [])]),
+  ]) as Record<string, number>;
 }
 
 export function TitleTrailing({ showPanelToggle }: { showPanelToggle: boolean }) {

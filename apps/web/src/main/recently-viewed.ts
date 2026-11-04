@@ -16,6 +16,7 @@ import { useLabels, useMessage } from "./mail/hooks";
 import { isBlank, useChats } from "./mail/chat-store";
 import { folderName, labelDisplayName } from "./mail/label-names";
 import { capabilitiesOf } from "./mail/capabilities";
+import type { AliasMailboxEntry } from "./mail/alias-mailboxes";
 import type { MailAccount, MailView } from "./mail/types";
 import type { SettingsPane } from "./mail/api";
 import { SETTINGS_SECTION_LABELS } from "./settings/settings-search";
@@ -112,6 +113,7 @@ export function useRecordRecentlyViewed({
   messageId,
   readerAccount,
   accounts,
+  aliases,
   views,
 }: {
   ready: boolean;
@@ -124,6 +126,7 @@ export function useRecordRecentlyViewed({
   messageId: string | null;
   readerAccount: string | null;
   accounts: MailAccount[];
+  aliases: AliasMailboxEntry[];
   views: MailView[];
 }): RecentPlace | null {
   const inSettings = settingsPane !== null;
@@ -184,12 +187,15 @@ export function useRecordRecentlyViewed({
       };
     }
   } else if (mailbox && label !== SEARCH_MAILBOX) {
-    const account = accounts.find((a) => a.id === mailbox);
-    const context = account
-      ? getAccountDisplayName(account)
-      : isViewSpaceId(mailbox)
-        ? "Views"
-        : null;
+    const alias = aliases.find((a) => a.id === mailbox);
+    const account = accounts.find((a) => a.id === mailbox) ?? alias?.parent;
+    const context = alias
+      ? alias.name
+      : account
+        ? getAccountDisplayName(account)
+        : isViewSpaceId(mailbox)
+          ? "Views"
+          : null;
     const view = views.find((v) => v.id === (isViewSpaceId(mailbox) ? mailbox : label));
     const ownLabel = ownLabels?.find((l) => l.id === label);
     const capabilities = capabilitiesOf(account);

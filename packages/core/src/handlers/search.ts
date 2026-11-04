@@ -11,7 +11,9 @@
 import { handle } from "../ipc.js";
 import { logger } from "../logger.js";
 import { providerFor } from "../providers/index.js";
+import { resolveMailbox } from "../services/alias-mailboxes.js";
 import * as mailStore from "../services/mail-store.js";
+import type { AliasScope } from "../services/mail-store.js";
 import { runAsTask } from "./ipc-budget.js";
 import type { MessageSummary } from "../types.js";
 
@@ -27,13 +29,14 @@ type SearchResult = {
 };
 
 async function searchAccount(
-  accountId: string,
+  mailbox: string,
   q: string,
   cursor: string | undefined,
 ): Promise<{ rows: MessageSummary[]; next: string | null; estimate: number }> {
+  const { accountId, alias } = await resolveMailbox(mailbox);
   const provider = providerFor(accountId);
-  if (!provider.search) {
-    const local = searchLocal(accountId, q);
+  if (!provider.search || alias) {
+    const local = searchLocal(accountId, q, alias);
     return { rows: local, next: null, estimate: local.length };
   }
   const page = await provider.search(accountId, q, cursor, PAGE_SIZE);
@@ -136,7 +139,7 @@ function matches(accountId: string, m: MessageSummary, op: Operator): boolean {
  * `is:unread`, `has:attachment`, `newer_than:`…) applied to what it finds, so
  * the search bar and its chips work the same on mailboxes without server search.
  */
-function searchLocal(accountId: string, q: string): MessageSummary[] {
+function searchLocal(accountId: string, q: string, alias?: AliasScope): MessageSummary[] {
   const ops = operatorsOf(q);
   const labelId = ops
     .filter((op) => !op.negated)
@@ -152,6 +155,7 @@ function searchLocal(accountId: string, q: string): MessageSummary[] {
   const attachments = ops.some((op) => op.key === "has" && op.value === "attachment");
   const found = mailStore.searchMessages(text, accountId, 0, 500, {
     labelId: labelId ?? undefined,
+    alias,
     hasAttachments: attachments || undefined,
   }).messages;
   return found

@@ -12,7 +12,7 @@ import { hasPendingLabelWrites } from "../../services/pending-label-writes.js";
 import * as store from "../../services/mail-store.js";
 import type { MailLabel, MessageSummary } from "../../types.js";
 import type { SyncContext } from "../provider.js";
-import { FolderGone, inFolder, withImap } from "./connection.js";
+import { FolderChanged, FolderGone, inFolder, withImap } from "./connection.js";
 import {
   FLAG_LABELS,
   labelsFor,
@@ -22,7 +22,7 @@ import {
   type Folder,
   type Folders,
 } from "./folders.js";
-import { SUMMARY_QUERY, toSummary } from "./messages.js";
+import { DELIVERY_HEADERS, deliveryAddressesOf, SUMMARY_QUERY, toSummary } from "./messages.js";
 
 const PAGE = 200;
 /** Without mod-sequences, flags are only compared when STATUS changed, or this often. */
@@ -43,6 +43,7 @@ interface FolderState {
 type SyncState = Record<string, FolderState>;
 
 const stateKey = (accountId: string) => `imapSync:${accountId}`;
+const deliveredToKey = (accountId: string) => `imapDeliveredTo:${accountId}`;
 
 function readState(accountId: string): SyncState {
   try {
@@ -71,6 +72,10 @@ export async function syncImap(accountId: string, ctx: SyncContext): Promise<voi
   writeState(accountId, state);
 
   const first = !store.getSyncState(accountId).fullSyncDone;
+  // Every summary of a mailbox new to the cache comes with its delivery headers.
+  if (first && store.countAllMessages(accountId) === 0) {
+    store.setKv(deliveredToKey(accountId), "1");
+  }
   const total = [...statuses.values()].reduce((sum, s) => sum + (s.messages ?? 0), 0);
   ctx.update(
     first
@@ -98,6 +103,45 @@ export async function syncImap(accountId: string, ctx: SyncContext): Promise<voi
   store.recountLabels(accountId, ["STARRED", "UNREAD"]);
   if (first) store.setSyncState(accountId, { fullSyncDone: true });
   await ctx.newMail(newMail);
+}
+
+export const needsDeliveredTo = (accountId: string): boolean =>
+  store.getKv(deliveredToKey(accountId)) !== "1";
+
+/** For mail cached before summaries fetched DELIVERY_HEADERS; in the backfill lane, behind sync. */
+export async function backfillDeliveredTo(accountId: string, ctx: SyncContext): Promise<void> {
+  for (const [path, folderState] of Object.entries(readState(accountId))) {
+    const cached = cachedUids(accountId, folderState.uidValidity, path);
+    const uids = [...cached.keys()];
+    for (let start = 0; start < uids.length; start += PAGE) {
+      let fetched: FetchedMessage[];
+      try {
+        fetched = await inFolder(
+          accountId,
+          path,
+          (client) => client.fetch(uids.slice(start, start + PAGE), { headers: DELIVERY_HEADERS }),
+          { uidValidity: folderState.uidValidity },
+        );
+      } catch (err) {
+        // Gone or recreated: the next sync refetches it. A folder the server won't read this
+        // way keeps To and Cc to go by, rather than holding up body downloads.
+        if (err instanceof FolderGone || err instanceof FolderChanged) break;
+        if (err instanceof ImapError && (err.status === "NO" || err.status === "BAD")) break;
+        throw err;
+      }
+      ctx.assertActive();
+      store.setDeliveredTo(
+        accountId,
+        fetched.flatMap((message) => {
+          const id = cached.get(message.uid);
+          return id ? [{ id, deliveredTo: deliveryAddressesOf(message.headers) }] : [];
+        }),
+      );
+    }
+  }
+  store.setKv(deliveredToKey(accountId), "1");
+  ctx.bumpRevision();
+  logger.info("imap-sync", "read the delivery headers of the mail cached before");
 }
 
 function labelsOf(folders: Folders, statuses: Map<string, MailboxStatus>): MailLabel[] {
