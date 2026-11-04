@@ -113,7 +113,9 @@ their own name, color and signature. The parent's tab still shows everything. IM
   `services/signatures.ts`); taking an address out of Send from takes its mailbox away. Its id
   (route, `mail:mailboxes`, a notification's `open.mailbox`) is its address lower-cased. Its
   default name is the address's local part, capitalized (me@ → "Me"); its default color comes
-  from the id, as an account's does.
+  from the id, as an account's does. A picture chosen for it is the parent's `aliasPictures[id]`,
+  kept with the parent's row on the relay (`alias_pictures`, at most 16) like a mailbox's own
+  picture, not in the capped preferences; it stays while its mailbox is off.
 - Order and on/off: the `mail:mailboxes` UI preference, keyed by its id. An alias mailbox always
   follows its parent (`arrangeMailboxes`, `apps/web/src/main/mailboxes.ts`); `order` ranks it
   among the parent's others, and a new one comes last of them. Turned off, or with its parent off,

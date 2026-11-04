@@ -4,6 +4,7 @@ import type {
   MailCapabilities,
   MailProviderKind,
 } from "@otter-mail/contracts";
+import type { AliasPictures } from "@otter-mail/contracts/relay";
 
 export interface MailAccount {
   id: string;
@@ -25,6 +26,8 @@ export interface MailAccount {
   sendAs?: string[];
   /** Those of `sendAs` shown as mailboxes of their own (IMAP). */
   aliasMailboxes?: AliasMailbox[];
+  /** Pictures chosen for its alias mailboxes, kept by address (lower-cased) even while one is off. */
+  aliasPictures?: AliasPictures;
   /** No usable Google sign-in; set by gmail:listAccounts, never stored. */
   signedOut?: boolean;
 }

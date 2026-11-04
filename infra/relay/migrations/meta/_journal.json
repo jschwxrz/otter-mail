@@ -85,6 +85,13 @@
       "when": 1793707581609,
       "tag": "0011_mailbox_pictures",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1793798566901,
+      "tag": "0012_alias_pictures",
+      "breakpoints": true
     }
   ]
 }

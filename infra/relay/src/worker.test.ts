@@ -26,7 +26,11 @@ import type {
   PreferencesResponse,
   RelayEvent,
 } from "@otter-mail/contracts/relay";
-import { MAILBOX_PICTURE_MAX_LENGTH, TUNNEL_CLOSE } from "@otter-mail/contracts/relay";
+import {
+  ALIAS_PICTURES_MAX,
+  MAILBOX_PICTURE_MAX_LENGTH,
+  TUNNEL_CLOSE,
+} from "@otter-mail/contracts/relay";
 import type {
   OutlookSignInResult,
   OutlookTokenResponse,
@@ -808,6 +812,7 @@ describe("linked accounts", () => {
         displayName: "Job",
         color: "#f00",
         customPicture: null,
+        aliasPictures: null,
       },
       {
         email: "home@example.com",
@@ -817,6 +822,7 @@ describe("linked accounts", () => {
         displayName: null,
         color: null,
         customPicture: null,
+        aliasPictures: null,
       },
     ]);
   });
@@ -848,6 +854,36 @@ describe("linked accounts", () => {
 
     expect((await call("PUT", route, token, { customPicture: null })).status).toBe(204);
     expect(await listAccounts(token)).toMatchObject([{ customPicture: null }]);
+  });
+
+  it("keeps an IMAP mailbox's alias mailboxes' pictures, by address", async () => {
+    const { token } = await signIn("aliases@example.com");
+    await link(token, "parent@example.com");
+    const route = "/v1/accounts/parent%40example.com";
+    const picture = `data:image/webp;base64,${"A".repeat(400)}`;
+    const pictures = { "me@riverbank.example": picture, "mail@riverbank.example": picture };
+    expect((await call("PUT", route, token, { aliasPictures: pictures })).status).toBe(204);
+    expect((await call("PUT", route, token, { color: "#00c7be" })).status).toBe(204);
+    expect(await listAccounts(token)).toMatchObject([{ aliasPictures: pictures }]);
+
+    const many = Object.fromEntries(
+      Array.from({ length: ALIAS_PICTURES_MAX + 1 }, (_, i) => [
+        `a${i}@riverbank.example`,
+        picture,
+      ]),
+    );
+    for (const refused of [
+      { "me@riverbank.example": "https://example.com/tracker.png" },
+      { "Me@Riverbank.example": picture },
+      { "not-an-address": picture },
+      many,
+    ]) {
+      expect((await call("PUT", route, token, { aliasPictures: refused })).status).toBe(400);
+    }
+    expect(await listAccounts(token)).toMatchObject([{ aliasPictures: pictures }]);
+
+    expect((await call("PUT", route, token, { aliasPictures: null })).status).toBe(204);
+    expect(await listAccounts(token)).toMatchObject([{ aliasPictures: null }]);
   });
 
   it("refuses to link without proof, or with proof for another address", async () => {
@@ -914,6 +950,7 @@ describe("IMAP mailboxes", () => {
         displayName: "Fastmail",
         color: null,
         customPicture: null,
+        aliasPictures: null,
       },
     ]);
   });
@@ -1040,6 +1077,7 @@ describe("Outlook mailboxes", () => {
         displayName: null,
         color: null,
         customPicture: null,
+        aliasPictures: null,
       })),
     );
     expect(await listAccounts(token)).toEqual([]);

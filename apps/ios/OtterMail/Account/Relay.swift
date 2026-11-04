@@ -18,6 +18,7 @@ final class Relay {
         var displayName: String?
         var color: String?
         var customPicture: String?
+        var aliasPictures: [String: String]?
     }
 
     struct Device: Decodable, Identifiable {

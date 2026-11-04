@@ -878,6 +878,7 @@ function AliasMailboxEditor({ entry, onStop }: { entry: AliasMailboxEntry; onSto
             />
           }
         />
+        <MailboxPictureRow account={aliasMailboxLook(entry)} alias={entry} />
         <SettingsRow
           title="Own mailbox"
           description={`Its mail stays in ${parentName}. Off, it's one of the addresses ${parentName} sends from.`}

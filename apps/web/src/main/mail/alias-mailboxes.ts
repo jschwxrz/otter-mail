@@ -30,7 +30,13 @@ export function aliasMailboxesOf(
 }
 
 export function aliasMailboxLook(entry: AliasMailboxEntry): MailAccount {
-  return { id: entry.id, email: entry.alias.address, name: entry.name, color: entry.color };
+  return {
+    id: entry.id,
+    email: entry.alias.address,
+    name: entry.name,
+    color: entry.color,
+    customPicture: entry.parent.aliasPictures?.[entry.id],
+  };
 }
 
 export function withAliasMailbox(

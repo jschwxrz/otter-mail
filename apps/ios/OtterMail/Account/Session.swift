@@ -258,6 +258,7 @@ final class Session {
             labels: existing?.labels ?? [],
             hasArchive: existing?.hasArchive,
             customPicture: existing?.customPicture,
+            aliasPictures: existing?.aliasPictures,
             imap: settings
         ))
         saveMailboxes()
@@ -362,6 +363,7 @@ final class Session {
                 hasArchive: existing?.hasArchive,
                 picture: account.picture,
                 customPicture: account.customPicture,
+                aliasPictures: account.aliasPictures,
                 signedOut: imap != nil ? ImapProvider.password(account.email) == nil
                     : outlook ? !microsoft.isSignedIn(account.email) : !google.isSignedIn(account.email),
                 imap: imap,

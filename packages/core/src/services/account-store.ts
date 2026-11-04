@@ -6,6 +6,7 @@
  */
 
 import type { AliasMailbox, MailProviderKind } from "@otter-mail/contracts";
+import type { AliasPictures } from "@otter-mail/contracts/relay";
 
 import { readJson, writeJson } from "../json-file.js";
 import type { MailAccount } from "../types.js";
@@ -113,6 +114,7 @@ export async function updateAccount(
     signatureInGmail?: boolean;
     sendAs?: string[];
     aliasMailboxes?: AliasMailbox[];
+    aliasPictures?: AliasPictures;
   },
 ): Promise<MailAccount> {
   return change((accounts) => {
@@ -141,6 +143,12 @@ export async function updateAccount(
             ? patch.aliasMailboxes
             : undefined
           : current.aliasMailboxes,
+      aliasPictures:
+        patch.aliasPictures !== undefined
+          ? Object.keys(patch.aliasPictures).length > 0
+            ? patch.aliasPictures
+            : undefined
+          : current.aliasPictures,
     };
     accounts[index] = updated;
     return updated;

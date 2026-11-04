@@ -103,6 +103,8 @@ final class MailStore {
             alias.color = entry.color ?? Session.defaultColor(entry.id)
             alias.signature = entry.signature ?? mailbox.signature
             alias.picture = nil
+            alias.customPicture = mailbox.aliasPictures?[entry.id]
+            alias.aliasPictures = nil
             alias.parent = mailbox.email
             return alias
         }
