@@ -53,7 +53,7 @@ struct MailSocketTests {
         let socket = MailSocket(server)
         socket.timeout = .seconds(60)
         Task {
-            try await Task.sleep(for: .milliseconds(50))
+            try? await Task.sleep(for: .milliseconds(50))
             server.close()
         }
         await #expect(throws: NWError.self) { try await socket.readLine() }

@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import Synchronization
 
 /**
  * A connection to a mail server (IMAP or SMTP), TLS by the system, read a
@@ -64,7 +65,7 @@ nonisolated final class MailSocket {
     }
 
     func write(_ text: String) async throws { try await write(Data(text.utf8)) }
-    func write(_ data: Data) async throws { try await timed { try await transport.send(data) } }
+    func write(_ data: Data) async throws { try await timed { [transport] in try await transport.send(data) } }
 
     func startTLS() async throws {
         buffer = Data()
@@ -73,29 +74,52 @@ nonisolated final class MailSocket {
 
     func close() { transport.close() }
 
-    private func receive() async throws -> Data { try await timed { try await transport.receive() } }
+    private func receive() async throws -> Data { try await timed { [transport] in try await transport.receive() } }
 
     /**
      * Closing the connection is the only way to stop a pending read or write,
      * and that fails it as cancelled (NWError ECANCELED, URLError.cancelled):
      * say it timed out instead, so it isn't taken for something the user did.
      */
-    private func timed<T>(_ io: () async throws -> T) async throws -> T {
+    private func timed<T: Sendable>(_ io: @Sendable () async throws -> T) async throws -> T {
         if timedOut { throw ImapError.timedOut }
         guard let timeout else { return try await io() }
-        let timer = Task { [transport] in
-            guard (try? await Task.sleep(for: timeout)) != nil else { return false }
-            transport.close()
-            return true
-        }
-        let result: Result<T, Error>
-        do { result = .success(try await io()) } catch { result = .failure(error) }
-        timer.cancel()
-        if await timer.value {
+        do {
+            return try await Self.within(timeout, closing: transport, io)
+        } catch ImapError.timedOut {
             timedOut = true
             throw ImapError.timedOut
         }
+    }
+
+    /** Off the caller's actor: a busy one mustn't make what the server sent in time look late. */
+    @concurrent
+    private static func within<T: Sendable>(
+        _ timeout: Duration, closing transport: any MailTransport, _ io: @Sendable () async throws -> T
+    ) async throws -> T {
+        let race = Race()
+        let timer = Task {
+            guard (try? await Task.sleep(for: timeout)) != nil, race.won(byTimer: true) else { return }
+            transport.close()
+        }
+        defer { timer.cancel() }
+        let result: Result<T, Error>
+        do { result = .success(try await io()) } catch { result = .failure(error) }
+        guard race.won(byTimer: false) else { throw ImapError.timedOut }
         return try result.get()
+    }
+
+    nonisolated private final class Race: Sendable {
+        private let winner = Mutex<Bool?>(nil)
+
+        /** True for whichever of the server and the timer gets here first. */
+        func won(byTimer timer: Bool) -> Bool {
+            winner.withLock { winner in
+                guard winner == nil else { return false }
+                winner = timer
+                return true
+            }
+        }
     }
 }
 
