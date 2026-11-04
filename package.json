@@ -21,7 +21,7 @@
     "release:ios": "node scripts/release-ios.ts",
     "typecheck": "vp run -r typecheck",
     "lint": "vp lint --report-unused-disable-directives",
-    "test": "vp run -r test",
+    "test": "vp run -r --parallel test",
     "fmt": "vp fmt",
     "fmt:check": "vp fmt --check",
     "deploy:site": "pnpm --filter @otter-mail/site deploy",

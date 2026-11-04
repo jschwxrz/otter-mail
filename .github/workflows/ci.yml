@@ -20,9 +20,11 @@ env:
 
 jobs:
   # The Swift jobs need macOS runners, which the Mac release waits on too: run
-  # them only when what they build changed (or this workflow did).
+  # them only when what they build changed (or this workflow did), and not again
+  # on main, where each merge's release builds the translator and the PR built the app.
   changes:
     name: Changes
+    if: github.event_name != 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -40,7 +42,6 @@ jobs:
           EVENT: ${{ github.event_name }}
           PR_BASE: ${{ github.event.pull_request.base.sha }}
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
-          PUSH_BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
           # NUL-separated, so unusual names aren't quoted; no renames, so a move out of a
@@ -50,13 +51,6 @@ jobs:
           changed() { grep -zqE "$1" "$RUNNER_TEMP/changed.txt" && echo true || echo false; }
           case "$EVENT" in
             pull_request) list_changes "$PR_BASE...$PR_HEAD" ;;
-            push)
-              if git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then
-                list_changes "$PUSH_BEFORE" "$GITHUB_SHA"
-              else
-                everything
-              fi
-              ;;
             # A manual run checks everything.
             *) everything ;;
           esac
@@ -151,29 +145,61 @@ jobs:
       - name: Export shared resources
         run: node scripts/export-ios-resources.ts
 
-      - name: Select simulator
+      # Booting takes minutes on a fresh runner: it boots in the background while the app builds.
+      - name: Boot a simulator
         run: |
           set -euo pipefail
           xcodebuild -version
-          xcrun simctl list devices available --json > "$RUNNER_TEMP/devices.json"
-          simulator="$(node --input-type=module -e '
-            import { readFileSync } from "node:fs";
-            const devices = JSON.parse(readFileSync(process.argv[1], "utf8"));
-            const device = Object.values(devices.devices).flat().find(d => d.name.startsWith("iPhone"));
-            if (!device) throw new Error("No available iPhone simulator on the Xcode runner.");
-            console.log(device.udid);
-          ' "$RUNNER_TEMP/devices.json")"
-          echo "IPHONE_SIMULATOR=$simulator" >> "$GITHUB_ENV"
-          xcrun simctl boot "$simulator" || true
-          xcrun simctl bootstatus "$simulator" -b
+          (
+            set -euo pipefail
+            xcrun simctl list devices available --json > "$RUNNER_TEMP/devices.json"
+            simulator="$(node --input-type=module -e '
+              import { readFileSync } from "node:fs";
+              const devices = JSON.parse(readFileSync(process.argv[1], "utf8"));
+              const device = Object.values(devices.devices).flat().find(d => d.name.startsWith("iPhone"));
+              if (!device) throw new Error("No available iPhone simulator on the Xcode runner.");
+              console.log(device.udid);
+            ' "$RUNNER_TEMP/devices.json")"
+            xcrun simctl boot "$simulator" || true
+            xcrun simctl bootstatus "$simulator" -b
+            echo "$simulator" > "$RUNNER_TEMP/simulator"
+          ) > "$RUNNER_TEMP/simulator.log" 2>&1 &
 
-      - name: Build app and extension, and run native tests
+      - name: Cache Swift packages
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/swift-packages
+          key: swift-packages-${{ hashFiles('apps/ios/OtterMail.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+
+      # Simulators on the runner are Apple silicon: arm64 alone, not the Intel slice too.
+      - name: Build app, extension and tests
         run: |
           xcodebuild -project apps/ios/OtterMail.xcodeproj -scheme OtterMail \
-            -destination "platform=iOS Simulator,id=$IPHONE_SIMULATOR" \
+            -destination "generic/platform=iOS Simulator" \
             -derivedDataPath "$RUNNER_TEMP/otter-ios-build" \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/swift-packages" \
+            ARCHS=arm64 CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO build-for-testing
+
+      - name: Run native tests
+        run: |
+          set -euo pipefail
+          for _ in $(seq 300); do
+            [[ -s "$RUNNER_TEMP/simulator" ]] && break
+            sleep 1
+          done
+          if [[ ! -s "$RUNNER_TEMP/simulator" ]]; then
+            cat "$RUNNER_TEMP/simulator.log"
+            echo "::error::The simulator didn't boot."
+            exit 1
+          fi
+          simulator="$(cat "$RUNNER_TEMP/simulator")"
+          echo "IPHONE_SIMULATOR=$simulator" >> "$GITHUB_ENV"
+          xcodebuild -project apps/ios/OtterMail.xcodeproj -scheme OtterMail \
+            -destination "platform=iOS Simulator,id=$simulator" \
+            -derivedDataPath "$RUNNER_TEMP/otter-ios-build" \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/swift-packages" \
             -resultBundlePath "$RUNNER_TEMP/otter-ios-tests.xcresult" \
-            CODE_SIGNING_ALLOWED=NO test
+            ARCHS=arm64 CODE_SIGNING_ALLOWED=NO test-without-building
 
       - name: Capture demo in light and dark
         run: |
