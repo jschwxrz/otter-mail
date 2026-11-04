@@ -1,3 +1,4 @@
+import type { ReportTags } from "@otter-mail/shared/error-reports";
 import { supportError } from "@otter-mail/shared/support";
 
 import { SIGNED_OUT_MESSAGE } from "./google.js";
@@ -25,6 +26,11 @@ export const logger = {
   info: (scope: string, message: string, data?: unknown) => log("info", scope, message, data),
   warn: (scope: string, message: string, data?: unknown) => log("warn", scope, message, data),
   error: (scope: string, message: string, data?: unknown) => log("error", scope, message, data),
-  failure: (scope: string, message: string, error: unknown) =>
-    log(expected(message, error) ? "warn" : "error", scope, message, error),
+  failure: (scope: string, message: string, error: unknown, tags?: ReportTags) =>
+    log(
+      expected(message, error) ? "warn" : "error",
+      scope,
+      message,
+      tags ? { error, tags } : error,
+    ),
 };

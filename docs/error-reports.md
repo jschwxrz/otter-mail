@@ -20,6 +20,11 @@ Everything goes through `packages/shared/src/error-reports.ts`:
   Every string is scrubbed: addresses become `[email]` (and a mailbox's route after it),
   tokens `[token]`, home folders `/Users/[user]`, query strings are cut, long opaque
   strings `[redacted]`.
+- **Tags**: `scope`, and for a handler that failed on a mailbox, what kind it is:
+  `provider` (`gmail`, `imap`, `outlook`) and, for IMAP, `server`, the IMAP host when it's one
+  of discovery's known providers (`imap.mail.me.com`, `imap.fastmail.com`, …) and `other` for
+  anything else, since a custom domain's host could say who. The channel is the
+  `environment` (`stable`, `nightly`). Pass them as `logger.failure(scope, message, err, tags)`.
 - **Identity**: only a random report id per install (core's `services/error-reports.ts`).
   Send feedback includes it, so an issue can be matched to its errors: search Sentry for
   `user.id:<id>`.
@@ -33,6 +38,9 @@ off; reports from before the app knows the choice are held, then sent or dropped
 - `logger.failure(scope, message, err)`: something failed; a warning when it's the network's
   doing (offline, timed out, rate limited) or a mailbox is signed out, else an error.
 - `logger.warn` / `logger.info`: context, sent only as breadcrumbs.
+
+Give each reason a guard refuses its own message (one `throw` per reason, not `!a || b`):
+Sentry groups errors by where they're thrown, and the message is what an issue says happened.
 
 Mail sync logs what the user can see and fix (signed out, offline, rate limited) as a warning.
 

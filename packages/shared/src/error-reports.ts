@@ -21,6 +21,9 @@ export const SENTRY_DSN = {
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
+/** What kind of mailbox an error happened in, from fixed lists (e.g. `provider`, `server`); never who. */
+export type ReportTags = Record<string, string>;
+
 export function reportEnvironment(version: string, release: boolean): string {
   return release ? releaseChannel(version) : "development";
 }
@@ -157,12 +160,21 @@ export function reportLog(level: LogLevel, scope: string, message: string, data?
   if (reported.size > 500) reported.clear();
   reported.set(key, now);
 
+  const tags = { ...tagsIn(data), scope };
   const error = errorIn(data);
   if (error) {
-    captureException(error, { tags: { scope }, contexts: { log: { message: text } } });
+    captureException(error, { tags, contexts: { log: { message: text } } });
   } else {
-    captureMessage(text, { level: "error", tags: { scope }, fingerprint: [scope, text] });
+    captureMessage(text, { level: "error", tags, fingerprint: [scope, text] });
   }
+}
+
+function tagsIn(data: unknown): ReportTags {
+  const tags = data && typeof data === "object" && "tags" in data ? data.tags : null;
+  if (!tags || typeof tags !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(tags).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+  );
 }
 
 function errorIn(data: unknown): Error | null {

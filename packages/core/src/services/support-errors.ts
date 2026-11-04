@@ -11,13 +11,15 @@ export function recordSupportError(
 ): void {
   if (!isSupportFailure(level, message)) return;
   let detail = "";
+  const error = data && typeof data === "object" && "error" in data ? data.error : data;
   try {
-    detail = data instanceof Error ? (data.stack ?? data.message) : (JSON.stringify(data) ?? "");
+    detail =
+      error instanceof Error ? (error.stack ?? error.message) : (JSON.stringify(error) ?? "");
   } catch {
     /* A logger must never break the operation it describes. */
   }
-  const error = supportError(new Date().toISOString(), scope, `${message} ${detail}`);
-  if (error) errors.push(error);
+  const recorded = supportError(new Date().toISOString(), scope, `${message} ${detail}`);
+  if (recorded) errors.push(recorded);
   if (errors.length > 50) errors.shift();
 }
 

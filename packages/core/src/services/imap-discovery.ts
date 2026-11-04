@@ -187,6 +187,15 @@ function fromPreset(preset: Preset, email: string): ImapSettings {
   };
 }
 
+const GMAIL_IMAP = "imap.gmail.com";
+
+/** The server's host when it's one of the providers above, else "other": a custom domain's host could say who. */
+export function knownImapServer(host: string | null): string {
+  const lower = host?.toLowerCase();
+  if (lower === GMAIL_IMAP || lower === "imap.googlemail.com") return GMAIL_IMAP;
+  return PRESETS.find((preset) => preset.imap.host === lower)?.imap.host ?? "other";
+}
+
 export function appPasswordUrl(imapHost: string): string | null {
   return PRESETS.find((preset) => preset.imap.host === imapHost)?.appPasswords ?? null;
 }

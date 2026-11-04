@@ -374,7 +374,10 @@ export async function updateLabel(
   await withImap(accountId, async (client) => {
     const folders = await listFolders(accountId, client);
     const from = folders.get(params.labelId);
-    if (!from || from.role) throw new Error("Only your own folders can be renamed.");
+    if (isSystemLabel(params.labelId) || from?.role) {
+      throw new Error("Only your own folders can be renamed.");
+    }
+    if (!from) throw new Error("That folder isn't on the server any more.");
     const to = folders.pathFor(name);
     if (to === from.path) return;
     await client.renameMailbox(from.path, to);

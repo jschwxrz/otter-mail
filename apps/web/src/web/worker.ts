@@ -2,7 +2,7 @@
 
 import { parseDemoMailboxes } from "@otter-mail/contracts/demo";
 import { addDemoMailboxes, callHandler, startCore, type Platform } from "@otter-mail/core";
-import { serializeError } from "@otter-mail/shared/error-reports";
+import { serializeError, type ReportTags } from "@otter-mail/shared/error-reports";
 
 import { webExtensions } from "./extensions";
 import { webPlatform, type Page } from "./platform";
@@ -35,8 +35,10 @@ const page: Page = {
   },
   report(level, scope, message, data) {
     if (level === "debug") return;
-    const error = data instanceof Error ? data : (data as { error?: unknown } | null)?.error;
-    post({ type: "report", level, scope, message, error: serializeError(error) });
+    const wrapped = data as { error?: unknown; tags?: ReportTags } | null;
+    const error = data instanceof Error ? data : wrapped?.error;
+    const tags = data instanceof Error ? undefined : wrapped?.tags;
+    post({ type: "report", level, scope, message, error: serializeError(error), tags });
   },
 };
 

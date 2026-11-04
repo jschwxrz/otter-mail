@@ -1,7 +1,34 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { ErrorEvent } from "@sentry/core";
 
-import { ConsentGate, scrubBreadcrumb, scrubEvent, scrubText } from "./error-reports.ts";
+const sentry = vi.hoisted(() => ({ captureException: vi.fn(), captureMessage: vi.fn() }));
+vi.mock("@sentry/core", async (original) => ({
+  ...(await original<typeof import("@sentry/core")>()),
+  ...sentry,
+}));
+
+import { ConsentGate, reportLog, scrubBreadcrumb, scrubEvent, scrubText } from "./error-reports.ts";
+
+describe("reportLog", () => {
+  it("sends a failure's tags beside its scope, and only string ones", () => {
+    const error = new Error("Only your own folders can be renamed.");
+    reportLog("error", "handlers", "gmail:updateLabel failed", {
+      error,
+      tags: { provider: "imap", server: "other", count: 3 },
+    });
+    expect(sentry.captureException).toHaveBeenCalledWith(error, {
+      tags: { provider: "imap", server: "other", scope: "handlers" },
+      contexts: { log: { message: "gmail:updateLabel failed" } },
+    });
+
+    reportLog("error", "sync", "the label list came back empty");
+    expect(sentry.captureMessage).toHaveBeenCalledWith("the label list came back empty", {
+      level: "error",
+      tags: { scope: "sync" },
+      fingerprint: ["sync", "the label list came back empty"],
+    });
+  });
+});
 
 describe("scrubText", () => {
   it.each([
