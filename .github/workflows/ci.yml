@@ -158,19 +158,12 @@ jobs:
             echo "$simulator" > "$RUNNER_TEMP/simulator"
           ) > "$RUNNER_TEMP/simulator.log" 2>&1 &
 
-      - name: Cache Swift packages
-        uses: actions/cache@v6
-        with:
-          path: ${{ runner.temp }}/swift-packages
-          key: swift-packages-${{ hashFiles('apps/ios/OtterMail.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
-
       # Simulators on the runner are Apple silicon: arm64 alone, not the Intel slice too.
       - name: Build app, extension and tests
         run: |
           xcodebuild -project apps/ios/OtterMail.xcodeproj -scheme OtterMail \
             -destination "generic/platform=iOS Simulator" \
             -derivedDataPath "$RUNNER_TEMP/otter-ios-build" \
-            -clonedSourcePackagesDirPath "$RUNNER_TEMP/swift-packages" \
             ARCHS=arm64 CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO build-for-testing
 
       - name: Run native tests
@@ -190,7 +183,6 @@ jobs:
           xcodebuild -project apps/ios/OtterMail.xcodeproj -scheme OtterMail \
             -destination "platform=iOS Simulator,id=$simulator" \
             -derivedDataPath "$RUNNER_TEMP/otter-ios-build" \
-            -clonedSourcePackagesDirPath "$RUNNER_TEMP/swift-packages" \
             -resultBundlePath "$RUNNER_TEMP/otter-ios-tests.xcresult" \
             ARCHS=arm64 CODE_SIGNING_ALLOWED=NO test-without-building
 
