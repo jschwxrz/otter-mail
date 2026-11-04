@@ -1,5 +1,5 @@
 import Foundation
-@_spi(Private) import Sentry
+@preconcurrency @_spi(Private) import Sentry
 import Testing
 
 struct ErrorReportsTests {
