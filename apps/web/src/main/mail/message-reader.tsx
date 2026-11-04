@@ -1739,7 +1739,6 @@ function InlineComposer({
   const [bcc, setBcc] = useState("");
   const [bccVisible, setBccVisible] = useState(false);
   const recipientsDirty = useRef(false);
-  const [formatting, setFormatting] = useState(false);
   const [fieldsOpen, setFieldsOpen] = useState(mode === "forward");
   const [attachments, setAttachments] = useState<ComposeAttachment[] | null>(
     mode === "forward" ? null : [],
@@ -2083,7 +2082,6 @@ function InlineComposer({
           placeholder={placeholder}
           ariaLabel={INLINE_MODE_LABEL[mode]}
           onTextChange={setText}
-          showToolbar={formatting}
           minHeightClass="min-h-[120px]"
           maxHeightClass="max-h-[45vh]"
           signatureHTML={account ? signatureFor(account, fromAddress) : undefined}
@@ -2094,8 +2092,6 @@ function InlineComposer({
         />
         <ComposerFooter
           onAttach={attach}
-          formatting={formatting}
-          onToggleFormatting={() => setFormatting((f) => !f)}
           onDiscard={discard}
           status={
             mode === "forward" && attachments == null ? "Loading attachments…" : draftStatus(draft)
