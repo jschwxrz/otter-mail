@@ -5,7 +5,7 @@
  * never stored here; the platform's Google sign-in keeps them.
  */
 
-import type { MailProviderKind } from "@otter-mail/contracts";
+import type { AliasMailbox, MailProviderKind } from "@otter-mail/contracts";
 
 import { readJson, writeJson } from "../json-file.js";
 import type { MailAccount } from "../types.js";
@@ -24,6 +24,11 @@ function rememberProviders(accounts: MailAccount[]): MailAccount[] {
 
 export function providerKindOf(accountId: string): MailProviderKind {
   return providerKinds.get(accountId) ?? "gmail";
+}
+
+/** `mail:mailboxes` lists alias mailboxes' ids too. */
+export function isAccountId(id: string): boolean {
+  return providerKinds.has(id);
 }
 
 export function imapHostOf(accountId: string): string | null {
@@ -107,6 +112,7 @@ export async function updateAccount(
     signature?: string;
     signatureInGmail?: boolean;
     sendAs?: string[];
+    aliasMailboxes?: AliasMailbox[];
   },
 ): Promise<MailAccount> {
   return change((accounts) => {
@@ -129,6 +135,12 @@ export async function updateAccount(
       signature: patch.signature !== undefined ? patch.signature || undefined : current.signature,
       signatureInGmail: patch.signatureInGmail ?? current.signatureInGmail,
       sendAs: patch.sendAs !== undefined ? patch.sendAs : current.sendAs,
+      aliasMailboxes:
+        patch.aliasMailboxes !== undefined
+          ? patch.aliasMailboxes.length > 0
+            ? patch.aliasMailboxes
+            : undefined
+          : current.aliasMailboxes,
     };
     accounts[index] = updated;
     return updated;

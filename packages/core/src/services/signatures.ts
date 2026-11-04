@@ -7,6 +7,8 @@ import { logger } from "../logger.js";
 import { findProvider, isSignedIn } from "../providers/index.js";
 import { isSingleAddress } from "./outgoing.js";
 import { keepsSendAsOnDevice, listAccounts, updateAccount } from "./account-store.js";
+import { parseAliasMailboxes } from "./alias-mailboxes.js";
+import { validAliasMailboxes } from "@otter-mail/contracts";
 import { preferenceChanged } from "./preferences.js";
 import type { MailAccount } from "../types.js";
 
@@ -66,8 +68,33 @@ export async function saveSendAs(account: MailAccount, entered: unknown[]): Prom
     seen.add(address.toLowerCase());
     addresses.push(address);
   }
-  const updated = await updateAccount(account.id, { sendAs: addresses });
+  // An address it no longer sends from is no longer a mailbox of its own.
+  const kept = new Set(addresses.map((a) => a.toLowerCase()));
+  const aliases = account.aliasMailboxes ?? [];
+  const aliasMailboxes = aliases.filter((alias) => kept.has(alias.address.toLowerCase()));
+  const updated = await updateAccount(account.id, { sendAs: addresses, aliasMailboxes });
   preferenceChanged("sendAs");
+  if (aliasMailboxes.length !== aliases.length) preferenceChanged("aliasMailboxes");
+  return updated;
+}
+
+export async function saveAliasMailboxes(
+  account: MailAccount,
+  entered: unknown,
+): Promise<MailAccount> {
+  if (!keepsSendAsOnDevice(account))
+    throw new Error(`${account.email}'s addresses can't be mailboxes of their own.`);
+  // A stale entry (maybe from another device) is dropped, not refused: it would block every edit.
+  const mailboxes = (await listAccounts()).map((a) => a.email);
+  const aliasMailboxes = validAliasMailboxes(
+    { ...account, aliasMailboxes: parseAliasMailboxes(entered) },
+    mailboxes,
+  ).map((alias) => ({
+    ...alias,
+    address: account.sendAs!.find((a) => a.toLowerCase() === alias.address.toLowerCase())!,
+  }));
+  const updated = await updateAccount(account.id, { aliasMailboxes });
+  preferenceChanged("aliasMailboxes");
   return updated;
 }
 

@@ -114,7 +114,8 @@ import {
 import { RichTextArea, textToHtml, type RichTextRef } from "./rich-text";
 import { RecipientInput } from "./recipient-input";
 import { FromPicker } from "./new-message-view";
-import { addressesOf, chosenAddress, replyAddress } from "./send-from";
+import { addressesOf, chosenAddress, ownAddress, replyAddress } from "./send-from";
+import { signatureFor, type AliasMailboxEntry } from "./alias-mailboxes";
 import {
   AttachmentChips,
   ComposeDropOverlay,
@@ -138,6 +139,7 @@ type MessageReaderProps = {
   accountId: string;
   messageId: string | null;
   listLabelId?: string | null;
+  alias?: AliasMailboxEntry;
   /** Browsing the list previews drafts without taking focus from navigation. */
   autoFocusDraft?: boolean;
   single?: boolean;
@@ -1652,6 +1654,7 @@ function ModeSwitcher({
 
 function InlineComposer({
   accountId,
+  alias,
   mode,
   onModeChange,
   lastMessage,
@@ -1660,6 +1663,7 @@ function InlineComposer({
   onClose,
 }: {
   accountId: string;
+  alias?: AliasMailboxEntry;
   mode: InlineMode;
   onModeChange: (mode: InlineMode) => void;
   lastMessage: MessageSummary;
@@ -1691,14 +1695,15 @@ function InlineComposer({
   const [pickedAddress, setPickedAddress] = useState<string>();
   // With other addresses, the default needs the detail: the summary lacks Cc, where the address
   // contacted may be. If the detail can't load, the summary's To is the best guess.
+  const aliasAddress = alias?.alias.address;
   const defaultAddress = !account
     ? undefined
     : ownAddresses.length === 1
       ? account.email
       : lastDetail
-        ? replyAddress(account, lastDetail)
-        : lastDetailQuery.isError
-          ? replyAddress(account, lastMessage)
+        ? replyAddress(account, lastDetail, aliasAddress)
+        : lastDetailQuery.isError || ownAddress(account, aliasAddress)
+          ? replyAddress(account, lastMessage, aliasAddress)
           : undefined;
   const sender =
     account && (pickedAddress || defaultAddress)
@@ -2020,7 +2025,7 @@ function InlineComposer({
           showToolbar={formatting}
           minHeightClass="min-h-[120px]"
           maxHeightClass="max-h-[45vh]"
-          signatureHTML={account?.signature}
+          signatureHTML={account ? signatureFor(account, fromAddress) : undefined}
         />
         <AttachmentChips
           attachments={attachments}
@@ -2075,6 +2080,7 @@ export function MessageReader({
   accountId,
   messageId,
   listLabelId = null,
+  alias,
   autoFocusDraft = true,
   single = false,
   onShowConversation,
@@ -2150,7 +2156,7 @@ export function MessageReader({
   const threadId = message?.threadId || null;
 
   const conversation = useExtensionConversation({ accountId, messageId, message });
-  const threadQuery = useThread(messageId ? accountId : null, threadId);
+  const threadQuery = useThread(messageId ? accountId : null, threadId, alias?.id);
   const threadMessages = threadQuery.data ?? [];
   const isThread = !single && threadMessages.length > 1;
 
@@ -2944,6 +2950,7 @@ export function MessageReader({
         {lastRow && inline ? (
           <InlineComposer
             accountId={accountId}
+            alias={alias}
             mode={inline}
             onModeChange={setInline}
             lastMessage={lastRow}

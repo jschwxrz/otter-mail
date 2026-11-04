@@ -6,7 +6,7 @@ import { mapPool } from "../pool.js";
 import { findProvider, isSignedIn, providerFor, signedOutMessage } from "../providers/index.js";
 import { SyncCancelled, type MailProvider } from "../providers/provider.js";
 import { getAttachmentData, hasCachedAttachment } from "./attachment-cache.js";
-import { listAccounts } from "./account-store.js";
+import { isAccountId, listAccounts } from "./account-store.js";
 import { platform } from "../platform.js";
 import * as store from "./mail-store.js";
 import { notifyNewMail, updateDockBadge } from "./notifier.js";
@@ -133,7 +133,7 @@ export function followMailboxArrangement(value: string | undefined): void {
   const was = turnedOff;
   turnedOff = new Set(off);
   for (const id of turnedOff) stopWatch(id);
-  for (const id of was) if (!turnedOff.has(id)) syncAccount(id, { force: true });
+  for (const id of was) if (!turnedOff.has(id) && isAccountId(id)) syncAccount(id, { force: true });
   updateDockBadge();
 }
 

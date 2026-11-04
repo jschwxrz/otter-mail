@@ -34,11 +34,13 @@ import { SignInCards, SyncButton } from "./sync-health";
 import { toast } from "./toast";
 import { useInboxUnread, useMailboxOptions, type MailboxOption } from "./top-bar";
 import type { MailAccount, MailView } from "./types";
+import type { MailboxTab } from "../mailboxes";
 import { HintTooltip, IconBtn, cn } from "./ui";
 import { ViewMark } from "./view-icon";
 
 export function AppSidebar({
   accounts,
+  tabs,
   views,
   mode,
   spaceId,
@@ -60,6 +62,7 @@ export function AppSidebar({
   onCloseSearch,
 }: {
   accounts: MailAccount[];
+  tabs: MailboxTab[];
   views: MailView[];
   mode: AppMode;
   spaceId: string | null;
@@ -80,7 +83,7 @@ export function AppSidebar({
   onSelectSearch: (id: string) => void;
   onCloseSearch: (id: string) => void;
 }) {
-  const options = useMailboxOptions(accounts);
+  const options = useMailboxOptions(tabs);
   const isMailbox = (id: string | null) => options.some((option) => option.id === id);
   const [lastMailbox, setLastMailbox] = useState<string | null>(null);
   if (isMailbox(spaceId) && spaceId !== lastMailbox) setLastMailbox(spaceId);
@@ -89,8 +92,8 @@ export function AppSidebar({
     : isMailbox(lastMailbox)
       ? lastMailbox
       : (options[0]?.id ?? null);
-  const healthIds =
-    spaceId && accounts.some((a) => a.id === spaceId) ? [spaceId] : accounts.map((a) => a.id);
+  const spaceTab = tabs.find((tab) => tab.id === spaceId);
+  const healthIds = spaceTab ? [spaceTab.account.id] : accounts.map((a) => a.id);
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       {workspace && !composing ? (
@@ -119,7 +122,7 @@ export function AppSidebar({
           <div className="flex shrink-0 flex-col px-(--sidebar-content-inset) pt-3">
             <SidebarTabs
               options={options}
-              accounts={accounts}
+              tabs={tabs}
               selectedId={mailbox}
               onSelect={(id) => onGo(id)}
             />
@@ -127,7 +130,7 @@ export function AppSidebar({
           <MailPage
             accounts={accounts}
             views={views}
-            mailbox={mailbox}
+            mailbox={tabs.find((tab) => tab.id === mailbox) ?? null}
             spaceId={composing ? null : spaceId}
             labelId={labelId}
             onGo={onGo}
@@ -249,16 +252,19 @@ function ModeSwitcher({
 
 function SidebarTabs({
   options,
-  accounts,
+  tabs,
   selectedId,
   onSelect,
 }: {
   options: MailboxOption[];
-  accounts: MailAccount[];
+  tabs: MailboxTab[];
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
-  const unread = useInboxUnread(accounts);
+  const unread = useInboxUnread(
+    tabs.flatMap((tab) => (tab.alias ? [] : [tab.account])),
+    tabs.flatMap((tab) => (tab.alias ? [tab.alias] : [])),
+  );
   return (
     <SidebarPicker
       tour="mailbox"
@@ -290,7 +296,7 @@ function MailPage({
 }: {
   accounts: MailAccount[];
   views: MailView[];
-  mailbox: string | null;
+  mailbox: MailboxTab | null;
   spaceId: string | null;
   labelId: string;
   onGo: (spaceId: string, labelId?: string) => void;
@@ -302,7 +308,7 @@ function MailPage({
 }) {
   const viewUnread = useViewUnreadCounts(views, accounts);
   const addAccount = useAddAccount();
-  const showing = mailbox != null && mailbox === spaceId;
+  const showing = mailbox != null && mailbox.id === spaceId;
 
   const addGmail = async () => {
     console.log("[AppSidebar:addAccount]");
@@ -333,10 +339,11 @@ function MailPage({
       <SidebarBody>
         {mailbox ? (
           <MailboxFolders
-            key={mailbox}
-            mailboxId={mailbox}
+            key={mailbox.id}
+            mailboxId={mailbox.account.id}
+            alias={mailbox.alias?.id}
             selectedLabelId={showing ? labelId : ""}
-            onSelectLabel={(label) => onGo(mailbox, label)}
+            onSelectLabel={(label) => onGo(mailbox.id, label)}
             searchRows={showing ? searchRows : undefined}
           />
         ) : (

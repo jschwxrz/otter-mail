@@ -23,8 +23,10 @@ import {
   listAccounts,
   updateAccount,
 } from "./account-store.js";
+import { parseAliasMailboxes } from "./alias-mailboxes.js";
 import { getSettings, updateSettings, type AppSettings } from "./settings-store.js";
 import { listViews, writeViews } from "./views-store.js";
+import type { AliasMailbox } from "@otter-mail/contracts";
 import type { MailView } from "../types.js";
 
 const UI_FILE = "ui-preferences.json";
@@ -170,6 +172,32 @@ const SECTIONS = {
       if (changed) broadcast("gmail:accounts-changed");
     },
   },
+  aliasMailboxes: {
+    async read() {
+      const all = syncedAliasMailboxesAll();
+      for (const account of await listAccounts()) {
+        if (!keepsSendAsOnDevice(account)) continue;
+        all[account.email.toLowerCase()] = account.aliasMailboxes ?? [];
+      }
+      return all;
+    },
+    async apply(value) {
+      if (!value || typeof value !== "object") return;
+      const all = value as Record<string, unknown>;
+      let changed = false;
+      for (const account of await listAccounts()) {
+        const key = account.email.toLowerCase();
+        if (!keepsSendAsOnDevice(account) || !(key in all)) continue;
+        const aliasMailboxes = parseAliasMailboxes(all[key]);
+        if (JSON.stringify(account.aliasMailboxes ?? []) === JSON.stringify(aliasMailboxes)) {
+          continue;
+        }
+        await updateAccount(account.id, { aliasMailboxes });
+        changed = true;
+      }
+      if (changed) broadcast("gmail:accounts-changed");
+    },
+  },
 } satisfies Record<string, Section>;
 
 export type SectionName = keyof typeof SECTIONS;
@@ -200,6 +228,19 @@ function syncedSendAsAll(): Record<string, string[]> {
 export function syncedSendAs(email: string): string[] | undefined {
   const addresses = syncedSendAsAll()[email.toLowerCase()];
   return Array.isArray(addresses) && addresses.length > 0 ? addresses : undefined;
+}
+
+function syncedAliasMailboxesAll(): Record<string, unknown> {
+  try {
+    return JSON.parse(synced.get("aliasMailboxes") ?? "{}") as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+export function syncedAliasMailboxes(email: string): AliasMailbox[] | undefined {
+  const aliases = parseAliasMailboxes(syncedAliasMailboxesAll()[email.toLowerCase()]);
+  return aliases.length > 0 ? aliases : undefined;
 }
 
 // The Hermes key is full control of someone's agent, and a device can be shared: this remembers

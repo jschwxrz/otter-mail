@@ -31,6 +31,12 @@ import {
 import { useDraftAutosave } from "./use-draft-autosave";
 import { RecipientInput } from "./recipient-input";
 import { addressesOf, chosenAddress } from "./send-from";
+import {
+  aliasMailboxId,
+  aliasMailboxLook,
+  aliasMailboxesOf,
+  signatureFor,
+} from "./alias-mailboxes";
 import type { ComposeAttachment, MailAccount } from "./types";
 
 export function FromPicker({
@@ -46,6 +52,10 @@ export function FromPicker({
   unavailable?: boolean;
   onChange: (accountId: string, address: string) => void;
 }) {
+  const lookOf = (account: MailAccount, address: string) => {
+    const alias = aliasMailboxesOf(account, accounts).find((a) => a.id === aliasMailboxId(address));
+    return alias ? aliasMailboxLook(alias) : account;
+  };
   return (
     <>
       <DropdownMenu>
@@ -55,7 +65,7 @@ export function FromPicker({
             aria-label="Send from"
             className="-ml-1 flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md px-1 py-0.5 text-sm text-foreground outline-none hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring"
           >
-            <AccountPicture account={value} className="size-4 rounded-[5px] text-[9px]" />
+            <AccountPicture account={lookOf(value, address)} className="size-4 rounded-[5px] text-[9px]" />
             <span className="truncate">{address}</span>
             <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
           </button>
@@ -66,7 +76,7 @@ export function FromPicker({
               <DropdownMenuItem
                 key={`${account.id}:${each}`}
                 icon={
-                  <AccountPicture account={account} className="size-4 rounded-[5px] text-[9px]" />
+                  <AccountPicture account={lookOf(account, each)} className="size-4 rounded-[5px] text-[9px]" />
                 }
                 onSelect={() => onChange(account.id, each)}
               >
@@ -88,16 +98,18 @@ export function FromPicker({
 export function NewMessageView({
   accounts,
   defaultAccountId,
+  defaultAddress,
   onClose,
   prefill,
 }: {
   accounts: MailAccount[];
   defaultAccountId: string;
+  defaultAddress?: string;
   onClose: () => void;
   prefill?: { to?: string; cc?: string; subject?: string; body?: string };
 }) {
   const [fromId, setFromId] = useState(defaultAccountId);
-  const [pickedAddress, setPickedAddress] = useState<string>();
+  const [pickedAddress, setPickedAddress] = useState(defaultAddress);
   const [to, setTo] = useState(prefill?.to ?? "");
   const [cc, setCc] = useState(prefill?.cc ?? "");
   const [ccVisible, setCcVisible] = useState(Boolean(prefill?.cc));
@@ -322,7 +334,7 @@ export function NewMessageView({
               minHeightClass="min-h-[40vh]"
               maxHeightClass="max-h-none"
               initialHTML={prefill?.body ? textToHtml(prefill.body) : undefined}
-              signatureHTML={fromAccount?.signature}
+              signatureHTML={fromAccount ? signatureFor(fromAccount, fromAddress) : undefined}
             />
           }
           attachments={

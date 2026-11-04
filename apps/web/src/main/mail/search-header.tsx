@@ -536,9 +536,10 @@ function ScopeChip({
 }) {
   if (accounts.length < 2) return null;
   const all = scope.length === accounts.length;
+  // An alias mailbox's scope is its address (its id).
   const label = all
     ? "All accounts"
-    : (accounts.find((a) => a.id === scope[0])?.email ?? "Account");
+    : (accounts.find((a) => a.id === scope[0])?.email ?? scope[0] ?? "Account");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

@@ -11,16 +11,18 @@ export function ownAddress(account: MailAccount, address: string | undefined): s
 }
 
 /**
- * The address a reply goes out from, as Apple Mail picks it: the mailbox's own message keeps
- * the address it was sent from; otherwise whichever of its addresses the mail was sent to (To,
- * then Cc); else its own.
+ * The address a reply goes out from: in an alias mailbox (`alias`, its address), that one.
+ * Elsewhere as Apple Mail picks it: the mailbox's own message keeps the address it was sent
+ * from; otherwise whichever of its addresses the mail was sent to (To, then Cc); else its own.
  */
 export function replyAddress(
   account: MailAccount,
   message: { fromEmail: string; to: string; cc?: string },
+  alias?: string,
 ): string {
   const recipients = [...splitAddressList(message.to), ...splitAddressList(message.cc ?? "")];
   return (
+    ownAddress(account, alias) ??
     ownAddress(account, message.fromEmail) ??
     recipients.map((entry) => ownAddress(account, parseAddressEntry(entry).email)).find(Boolean) ??
     account.email

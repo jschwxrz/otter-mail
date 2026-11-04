@@ -59,7 +59,13 @@ import { getSettings, updateSettings, type AppSettings } from "../services/setti
 import { preferenceChanged } from "../services/preferences.js";
 import { refreshProfiles } from "../services/google-profile.js";
 import { forgetRefusals } from "../services/connections.js";
-import { refreshSignatures, saveSendAs, saveSignature } from "../services/signatures.js";
+import {
+  refreshSignatures,
+  saveAliasMailboxes,
+  saveSendAs,
+  saveSignature,
+} from "../services/signatures.js";
+import { aliasScope, resolveMailbox } from "../services/alias-mailboxes.js";
 import { suggestSendAs } from "../services/send-as-suggestions.js";
 import * as viewsStore from "../services/views-store.js";
 import { ALL_MAIL_LABEL_ID } from "../types.js";
@@ -393,6 +399,9 @@ export function registerMailHandlers(): void {
       let updated = await storeUpdateAccount(accountId, { displayName, color, customPicture });
       if (signature !== undefined) updated = await saveSignature(updated, signature);
       if (Array.isArray(p?.sendAs)) updated = await saveSendAs(updated, p.sendAs);
+      if (Array.isArray(p?.aliasMailboxes)) {
+        updated = await saveAliasMailboxes(updated, p.aliasMailboxes);
+      }
       broadcast("gmail:accounts-changed");
       if (displayName !== undefined || color !== undefined) {
         void accountEdited(updated, ["displayName", "color"]);
@@ -412,6 +421,8 @@ export function registerMailHandlers(): void {
     try {
       const accountId = assertString(p?.accountId, "accountId");
       mailSync.syncAccount(accountId);
+      const alias = asString(p?.alias);
+      if (alias) return mailStore.getAliasLabels(accountId, await aliasScope(accountId, alias));
       const local = mailStore.getLabels(accountId);
       if (local.length > 0) return local;
       const labels = await providerFor(accountId).listLabels(accountId);
@@ -505,6 +516,8 @@ export function registerMailHandlers(): void {
     try {
       const accountId = assertString(p?.accountId, "accountId");
       const labelIds = asStringArray(p?.labelIds);
+      const aliasId = asString(p?.alias);
+      const alias = aliasId ? await aliasScope(accountId, aliasId) : undefined;
       const pageToken = asString(p?.pageToken);
       const maxResults = asNumber(p?.maxResults) ?? LOCAL_PAGE_SIZE;
 
@@ -517,7 +530,7 @@ export function registerMailHandlers(): void {
 
       const liveLabelId = labelId === ALL_MAIL_LABEL_ID ? null : labelId;
       const page = await pageWithLiveFill([{ accountId, labelId: liveLabelId }], maxResults, () =>
-        mailStore.getThreadsPage(accountId, labelId, offset, maxResults),
+        mailStore.getThreadsPage(accountId, labelId, offset, maxResults, alias),
       );
       return {
         messages: page.messages,
@@ -546,7 +559,10 @@ export function registerMailHandlers(): void {
     });
     try {
       const q = asString(p?.q) ?? "";
-      const accountId = asString(p?.accountId) ?? null;
+      const mailbox = asString(p?.accountId);
+      const { accountId, alias } = mailbox
+        ? await resolveMailbox(mailbox)
+        : { accountId: null, alias: undefined };
       const labelId = asString(p?.labelId);
       const rules = p?.rules === undefined ? undefined : parseRules(p.rules);
       const pageToken = asString(p?.pageToken);
@@ -555,6 +571,7 @@ export function registerMailHandlers(): void {
 
       const page = mailStore.searchMessages(q, accountId, offset, maxResults, {
         labelId,
+        alias,
         rules,
         starred: p?.starred === true || undefined,
         important: p?.important === true || undefined,
@@ -682,17 +699,26 @@ export function registerMailHandlers(): void {
       const messageId = assertString(p?.messageId, "messageId");
       const addLabelIds = asStringArray(p?.addLabelIds);
       const removeLabelIds = asStringArray(p?.removeLabelIds);
+      // The reader shows copies once (getThreadForReading), so they change together.
+      const flagsOnly = [...(addLabelIds ?? []), ...(removeLabelIds ?? [])].every((id) =>
+        ["UNREAD", "STARRED"].includes(id),
+      );
+      const ids = mailStore.getCopies(accountId, messageId, !flagsOnly);
       return await settleLabelWrite(
         "gmail:modifyMessage",
         accountId,
-        [messageId],
+        ids,
         addLabelIds ?? [],
         removeLabelIds ?? [],
         () =>
-          providerFor(accountId).modifyMessage(accountId, messageId, {
-            addLabelIds,
-            removeLabelIds,
-          }),
+          Promise.all(
+            ids.map((id) =>
+              providerFor(accountId).modifyMessage(accountId, id, {
+                addLabelIds,
+                removeLabelIds,
+              }),
+            ),
+          ),
       );
     } catch (err) {
       console.log("[gmail:modifyMessage] error", { error: String(err) });
@@ -706,16 +732,11 @@ export function registerMailHandlers(): void {
     try {
       const accountId = assertString(p?.accountId, "accountId");
       const messageId = assertString(p?.messageId, "messageId");
-      return await settleLabelWrite(
-        "gmail:trashMessage",
-        accountId,
-        [messageId],
-        ["TRASH"],
-        [],
-        () =>
-          providerFor(accountId)
-            .trashMessage(accountId, messageId)
-            .then(() => refreshMetadata(accountId, [messageId])),
+      const ids = mailStore.getCopies(accountId, messageId, true);
+      return await settleLabelWrite("gmail:trashMessage", accountId, ids, ["TRASH"], [], () =>
+        Promise.all(ids.map((id) => providerFor(accountId).trashMessage(accountId, id))).then(() =>
+          refreshMetadata(accountId, ids),
+        ),
       );
     } catch (err) {
       console.log("[gmail:trashMessage] error", { error: String(err) });
@@ -729,7 +750,8 @@ export function registerMailHandlers(): void {
     try {
       const accountId = assertString(p?.accountId, "accountId");
       const threadId = assertString(p?.threadId, "threadId");
-      return mailStore.getThreadMessages(accountId, threadId);
+      const alias = asString(p?.alias)?.toLowerCase();
+      return mailStore.getThreadForReading(accountId, threadId, alias);
     } catch (err) {
       console.log("[gmail:getThread] error", { error: String(err) });
       throw err;
@@ -812,23 +834,18 @@ export function registerMailHandlers(): void {
     try {
       const accountId = assertString(p?.accountId, "accountId");
       const messageId = assertString(p?.messageId, "messageId");
-      return await settleLabelWrite(
-        "gmail:untrashMessage",
-        accountId,
-        [messageId],
-        [],
-        ["TRASH"],
-        () =>
-          providerFor(accountId)
-            .untrashMessage(accountId, messageId)
-            .then((fresh) => {
-              mailStore.upsertMessages(accountId, fresh);
-              mailStore.recountLabels(accountId, [
-                ...new Set(fresh.flatMap((m) => m.labelIds)),
-                "TRASH",
-              ]);
-              updateDockBadge();
-            }),
+      const ids = mailStore.getCopies(accountId, messageId, true);
+      return await settleLabelWrite("gmail:untrashMessage", accountId, ids, [], ["TRASH"], () =>
+        Promise.all(ids.map((id) => providerFor(accountId).untrashMessage(accountId, id)))
+          .then((copies) => copies.flat())
+          .then((fresh) => {
+            mailStore.upsertMessages(accountId, fresh);
+            mailStore.recountLabels(accountId, [
+              ...new Set(fresh.flatMap((m) => m.labelIds)),
+              "TRASH",
+            ]);
+            updateDockBadge();
+          }),
       );
     } catch (err) {
       console.log("[gmail:untrashMessage] error", { error: String(err) });

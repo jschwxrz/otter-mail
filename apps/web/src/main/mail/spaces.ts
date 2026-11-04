@@ -1,4 +1,5 @@
 import { workspaceOf } from "../extensions/workspaces";
+import type { AliasMailboxEntry } from "./alias-mailboxes";
 import type { MailAccount, MailView } from "./types";
 
 export const CHATS_SPACE = "__chats__";
@@ -13,6 +14,7 @@ export const isViewSpaceId = (id: string) => id.startsWith("v_");
 
 export type Space =
   | { kind: "mailbox"; id: string; account: MailAccount }
+  | { kind: "alias"; id: string; account: MailAccount; alias: AliasMailboxEntry }
   | { kind: "view"; id: string; view: MailView }
   | { kind: "chats"; id: typeof CHATS_SPACE }
   | { kind: "calendar"; id: typeof CALENDAR_SPACE }
@@ -20,7 +22,11 @@ export type Space =
 
 export function spaceOf(
   id: string,
-  { accounts, views }: { accounts: MailAccount[]; views: MailView[] },
+  {
+    accounts,
+    views,
+    aliases = [],
+  }: { accounts: MailAccount[]; views: MailView[]; aliases?: AliasMailboxEntry[] },
 ): Space | null {
   if (id === CHATS_SPACE) return { kind: "chats", id };
   if (id === CALENDAR_SPACE) return { kind: "calendar", id };
@@ -31,7 +37,9 @@ export function spaceOf(
     return view ? { kind: "view", id, view } : null;
   }
   const account = accounts.find((a) => a.id === id);
-  return account ? { kind: "mailbox", id, account } : null;
+  if (account) return { kind: "mailbox", id, account };
+  const alias = aliases.find((a) => a.id === id);
+  return alias ? { kind: "alias", id, account: alias.parent, alias } : null;
 }
 
 export function firstLabelOf(spaceId: string): string {
@@ -52,4 +60,5 @@ export function modeOf(spaceId: string | null): AppMode {
   return workspace ? `workspace:${workspace.id}` : "mail";
 }
 
-export const spansMailboxes = (space: Space | null) => space != null && space.kind !== "mailbox";
+export const spansMailboxes = (space: Space | null) =>
+  space != null && space.kind !== "mailbox" && space.kind !== "alias";

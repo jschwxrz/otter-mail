@@ -1,4 +1,9 @@
-import type { ImapSettings, MailCapabilities, MailProviderKind } from "@otter-mail/contracts";
+import type {
+  AliasMailbox,
+  ImapSettings,
+  MailCapabilities,
+  MailProviderKind,
+} from "@otter-mail/contracts";
 
 export interface MailAccount {
   id: string;
@@ -18,6 +23,8 @@ export interface MailAccount {
   signatureInGmail?: boolean;
   /** The other addresses it sends from (`capabilities.sendAs`); never its own. */
   sendAs?: string[];
+  /** Those of `sendAs` shown as mailboxes of their own (IMAP). */
+  aliasMailboxes?: AliasMailbox[];
   /** No usable Google sign-in; set by gmail:listAccounts, never stored. */
   signedOut?: boolean;
 }
@@ -39,6 +46,8 @@ export interface MessageSummary {
   fromName: string;
   fromEmail: string;
   to: string;
+  /** Absent where the summary doesn't carry it (Gmail's and Outlook's lists): the detail does. */
+  cc?: string;
   subject: string;
   snippet: string;
   date: number;
@@ -53,13 +62,17 @@ export interface MessageSummary {
   /** RFC 2822 reply headers — captured on Gmail fetches and persisted, never returned by store reads. */
   messageIdHeader?: string;
   referencesHeader?: string;
+  /**
+   * The addresses the server delivered this copy to, lower-cased (IMAP: the topmost
+   * Original-Recipient, Delivered-To and X-Original-To). Never returned by store reads.
+   */
+  deliveredTo?: string[];
 }
 
 export interface MessageDetail extends MessageSummary {
   draftRevision?: string;
   bodyHtml: string | null;
   bodyText: string | null;
-  cc?: string;
   bcc?: string;
   attachments: {
     id: string;

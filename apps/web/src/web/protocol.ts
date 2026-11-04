@@ -31,7 +31,7 @@ export type PageEffect =
       title: string;
       subtitle?: string;
       body?: string;
-      open?: { accountId: string; messageId: string };
+      open?: { accountId: string; messageId: string; mailbox?: string };
     }
   | { kind: "badge"; count: number }
   | { kind: "download"; name: string; bytes: Uint8Array }

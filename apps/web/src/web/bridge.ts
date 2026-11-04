@@ -140,7 +140,7 @@ function saveBytes(name: string, bytes: Uint8Array, open: boolean): void {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-let pendingOpenMessage: { accountId: string; messageId: string } | null = null;
+let pendingOpenMessage: { accountId: string; messageId: string; mailbox?: string } | null = null;
 
 function applyEffect(effect: PageEffect): void {
   switch (effect.kind) {
