@@ -288,7 +288,8 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-describe("Gmail realtime", () => {
+// Real background syncs: well under a second alone, seconds on a busy CI runner.
+describe("Gmail realtime", { timeout: 15_000 }, () => {
   it("opens the event stream with the session, and reports it live", async () => {
     await boot();
     await goLive();

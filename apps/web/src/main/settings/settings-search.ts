@@ -346,6 +346,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["alias mailbox address tab inbox separate custom domain icloud filter"],
   },
   {
+    id: "alias-mail-in-parent",
+    title: "Their mail in the account's tab too",
+    pane: "accounts",
+    searchTerms: ["alias mailbox mail parent tab twice duplicate rest only icloud"],
+  },
+  {
     id: "alias-mailbox",
     title: "Address with its own mailbox",
     pane: "accounts",

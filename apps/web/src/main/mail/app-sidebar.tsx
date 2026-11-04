@@ -50,6 +50,7 @@ export function AppSidebar({
   composing,
   onMode,
   onGo,
+  onMoveTab,
   onSelectChat,
   onNewChat,
   onCompose,
@@ -72,6 +73,7 @@ export function AppSidebar({
   composing: boolean;
   onMode: (mode: AppMode) => void;
   onGo: (spaceId: string, labelId?: string) => void;
+  onMoveTab: (id: string, target: string, after: boolean) => void;
   onSelectChat: (chatId: string) => void;
   onNewChat: () => void;
   onCompose: () => void;
@@ -125,6 +127,7 @@ export function AppSidebar({
               tabs={tabs}
               selectedId={mailbox}
               onSelect={(id) => onGo(id)}
+              onMove={onMoveTab}
             />
           </div>
           <MailPage
@@ -255,11 +258,13 @@ function SidebarTabs({
   tabs,
   selectedId,
   onSelect,
+  onMove,
 }: {
   options: MailboxOption[];
   tabs: MailboxTab[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onMove: (id: string, target: string, after: boolean) => void;
 }) {
   const unread = useInboxUnread(
     tabs.flatMap((tab) => (tab.alias ? [] : [tab.account])),
@@ -270,11 +275,13 @@ function SidebarTabs({
       tour="mailbox"
       selectedId={selectedId}
       onSelect={onSelect}
+      onMove={onMove}
       items={options.map((option) => ({
         id: option.id,
         label: option.name,
         icon: <AccountPicture account={option.account} className="size-5 rounded-md text-[10px]" />,
         hint: option.shortcut,
+        detail: option.detail,
         dot: (unread[option.id] ?? 0) > 0,
       }))}
     />

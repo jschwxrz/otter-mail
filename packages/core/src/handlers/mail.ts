@@ -65,7 +65,7 @@ import {
   saveSendAs,
   saveSignature,
 } from "../services/signatures.js";
-import { aliasScope, resolveMailbox } from "../services/alias-mailboxes.js";
+import { aliasScope, resolveMailbox, restScope } from "../services/alias-mailboxes.js";
 import { suggestSendAs } from "../services/send-as-suggestions.js";
 import * as viewsStore from "../services/views-store.js";
 import { ALL_MAIL_LABEL_ID } from "../types.js";
@@ -452,11 +452,13 @@ export function registerMailHandlers(): void {
       mailSync.syncAccount(accountId);
       const alias = asString(p?.alias);
       if (alias) return mailStore.getAliasLabels(accountId, await aliasScope(accountId, alias));
-      const local = mailStore.getLabels(accountId);
-      if (local.length > 0) return local;
-      const labels = await providerFor(accountId).listLabels(accountId);
-      mailStore.upsertLabels(accountId, labels);
-      return labels;
+      let labels = mailStore.getLabels(accountId);
+      if (labels.length === 0) {
+        labels = await providerFor(accountId).listLabels(accountId);
+        mailStore.upsertLabels(accountId, labels);
+      }
+      const rest = await restScope(accountId);
+      return rest ? mailStore.withoutAliasMail(accountId, labels, rest) : labels;
     } catch (err) {
       console.log("[gmail:listLabels] error", { error: String(err) });
       throw err;
@@ -546,7 +548,7 @@ export function registerMailHandlers(): void {
       const accountId = assertString(p?.accountId, "accountId");
       const labelIds = asStringArray(p?.labelIds);
       const aliasId = asString(p?.alias);
-      const alias = aliasId ? await aliasScope(accountId, aliasId) : undefined;
+      const scope = aliasId ? await aliasScope(accountId, aliasId) : await restScope(accountId);
       const pageToken = asString(p?.pageToken);
       const maxResults = asNumber(p?.maxResults) ?? LOCAL_PAGE_SIZE;
 
@@ -559,7 +561,7 @@ export function registerMailHandlers(): void {
 
       const liveLabelId = labelId === ALL_MAIL_LABEL_ID ? null : labelId;
       const page = await pageWithLiveFill([{ accountId, labelId: liveLabelId }], maxResults, () =>
-        mailStore.getThreadsPage(accountId, labelId, offset, maxResults, alias),
+        mailStore.getThreadsPage(accountId, labelId, offset, maxResults, scope),
       );
       return {
         messages: page.messages,
@@ -589,9 +591,9 @@ export function registerMailHandlers(): void {
     try {
       const q = asString(p?.q) ?? "";
       const mailbox = asString(p?.accountId);
-      const { accountId, alias } = mailbox
+      const { accountId, scope } = mailbox
         ? await resolveMailbox(mailbox)
-        : { accountId: null, alias: undefined };
+        : { accountId: null, scope: undefined };
       const labelId = asString(p?.labelId);
       const rules = p?.rules === undefined ? undefined : parseRules(p.rules);
       const pageToken = asString(p?.pageToken);
@@ -600,7 +602,7 @@ export function registerMailHandlers(): void {
 
       const page = mailStore.searchMessages(q, accountId, offset, maxResults, {
         labelId,
-        alias,
+        mailbox: scope,
         rules,
         starred: p?.starred === true || undefined,
         important: p?.important === true || undefined,

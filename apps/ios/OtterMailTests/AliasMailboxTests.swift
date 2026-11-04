@@ -134,7 +134,7 @@ struct AliasMailboxTests {
         #expect(store.threads(in: .sent, scope: parent).map(\.id) == ["own"])
     }
 
-    @Test func aliasMailboxesFollowTheirParentInTheSwitcher() {
+    @Test func aliasMailboxesStartAfterTheirParentAndGoAnywhere() {
         let gmail = mailbox("robin@gmail.example", imap: false)
         let store = store([], mailboxes: [mailbox(), gmail])
         #expect(store.shownScopes.map(\.email) == [parent, me, studio, gmail.email])
@@ -146,30 +146,73 @@ struct AliasMailboxTests {
         #expect(store.alias(me)?.displayName == "Me")
         #expect(store.alias(me)?.color == Session.defaultColor(me))
         #expect(store.alias(me)?.signature == "<div>Robin</div>")
+        // Me isn't ordered yet: it follows Studio, the one before it by default.
         store.preferences.arrangement.order = [gmail.email, studio, parent]
-        #expect(store.shownScopes.map(\.email) == [gmail.email, parent, studio, me])
+        #expect(store.shownScopes.map(\.email) == [gmail.email, studio, me, parent])
+        #expect(store.groupedScopes.map(\.email) == [gmail.email, parent, studio, me])
         store.setOn(false, store.alias(studio)!)
-        #expect(store.shownScopes.map(\.email) == [gmail.email, parent, me])
+        #expect(store.shownScopes.map(\.email) == [gmail.email, me, parent])
         store.setOn(false, mailbox())
         #expect(store.shownScopes.map(\.email) == [gmail.email])
-        #expect(store.preferences.arrangement.off == [parent, studio])
+        #expect(store.preferences.arrangement.off == [studio, parent])
         // Gmail's Send mail as comes later: only IMAP mailboxes have alias mailboxes for now.
         store.otherAddresses.sendAs[gmail.email] = ["alias@gmail.example"]
         store.otherAddresses.aliasMailboxes[gmail.email] = [AliasMailbox(address: "alias@gmail.example")]
         #expect(store.aliases(of: gmail).isEmpty)
     }
 
-    @Test func reorderingKeepsAliasMailboxesWithTheirParent() {
+    @Test func reorderingPutsAnyMailboxAnywhere() {
         let gmail = mailbox("robin@gmail.example", imap: false)
         let store = store([], mailboxes: [mailbox(), gmail])
         #expect(store.arrangedScopes.map(\.email) == [parent, me, studio, gmail.email])
         store.move(from: [2], to: 1)
         #expect(store.arrangedScopes.map(\.email) == [parent, studio, me, gmail.email])
-        // Dragged past the Gmail mailbox, it goes back after its parent.
         store.move(from: [1], to: 4)
-        #expect(store.arrangedScopes.map(\.email) == [parent, me, studio, gmail.email])
+        #expect(store.arrangedScopes.map(\.email) == [parent, me, gmail.email, studio])
+        // Settings lists it under its parent all the same.
+        #expect(store.groupedScopes.map(\.email) == [parent, me, studio, gmail.email])
         store.move(from: [3], to: 0)
-        #expect(store.arrangedScopes.map(\.email) == [gmail.email, parent, me, studio])
+        #expect(store.arrangedScopes.map(\.email) == [studio, parent, me, gmail.email])
+    }
+
+    @Test func theParentsListCanLeaveItsAliasMailboxesMailOut() {
+        let toParent = thread("parent", ["INBOX"], [message("p", to: [parent], deliveredTo: parent)])
+        let toMe = thread("me", ["INBOX"], [message("m", to: [me])])
+        // Your reply beside mail for Me doesn't keep it in the parent's Inbox.
+        let dinner = thread("dinner", ["INBOX"], [
+            message("d1", to: [me], deliveredTo: me, hoursAgo: 3),
+            message("d2", from: Person(name: "Robin", email: me), to: [ines.email], unread: false, hoursAgo: 2),
+        ])
+        let fromStudio = thread("from-studio", ["SENT"], [message("s", from: Person(name: "Robin", email: studio), to: [ines.email], unread: false)])
+        let fromParent = thread("from-parent", ["SENT"], [message("o", from: Person(name: "Robin", email: parent), to: [ines.email], unread: false)])
+        let store = store([toParent, toMe, dinner, copies, fromStudio, fromParent])
+        let inbox = { Set(store.threads(in: .inbox, scope: self.parent).map(\.id)) }
+        #expect(inbox() == ["parent", "me", "dinner", "open-day"])
+
+        store.setAliasMailInParent(false, parent)
+        #expect(store.preferences.aliasMailApart == [parent])
+        #expect(inbox() == ["parent"])
+        #expect(store.threads(in: .sent, scope: parent).map(\.id) == ["from-parent"])
+        #expect(store.unreadCount(in: .inbox, scope: parent) == 1)
+        #expect(Set(store.threads(in: .inbox, scope: me).map(\.id)) == ["me", "dinner", "open-day"])
+        // The badge still counts all of it, once.
+        #expect(store.appBadge == 4)
+
+        // A turned-off alias mailbox's mail comes back, or it would be nowhere.
+        store.setOn(false, store.alias(studio)!)
+        #expect(inbox() == ["parent", "open-day"])
+
+        store.setAliasMailInParent(true, parent)
+        #expect(store.preferences.aliasMailApart.isEmpty)
+        #expect(inbox() == ["parent", "me", "dinner", "open-day"])
+    }
+
+    @Test func iCloudIsAppleSMailServer() {
+        var cloud = mailbox()
+        #expect(!cloud.isICloud)
+        cloud.imap?.imap.host = "IMAP.mail.me.com"
+        #expect(cloud.isICloud)
+        #expect(!mailbox(imap: false).isICloud)
     }
 
     @Test func anAliasMailboxShowsThePictureChosenForIt() {

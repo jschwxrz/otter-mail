@@ -1,7 +1,7 @@
 import { TimePicker } from "./mail-schedule";
 import { useCapabilities } from "./capabilities";
 import { useState, type ReactNode } from "react";
-import { PaperclipIcon, Trash2Icon, TypeIcon } from "lucide-react";
+import { PaperclipIcon, Trash2Icon } from "lucide-react";
 import { matchesCommand } from "../keybindings/dispatch";
 import { ShortcutText } from "../keybindings/store";
 import { HintTooltip, IconBtn, cn } from "./ui";
@@ -278,8 +278,6 @@ const FOOTER_ICON = "size-8 rounded-lg";
 export function ComposerFooter({
   onAttach,
   attachDisabled,
-  formatting,
-  onToggleFormatting,
   onDiscard,
   status,
   statusTone = "muted",
@@ -291,8 +289,6 @@ export function ComposerFooter({
 }: {
   onAttach: () => void;
   attachDisabled?: boolean;
-  formatting: boolean;
-  onToggleFormatting: () => void;
   onDiscard: () => void;
   status?: ReactNode;
   statusTone?: "muted" | "error";
@@ -313,16 +309,6 @@ export function ComposerFooter({
           className={FOOTER_ICON}
         >
           <PaperclipIcon className="size-4" />
-        </IconBtn>
-      </HintTooltip>
-      <HintTooltip label={formatting ? "Hide formatting" : "Formatting"}>
-        <IconBtn
-          label="Formatting"
-          active={formatting}
-          onClick={onToggleFormatting}
-          className={FOOTER_ICON}
-        >
-          <TypeIcon className="size-4" />
         </IconBtn>
       </HintTooltip>
       <HintTooltip label="Discard draft">

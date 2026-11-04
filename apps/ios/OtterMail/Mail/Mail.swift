@@ -30,6 +30,8 @@ nonisolated struct Mailbox: Identifiable, Hashable, Codable {
     var source: String { parent ?? email }
     var me: Person { Person(name: name, email: email) }
     var provider: MailProviderKind { imap != nil ? .imap : outlook == true ? .outlook : .gmail }
+    /** On Apple's mail server, as the Mac's Add mailbox › iCloud sets it up. */
+    var isICloud: Bool { imap?.imap.host.lowercased() == "imap.mail.me.com" }
     var capabilities: MailCapabilities {
         switch provider {
         case .gmail: .gmail

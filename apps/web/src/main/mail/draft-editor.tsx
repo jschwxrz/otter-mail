@@ -75,7 +75,6 @@ export function DraftEditor({
   const [subject, setSubject] = useState(detail.subject ?? "");
   const [text, setText] = useState(detail.bodyText ?? "");
   const [sending, setSending] = useState(false);
-  const [formatting, setFormatting] = useState(false);
   const editorRef = useRef<RichTextRef>(null);
 
   const sendMessage = useSendMessage();
@@ -359,7 +358,6 @@ export function DraftEditor({
       ariaLabel="Message"
       onTextChange={setText}
       autoFocus={autoFocus}
-      showToolbar={formatting}
       minHeightClass={inThread ? "min-h-[140px]" : "min-h-[40vh]"}
       maxHeightClass={inThread ? "max-h-[45vh]" : "max-h-none"}
       initialHTML={detail.bodyHtml ?? (detail.bodyText ? textToHtml(detail.bodyText) : undefined)}
@@ -375,8 +373,6 @@ export function DraftEditor({
     <ComposerFooter
       onAttach={attach}
       attachDisabled={attachments == null}
-      formatting={formatting}
-      onToggleFormatting={() => setFormatting((f) => !f)}
       onDiscard={handleDiscard}
       status={
         attachments == null ? (

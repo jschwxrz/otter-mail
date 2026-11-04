@@ -1,6 +1,7 @@
-import type { MailProviderKind } from "@otter-mail/contracts";
-import { ServerIcon } from "lucide-react";
+import { CloudIcon, ServerIcon } from "lucide-react";
 import gmailMark from "../assets/gmail.svg";
+import { isICloud } from "./capabilities";
+import type { MailAccount } from "./types";
 
 export function GmailMark({ className = "size-4" }: { className?: string }) {
   return <img src={gmailMark} className={`${className} object-contain`} alt="" aria-hidden />;
@@ -18,19 +19,29 @@ export function MicrosoftMark({ className = "size-4" }: { className?: string }) 
 }
 
 export function ProviderMark({
-  provider = "gmail",
+  account,
   className = "size-3.5",
 }: {
-  provider?: MailProviderKind;
+  account: Pick<MailAccount, "provider" | "imap">;
   className?: string;
 }) {
-  const label = provider === "gmail" ? "Gmail" : provider === "outlook" ? "Outlook" : "IMAP";
+  const provider = account.provider ?? "gmail";
+  const icloud = isICloud(account);
+  const label = icloud
+    ? "iCloud"
+    : provider === "gmail"
+      ? "Gmail"
+      : provider === "outlook"
+        ? "Outlook"
+        : "IMAP";
   return (
     <span role="img" aria-label={label} title={label} className="inline-flex shrink-0 items-center">
       {provider === "gmail" ? (
         <GmailMark className={className} />
       ) : provider === "outlook" ? (
         <MicrosoftMark className={className} />
+      ) : icloud ? (
+        <CloudIcon className={className} color="#3b9cf5" fill="currentColor" aria-hidden />
       ) : (
         <ServerIcon className={className} aria-hidden />
       )}

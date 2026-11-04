@@ -50,9 +50,9 @@ account offers each kind.
 | Add a Gmail mailbox (Google sign-in)                                                                        | ✓ (loopback OAuth) | ✓ (popup; tokens kept by the relay) | ✓ (PKCE)                |
 | Add an IMAP mailbox, servers discovered                                                                     | ✓                  | ✓ (no domain autoconfig file: CORS) | ✓                       |
 | Add an Outlook mailbox (Microsoft sign-in)                                                                  | ✓ (loopback OAuth) | ✓ (popup; tokens kept by the relay) | ✓ (PKCE)                |
-| Provider icons in mailbox settings (Gmail, Outlook, IMAP)                                                   | ✓                  | ✓                                   | ✓                       |
+| Provider icons in mailbox settings (Gmail, Outlook, iCloud, IMAP)                                           | ✓                  | ✓                                   | ✓ (iCloud's: IMAP's)    |
 | IMAP through the relay tunnel                                                                               | — (direct)         | ✓ (TLS 1.3 servers only)            | — (direct)              |
-| Several mailboxes: on/off, reorder                                                                          | ✓                  | ✓                                   | ✓                       |
+| Several mailboxes: on/off, reorder (drag the sidebar's tabs; alias mailboxes anywhere)                      | ✓                  | ✓                                   | ✓ (aliases by parent)   |
 | One sidebar: mailbox tabs, Search or ask (⌘K)                                                               | ✓                  | ✓                                   | — (bar menu)            |
 | Modes at the sidebar's foot: Mail, Calendar, Agent (G M, G C, G A); each its own sidebar, back where it was | ✓                  | ✓                                   | —                       |
 | ⌘-click a place (folder, conversation, chat, mode, Settings): a new tab behind; ⌘⇧ shows it                 | ✓ (window tab)     | ✓ (browser tab)                     | —                       |
@@ -62,6 +62,7 @@ account offers each kind.
 | Rename and color a mailbox (synced)                                                                         | ✓                  | ✓                                   | ✓                       |
 | Own mailbox for a Send from address (IMAP): a tab, filtered folders, name, color, signature; synced         | ✓                  | ✓                                   | ✓ (made on Mac, web)    |
 | A message Bcc'd to two of your addresses: a copy in each alias mailbox, shown once elsewhere                | ✓                  | ✓                                   | ✓                       |
+| The parent without its alias mailboxes' mail (a switch; synced)                                             | ✓                  | ✓                                   | —                       |
 | Google profile picture per mailbox                                                                          | ✓ (kept current)   | ✓ (kept current)                    | —                       |
 | Your own picture for a mailbox (Settings › Connections; synced, over Google's)                              | ✓                  | ✓                                   | shown                   |
 | Your own picture for an alias mailbox (its settings; synced with its parent)                                | ✓                  | ✓                                   | shown                   |
@@ -262,7 +263,7 @@ chats read the same everywhere and continue on that Mac.
 | From in an alias mailbox               | new mail and replies from its address; its signature, else the mailbox's                                                          | ✓        | ✓                                              |
 | Contact suggestions (from cached mail) | ✓                                                                                                                                 | ✓        | ✓ (recipient chips)                            |
 | Attachments (25 MB)                    | ✓                                                                                                                                 | ✓        | ✓ (Photos / Files)                             |
-| Rich text (bold, lists, links, quotes) | ✓                                                                                                                                 | ✓        | —                                              |
+| Rich text (bold, lists, links, quotes) | toolbar and shortcuts: bold, italic, underline, size, color, links, nested lists (Tab, Shift+Tab), quotes, undo                   | ✓        | —                                              |
 | Drafts                                 | autosaved, conflict-aware                                                                                                         | ✓        | local autosave/recovery; mailbox save on close |
 | Undo send (10 s)                       | ✓                                                                                                                                 | ✓        | —                                              |
 | Send later                             | ✓ (on this device, while open; Outlook: by Outlook)                                                                               | ✓ (same) | —                                              |

@@ -23,7 +23,7 @@ import {
   listAccounts,
   updateAccount,
 } from "./account-store.js";
-import { parseAliasMailboxes } from "./alias-mailboxes.js";
+import { followAliasMailApart, parseAliasMailboxes } from "./alias-mailboxes.js";
 import { getSettings, updateSettings, type AppSettings } from "./settings-store.js";
 import { listViews, writeViews } from "./views-store.js";
 import type { AliasMailbox } from "@otter-mail/contracts";
@@ -53,6 +53,7 @@ export async function getUiPreferences(initialize = false): Promise<UiPreference
 async function writeUiPreferences(ui: UiPreferences): Promise<void> {
   await writeJson(UI_FILE, ui);
   followMailboxArrangement(ui["mail:mailboxes"]);
+  followAliasMailApart(ui["mail:alias-mail-apart"]);
   broadcast("preferences:uiChanged", ui);
 }
 

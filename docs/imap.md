@@ -103,7 +103,8 @@ One of the addresses a mailbox sends from (`sendAs`) can have a mailbox of its o
 **Own mailbox** switch on its row in Settings › Connections › Send from. A custom domain's
 addresses delivered into one iCloud inbox then each get a tab beside the mailboxes, with their
 own Inbox, Flagged, Sent, Drafts, Archive, Junk and Trash, filtered from the parent's mail, and
-their own name, color and signature. The parent's tab still shows everything. IMAP only for now
+their own name, color and signature. The parent's tab shows their mail too, unless its **Their
+mail in … too** switch (under the Send from addresses) is off. IMAP only for now
 (`capabilities.sendAs === "device"`).
 
 - Data: `account.aliasMailboxes` (contracts' `AliasMailbox`: address, name, color, signature),
@@ -116,10 +117,16 @@ their own name, color and signature. The parent's tab still shows everything. IM
   from the id, as an account's does. A picture chosen for it is the parent's `aliasPictures[id]`,
   kept with the parent's row on the relay (`alias_pictures`, at most 16) like a mailbox's own
   picture, not in the capped preferences; it stays while its mailbox is off.
-- Order and on/off: the `mail:mailboxes` UI preference, keyed by its id. An alias mailbox always
-  follows its parent (`arrangeMailboxes`, `apps/web/src/main/mailboxes.ts`); `order` ranks it
-  among the parent's others, and a new one comes last of them. Turned off, or with its parent off,
-  it isn't shown.
+- Order and on/off: the `mail:mailboxes` UI preference, keyed by its id. Its tab drags anywhere
+  in the sidebar's row (`arrangeMailboxes` and `moveMailbox`, `apps/web/src/main/mailboxes.ts`);
+  one not dragged yet follows its parent and the parent's others. Settings › Connections lists it
+  under its parent either way. Turned off, or with its parent off, it isn't shown.
+- The parent without their mail: the `mail:alias-mail-apart` UI preference lists the parents
+  (addresses, lower-cased) whose switch is off, and core follows it (`followAliasMailApart`). Their
+  tab then lists what none of their alias mailboxes that are turned on has (`RestScope`,
+  `services/mail-store.ts`; a turned-off one's mail stays, or it would be nowhere), and its folder
+  counts are the server's less theirs (`withoutAliasMail`), since the server counts mail not cached
+  yet. Searching the parent still finds all of its mail.
 - Which mail is its own (`aliasWhere`, `services/mail-store.ts`). Each copy keeps every
   address it was delivered to: the topmost `Original-Recipient` (`rfc822;` stripped; iCloud
   stamps it on every delivered copy), `Delivered-To` and `X-Original-To` (Postfix with virtual

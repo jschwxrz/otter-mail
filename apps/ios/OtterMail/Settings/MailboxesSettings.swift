@@ -5,26 +5,33 @@ struct MailboxesSettings: View {
     @Environment(MailStore.self) private var store
     @Environment(\.palette) private var palette
     @State private var error: String?
+    @State private var editMode: EditMode = .inactive
 
     var body: some View {
         SettingsForm {
             Section {
                 let shown = store.shownScopes
                 let mailboxes = store.shownMailboxes.count
-                ForEach(store.arrangedScopes) { mailbox in
+                // Editing, the menu's order: anything goes anywhere. Otherwise each mailbox with its alias mailboxes under it.
+                ForEach(editMode.isEditing ? store.arrangedScopes : store.groupedScopes) { mailbox in
                     if let parent = mailbox.parent {
                         // Made and edited on the Mac and the web, so no page of its own here.
                         row(mailbox, on: shown.contains(mailbox), locked: shown.allSatisfy { $0.email != parent }) {
-                            Text(mailbox.displayName).foregroundStyle(palette.text)
+                            HStack(spacing: 6) {
+                                Text(mailbox.displayName).foregroundStyle(palette.text)
+                                if editMode.isEditing, let parent = store.mailbox(parent) {
+                                    Text("in \(parent.displayName)").font(.inter(.subheadline)).foregroundStyle(palette.muted)
+                                }
+                            }
                         }
-                        .padding(.leading, 24)
+                        .padding(.leading, editMode.isEditing ? 0 : 24)
                     } else {
                         NavigationLink {
                             MailboxSettings(email: mailbox.email)
                         } label: {
                             row(mailbox, on: shown.contains(mailbox), locked: shown.contains(mailbox) && mailboxes == 1) {
                                 HStack(spacing: 6) {
-                                    ProviderMark(provider: mailbox.provider, size: 14)
+                                    ProviderMark(provider: mailbox.provider, icloud: mailbox.isICloud, size: 14)
                                     Text(mailbox.displayName).foregroundStyle(palette.text)
                                 }
                             }
@@ -72,6 +79,7 @@ struct MailboxesSettings: View {
         .navigationTitle("Mailboxes")
         .toolbarTitleDisplayMode(.inline)
         .toolbar { EditButton() }
+        .environment(\.editMode, $editMode)
         .alert("Couldn't add the mailbox", isPresented: .constant(error != nil)) {
             Button("OK") { error = nil }
         } message: {
@@ -213,6 +221,19 @@ struct MailboxSettings: View {
                 Text("Shown in the sidebar and on its mail, on every device. Only used in Otter Mail.").sectionFooter()
             }
 
+            let aliases = store.aliases(of: mailbox)
+            if !aliases.isEmpty {
+                Section {
+                    Toggle("Their mail in \(mailbox.displayName) too", isOn: Binding(
+                        get: { !store.preferences.aliasMailApart.contains(email.lowercased()) },
+                        set: { store.setAliasMailInParent($0, email) }
+                    ))
+                } footer: {
+                    Text("Mail for \(ListFormatter.localizedString(byJoining: aliases.map(\.displayName))) also shows in \(mailbox.displayName)'s list. Off, \(mailbox.displayName) shows only the rest.")
+                        .sectionFooter()
+                }
+            }
+
             if !mailbox.signedOut {
                 Section {
                     SignatureEditor(
@@ -280,7 +301,7 @@ struct MailboxSettings: View {
         switch mailbox.provider {
         case .gmail: "Gmail"
         case .outlook: "Outlook"
-        case .imap: "the server"
+        case .imap: mailbox.isICloud ? "iCloud" : "the server"
         }
     }
 
@@ -368,6 +389,7 @@ struct GmailMark: View {
 
 struct ProviderMark: View {
     let provider: MailProviderKind
+    var icloud = false
     var size: CGFloat = 14
 
     var body: some View {
@@ -375,12 +397,12 @@ struct ProviderMark: View {
             switch provider {
             case .gmail: GmailMark(size: size)
             case .outlook: MicrosoftMark(size: size)
-            case .imap: Image(systemName: "server.rack").font(.system(size: size))
+            case .imap: Image(systemName: icloud ? "icloud.fill" : "server.rack").font(.system(size: size))
             }
         }
         .frame(width: size, height: size)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(provider == .gmail ? "Gmail" : provider == .outlook ? "Outlook" : "IMAP")
+        .accessibilityLabel(provider == .gmail ? "Gmail" : provider == .outlook ? "Outlook" : icloud ? "iCloud" : "IMAP")
     }
 }
 

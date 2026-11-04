@@ -33,7 +33,9 @@ async function searchAccount(
   q: string,
   cursor: string | undefined,
 ): Promise<{ rows: MessageSummary[]; next: string | null; estimate: number }> {
-  const { accountId, alias } = await resolveMailbox(mailbox);
+  const { accountId, scope } = await resolveMailbox(mailbox);
+  // Searching a parent finds all of its mail, on its server, its alias mailboxes' too.
+  const alias = scope && "address" in scope ? scope : undefined;
   const provider = providerFor(accountId);
   if (!provider.search || alias) {
     const local = searchLocal(accountId, q, alias);
@@ -155,7 +157,7 @@ function searchLocal(accountId: string, q: string, alias?: AliasScope): MessageS
   const attachments = ops.some((op) => op.key === "has" && op.value === "attachment");
   const found = mailStore.searchMessages(text, accountId, 0, 500, {
     labelId: labelId ?? undefined,
-    alias,
+    mailbox: alias,
     hasAttachments: attachments || undefined,
   }).messages;
   return found

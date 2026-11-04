@@ -19,6 +19,7 @@ final class MailStore {
     }
     @ObservationIgnored private var folderThreads: [Place: [MailThread]] = [:]
     @ObservationIgnored private var unreadCounts: [Place: Int] = [:]
+    @ObservationIgnored private var cachedFor: [String] = []
     var otherAddresses = MailAddresses() {
         didSet { if otherAddresses != oldValue { folderThreads.removeAll(); unreadCounts.removeAll() } }
     }
@@ -64,15 +65,33 @@ final class MailStore {
         arrangedMailboxes.filter { !preferences.arrangement.off.contains($0.email) }
     }
 
-    /** As on the Mac and the web: `mail:mailboxes` orders an alias mailbox only among its parent's, right after it. */
+    /**
+     * As on the Mac and the web: `mail:mailboxes` orders every mailbox, alias mailboxes among the rest.
+     * One not in it yet follows the one before it in the default order (each mailbox, then its alias
+     * mailboxes), so a new alias mailbox starts beside its parent.
+     */
     var arrangedScopes: [Mailbox] {
         let order = preferences.arrangement.order
         let rank = Dictionary(order.enumerated().map { ($1, $0) }) { a, _ in a }
-        return arrangedMailboxes.flatMap { mailbox in
+        let byDefault = arrangedMailboxes.flatMap { mailbox in
             [mailbox] + aliases(of: mailbox).enumerated()
                 .sorted { (rank[$0.element.email] ?? order.count, $0.offset) < (rank[$1.element.email] ?? order.count, $1.offset) }
                 .map(\.element)
         }
+        var previous = -1
+        return byDefault.enumerated()
+            .map { offset, mailbox in
+                if let at = rank[mailbox.email] { previous = at }
+                return (mailbox: mailbox, rank: previous, offset: offset)
+            }
+            .sorted { ($0.rank, $0.offset) < ($1.rank, $1.offset) }
+            .map(\.mailbox)
+    }
+
+    /** `arrangedScopes` with each mailbox's alias mailboxes under it, as Settings lists them. */
+    var groupedScopes: [Mailbox] {
+        let scopes = arrangedScopes
+        return scopes.filter { $0.parent == nil }.flatMap { mailbox in [mailbox] + scopes.filter { $0.parent == mailbox.email } }
     }
 
     var shownScopes: [Mailbox] {
@@ -171,8 +190,13 @@ final class MailStore {
     }
 
     /** Alias mailboxes' mail is their parents', so only mailboxes count. */
+    /** Each mailbox's Inbox with its alias mailboxes' mail, even when its list leaves that out. */
     var appBadge: Int {
-        shownMailboxes.reduce(0) { $0 + unreadCount(in: .inbox, scope: $1.email) }
+        shownMailboxes.reduce(0) { total, mailbox in
+            total + (aliasesApart(from: mailbox.email).isEmpty
+                ? unreadCount(in: .inbox, scope: mailbox.email)
+                : threads(of: mailbox.email, in: .inbox, whole: true).count(where: \.unread))
+        }
     }
 
     func upsert(mailbox: Mailbox) {
@@ -227,19 +251,38 @@ final class MailStore {
         preferences.arrangement.off = arrangedScopes.map(\.email).filter(off.contains)
     }
 
-    /** An alias mailbox dropped away from its parent goes back after it. */
     func move(from source: IndexSet, to destination: Int) {
         var moved = arrangedScopes
         moved.move(fromOffsets: source, toOffset: destination)
-        preferences.arrangement.order = moved.filter { $0.parent == nil }
-            .flatMap { mailbox in [mailbox] + moved.filter { $0.parent == mailbox.email } }
-            .map(\.email)
+        preferences.arrangement.order = moved.map(\.email)
+    }
+
+    /** The alias mailboxes turned on whose mail `email`'s list leaves out ("Their mail in … too" off). */
+    func aliasesApart(from email: String) -> [String] {
+        guard preferences.aliasMailApart.contains(email.lowercased()) else { return [] }
+        return shownAliases(of: email).map(\.id)
+    }
+
+    func setAliasMailInParent(_ on: Bool, _ email: String) {
+        let key = email.lowercased()
+        preferences.aliasMailApart = preferences.aliasMailApart.filter { $0 != key } + (on ? [] : [key])
+    }
+
+    /** The lists also follow which mailboxes are on and which leave their alias mailboxes' mail out. */
+    private func checkCaches() {
+        let key = preferences.arrangement.off + ["|"] + preferences.aliasMailApart
+        if key != cachedFor {
+            folderThreads.removeAll()
+            unreadCounts.removeAll()
+            cachedFor = key
+        }
     }
 
     func threads(in folder: Folder, scope: String) -> [MailThread] {
         // Cache hits must still subscribe the view to mail changes.
         _ = threads
         _ = otherAddresses
+        checkCaches()
         let key = Place(scope: scope, folder: folder)
         if let cached = folderThreads[key] { return cached }
         let result = threads(of: scope, in: folder).sorted { $0.latest.date > $1.latest.date }
@@ -250,6 +293,7 @@ final class MailStore {
     func unreadCount(in folder: Folder, scope: String) -> Int {
         _ = threads
         _ = otherAddresses
+        checkCaches()
         let key = Place(scope: scope, folder: folder)
         if let cached = unreadCounts[key] { return cached }
         let count = threads(of: scope, in: folder).reduce(0) { $0 + ($1.unread ? 1 : 0) }
@@ -257,26 +301,53 @@ final class MailStore {
         return count
     }
 
-    private func threads(of scope: String, in folder: Folder) -> [MailThread] {
+    /** `whole`: a mailbox's own list with its alias mailboxes' mail, whatever its switch says. */
+    private func threads(of scope: String, in folder: Folder, whole: Bool = false) -> [MailThread] {
         let alias = aliasScope(scope)
         let source = alias?.source ?? scope
         let addresses = self.addresses(of: source)
         let (mine, others) = (Set(addresses), Set(addresses.dropFirst()))
+        let apart = alias != nil || whole ? [] : aliasesApart(from: scope)
         return allThreads(of: source).filter { thread in
-            matches(thread, folder, mine: mine) && alias.map { Self.belongs(thread, to: $0.email, in: folder, others: others) } != false
+            guard matches(thread, folder, mine: mine) else { return false }
+            if let alias { return Self.belongs(thread, to: alias.email, in: folder, others: others) }
+            return apart.isEmpty || Self.isRest(thread, without: apart, in: folder, mine: mine, others: others)
+        }
+    }
+
+    /** Whether `message` puts its thread in `address`'s (an alias mailbox's) `folder`. */
+    private static func isFor(_ message: Message, _ address: String, in folder: Folder, others: Set<String>) -> Bool {
+        let received = {
+            AliasMailbox.receives(address, deliveredTo: message.deliveredTo, recipients: (message.to + message.cc).map(\.email), others: others)
+        }
+        let wrote = { message.from.isAddress(address) }
+        switch folder {
+        case .inbox, .junk: return received()
+        case .sent: return !message.draft && wrote()
+        case .drafts: return message.draft && wrote()
+        default: return received() || wrote()
         }
     }
 
     static func belongs(_ thread: MailThread, to address: String, in folder: Folder, others: Set<String>) -> Bool {
-        let received = { (message: Message) in
-            AliasMailbox.receives(address, deliveredTo: message.deliveredTo, recipients: (message.to + message.cc).map(\.email), others: others)
-        }
-        let wrote = { (message: Message) in message.from.isAddress(address) }
-        switch folder {
-        case .inbox, .junk: return thread.messages.contains(where: received)
-        case .sent: return thread.sent.contains(where: wrote)
-        case .drafts: return thread.messages.contains { $0.draft && wrote($0) }
-        default: return thread.messages.contains { received($0) || wrote($0) }
+        thread.messages.contains { isFor($0, address, in: folder, others: others) }
+    }
+
+    /**
+     * Whether the parent's `folder` keeps `thread` with its alias mailboxes' (`aliases`) mail left out:
+     * one of the messages that put it there is none of theirs. In Inbox and Junk that's mail that came
+     * in, not your replies beside it.
+     */
+    static func isRest(_ thread: MailThread, without aliases: [String], in folder: Folder, mine: Set<String>, others: Set<String>) -> Bool {
+        thread.messages.contains { message in
+            let fromMine = mine.contains(message.from.email.lowercased())
+            let there = switch folder {
+            case .inbox, .junk: !message.draft && (!fromMine || (message.to + message.cc).contains { mine.contains($0.email.lowercased()) })
+            case .sent: !message.draft && fromMine
+            case .drafts: message.draft
+            default: true
+            }
+            return there && !aliases.contains { isFor(message, $0, in: folder, others: others) }
         }
     }
 
