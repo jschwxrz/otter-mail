@@ -372,7 +372,7 @@ const personal: SeedAccount = {
           {
             from: mum,
             hoursAgo: 50,
-            text: "Here are a couple from Sunday. Your father insists the fish was bigger than it looks.\n\nLove,\nMum",
+            text: "Here are a couple from Sunday. Your father insists the fish was bigger than it looks. Ring us on +44 20 7946 0958 this weekend?\n\nLove,\nMum",
             attachments: [
               {
                 filename: "lake-morning.svg",
@@ -1084,7 +1084,7 @@ const work: SeedAccount = {
             from: p("Support digest", "digest@acme.example"),
             hoursAgo: 24 * 10,
             text: "Top requests this month: offline search (41), keyboard shortcuts (27), Outlook import (12).",
-            html: "<h2>September feedback</h2><table border='1' cellpadding='6' style='border-collapse:collapse'><tr><th>Request</th><th>Votes</th></tr><tr><td>Offline search</td><td>41</td></tr><tr><td>Keyboard shortcuts</td><td>27</td></tr><tr><td>Outlook import</td><td>12</td></tr></table><p>NPS: <b>54</b> (+3)</p>",
+            html: "<h2>September feedback</h2><table border='1' cellpadding='6' style='border-collapse:collapse'><tr><th>Request</th><th>Votes</th></tr><tr><td>Offline search</td><td>41</td></tr><tr><td>Keyboard shortcuts</td><td>27</td></tr><tr><td>Outlook import</td><td>12</td></tr></table><p>NPS: <b>54</b> (+3)</p><p>Questions? Call me on +1 415 555 0132.</p>",
           },
         ],
       },
