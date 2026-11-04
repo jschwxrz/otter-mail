@@ -239,6 +239,8 @@ export type SidebarPickerItem = {
   label: string;
   icon: ReactNode;
   hint?: string;
+  /** Added to the tooltip: "Mail · in iCloud". */
+  detail?: string;
   dot?: boolean;
 };
 
@@ -246,31 +248,83 @@ export function SidebarPicker({
   items,
   selectedId,
   onSelect,
+  onMove,
   tour,
 }: {
   items: readonly SidebarPickerItem[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Given, the items drag into order: `id` goes before or after `target`. */
+  onMove?: (id: string, target: string, after: boolean) => void;
   tour?: string;
 }) {
+  const [dragged, setDragged] = useState<string | null>(null);
+  const [drop, setDrop] = useState<{ id: string; after: boolean } | null>(null);
+  const endDrag = () => {
+    setDragged(null);
+    setDrop(null);
+  };
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-0.5" data-tour={tour}>
-      {items.map(({ id, label, icon, hint, dot = false }) => {
+      {items.map(({ id, label, icon, hint, detail, dot = false }) => {
         const selected = id === selectedId;
+        const dropHere = drop?.id === id ? drop : null;
         return (
-          <HintTooltip key={id} label={label} hint={hint} disabled={selected}>
+          <HintTooltip
+            key={id}
+            label={detail ? `${label} · ${detail}` : label}
+            hint={hint}
+            disabled={selected || dragged !== null}
+          >
             <button
               type="button"
               aria-label={label}
               aria-current={selected ? "page" : undefined}
               onClick={() => onSelect(id)}
+              draggable={onMove ? true : undefined}
+              onDragStart={
+                onMove
+                  ? (e) => {
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", label);
+                      setDragged(id);
+                    }
+                  : undefined
+              }
+              onDragOver={(e) => {
+                if (!dragged) return;
+                e.preventDefault();
+                if (dragged === id) {
+                  setDrop(null);
+                  return;
+                }
+                const box = e.currentTarget.getBoundingClientRect();
+                setDrop({ id, after: e.clientX > box.left + box.width / 2 });
+              }}
+              onDrop={(e) => {
+                if (!dragged) return;
+                e.preventDefault();
+                if (drop) onMove?.(dragged, drop.id, drop.after);
+                endDrag();
+              }}
+              onDragEnd={endDrag}
               className={cn(
-                "flex h-8 min-w-0 shrink-0 cursor-pointer items-center rounded-lg px-1.5 text-sm font-medium outline-none transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-focus-ring motion-reduce:transition-none",
+                "relative flex h-8 min-w-0 shrink-0 cursor-pointer items-center rounded-lg px-1.5 text-sm font-medium outline-none transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-focus-ring motion-reduce:transition-none",
                 selected
                   ? "max-w-full shrink bg-sidebar-row-selected text-sidebar-foreground"
                   : "text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
+                dragged === id && "opacity-40",
               )}
             >
+              {dropHere ? (
+                <span
+                  aria-hidden
+                  className={cn(
+                    "pointer-events-none absolute inset-y-1 w-0.5 rounded-full bg-primary",
+                    dropHere.after ? "-right-0.5" : "-left-0.5",
+                  )}
+                />
+              ) : null}
               <span className="relative flex size-5 shrink-0 items-center justify-center [&>svg]:size-4">
                 {icon}
                 {dot && !selected ? (

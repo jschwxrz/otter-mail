@@ -1,6 +1,6 @@
 import { IMAP_CAPABILITIES } from "@otter-mail/contracts";
 import { describe, expect, it } from "vite-plus/test";
-import { arrangeMailboxes } from "../mailboxes";
+import { arrangeMailboxes, moveMailbox } from "../mailboxes";
 import { aliasMailboxesOf, signatureFor, withAliasMailbox } from "./alias-mailboxes";
 import type { MailAccount } from "./types";
 
@@ -59,21 +59,46 @@ describe("withAliasMailbox", () => {
 });
 
 describe("arrangeMailboxes", () => {
-  it("puts each account's alias mailboxes after it, new ones last of them", () => {
-    const ids = (order: string[]) =>
-      arrangeMailboxes([cloud, side], { order, off: [] }).map((tab) => tab.id);
+  const ids = (order: string[]) =>
+    arrangeMailboxes([cloud, side], { order, off: [] }).map((tab) => tab.id);
+
+  it("puts each account's alias mailboxes after it until they're moved", () => {
     expect(ids([])).toEqual([
       "robin@cloud.example",
       "me@riverbank.example",
       "mail@riverbank.example",
       "side@other.example",
     ]);
-    // Reordered: Club before Me, and the accounts the other way round.
-    expect(ids(["side@other.example", "mail@riverbank.example", "robin@cloud.example"])).toEqual([
+  });
+
+  it("puts every tab where it was dragged, one not dragged yet after the tab before it", () => {
+    expect(ids(["me@riverbank.example", "side@other.example", "robin@cloud.example"])).toEqual([
+      "me@riverbank.example",
+      "mail@riverbank.example",
       "side@other.example",
       "robin@cloud.example",
-      "mail@riverbank.example",
-      "me@riverbank.example",
     ]);
+  });
+});
+
+describe("moveMailbox", () => {
+  it("puts one before or after another, the rest where they were", () => {
+    const off = ["robin@cloud.example"];
+    const moved = moveMailbox(
+      [cloud, side],
+      { order: [], off },
+      "mail@riverbank.example",
+      "side@other.example",
+      true,
+    );
+    expect(moved).toEqual({
+      order: [
+        "robin@cloud.example",
+        "me@riverbank.example",
+        "side@other.example",
+        "mail@riverbank.example",
+      ],
+      off,
+    });
   });
 });

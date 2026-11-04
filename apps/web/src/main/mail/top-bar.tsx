@@ -297,6 +297,8 @@ export type MailboxOption = {
   id: string;
   account: MailAccount;
   name: string;
+  /** An alias mailbox's: "in iCloud". */
+  detail?: string;
   shortcut: string;
 };
 
@@ -308,6 +310,7 @@ export function useMailboxOptions(tabs: MailboxTab[]): MailboxOption[] {
     id: tab.id,
     account: tab.alias ? aliasMailboxLook(tab.alias) : tab.account,
     name: tab.alias ? tab.alias.name : getAccountDisplayName(tab.account),
+    detail: tab.alias ? `in ${getAccountDisplayName(tab.account)}` : undefined,
     shortcut: jump(i + 1),
   }));
 }

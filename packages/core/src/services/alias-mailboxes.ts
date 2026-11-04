@@ -1,7 +1,8 @@
 import { validAliasMailboxes, type AliasMailbox } from "@otter-mail/contracts";
 
+import { broadcast } from "../ipc.js";
 import { getAccount, isAccountId, listAccounts } from "./account-store.js";
-import { addressList, type AliasScope } from "./mail-store.js";
+import { addressList, type AliasScope, type MailboxScope, type RestScope } from "./mail-store.js";
 import type { MailAccount, MessageSummary } from "../types.js";
 
 export function parseAliasMailboxes(value: unknown): AliasMailbox[] {
@@ -54,15 +55,45 @@ export async function aliasScope(accountId: string, alias: string): Promise<Alia
   return aliasScopeOf(await getAccount(accountId), alias);
 }
 
+/**
+ * Parents, by address lower-cased, whose tab leaves out their alias mailboxes' mail: the
+ * renderer's synced UI preference `mail:alias-mail-apart`.
+ */
+let apart = new Set<string>();
+
+export function followAliasMailApart(value: string | undefined): void {
+  let next: string[] = [];
+  try {
+    const parsed: unknown = JSON.parse(value ?? "[]");
+    if (Array.isArray(parsed)) next = parsed.filter((e): e is string => typeof e === "string");
+  } catch {
+    // Unreadable: every parent shows all of its mail.
+  }
+  const changed = next.length !== apart.size || next.some((key) => !apart.has(key));
+  apart = new Set(next);
+  if (changed) broadcast("gmail:mail-changed");
+}
+
+/** The parent's tab without its alias mailboxes' mail, when it's set apart and has any. */
+export async function restScope(accountId: string): Promise<RestScope | undefined> {
+  const account = await getAccount(accountId);
+  if (!account || !apart.has(account.email.toLowerCase())) return undefined;
+  const emails = (await listAccounts()).map((a) => a.email);
+  const aliases = validAliasMailboxes(account, emails).map((a) => a.address.toLowerCase());
+  if (aliases.length === 0) return undefined;
+  return { aliases, sendAs: (account.sendAs ?? []).map((a) => a.toLowerCase()) };
+}
+
 export async function resolveMailbox(
   id: string,
-): Promise<{ accountId: string; alias?: AliasScope }> {
-  if (isAccountId(id)) return { accountId: id };
+): Promise<{ accountId: string; scope?: MailboxScope }> {
   const accounts = await listAccounts();
-  if (accounts.some((a) => a.id === id)) return { accountId: id };
+  if (isAccountId(id) || accounts.some((a) => a.id === id)) {
+    return { accountId: id, scope: await restScope(id) };
+  }
   const emails = accounts.map((a) => a.email);
   const parent = accounts.find((account) =>
     validAliasMailboxes(account, emails).some((alias) => alias.address.toLowerCase() === id),
   );
-  return parent ? { accountId: parent.id, alias: aliasScopeOf(parent, id) } : { accountId: id };
+  return parent ? { accountId: parent.id, scope: aliasScopeOf(parent, id) } : { accountId: id };
 }

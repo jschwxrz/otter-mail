@@ -29,7 +29,13 @@ export function signInName(account: MailAccount): string {
   return signInProvider(account) === "outlook" ? "Microsoft" : "Google";
 }
 
+/** On Apple's mail server, as Add mailbox › iCloud sets it up. */
+export function isICloud(account: Pick<MailAccount, "imap">): boolean {
+  return account.imap?.imap.host.toLowerCase() === "imap.mail.me.com";
+}
+
 export function mailServerName(account: MailAccount): string {
+  if (isICloud(account)) return "iCloud";
   if (account.imap) return account.imap.imap.host;
   return account.provider === "outlook" ? "Outlook" : "Gmail";
 }

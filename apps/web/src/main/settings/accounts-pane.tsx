@@ -5,14 +5,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Dialog } from "~/components/ui/dialog";
 import { Text } from "~/components/ui/text";
-import { CheckIcon, GripVerticalIcon, PlusIcon, RotateCwIcon } from "lucide-react";
+import { CheckIcon, PlusIcon, RotateCwIcon } from "lucide-react";
 import { Switch } from "~/components/ui/switch";
 import {
   arrangeMailboxes,
-  arrangementKey,
   setMailboxArrangement,
+  useAliasMailInParent,
   useMailboxArrangement,
-  type MailboxTab,
 } from "../mailboxes";
 import type { AliasMailbox } from "@otter-mail/contracts";
 import {
@@ -204,70 +203,33 @@ function SignInButton({
   );
 }
 
-type DropSpot = { key: string; after: boolean } | null;
-
-type RowDrag = {
-  dragging: boolean;
-  dropHere: DropSpot;
-  onDragStart: () => void;
-  onDragOver: (after: boolean) => void;
-  onDrop: () => void;
-  onDragEnd: () => void;
-};
+/** An alias mailbox's row hangs from its parent's by a line, from the parent's picture down. */
+type Branch = { first: boolean; last: boolean };
 
 function MailboxListRow({
   label,
   selected,
   onSelect,
-  indent = false,
-  drag,
+  branch,
   children,
   toggle,
 }: {
   label: string;
   selected: boolean;
   onSelect: () => void;
-  indent?: boolean;
-  drag: RowDrag;
+  branch?: Branch;
   children: ReactNode;
   toggle: ReactNode;
 }) {
-  const { dropHere } = drag;
   return (
     <div
       data-slot="settings-row"
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move";
-        drag.onDragStart();
-      }}
-      onDragOver={(e) => {
-        e.preventDefault();
-        const box = e.currentTarget.getBoundingClientRect();
-        drag.onDragOver(e.clientY > box.top + box.height / 2);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        drag.onDrop();
-      }}
-      onDragEnd={drag.onDragEnd}
       className={cn(
-        "group/row relative flex min-h-[60px] items-center gap-3 px-4 py-2.5",
-        indent && "pl-12",
+        "relative flex items-center gap-3 px-4",
+        branch ? "min-h-[52px] py-2 pl-12" : "min-h-[60px] py-2.5",
         selected ? "bg-foreground/[0.04]" : "hover:bg-foreground/[0.03]",
-        drag.dragging && "opacity-40",
       )}
     >
-      {dropHere ? (
-        <span
-          aria-hidden
-          className={cn(
-            "pointer-events-none absolute right-4 h-0.5 rounded-full bg-primary",
-            indent ? "left-12" : "left-4",
-            dropHere.after ? "-bottom-px" : "-top-px",
-          )}
-        />
-      ) : null}
       <button
         type="button"
         className="absolute inset-0 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring"
@@ -275,14 +237,18 @@ function MailboxListRow({
         aria-label={`Select ${label}`}
         aria-pressed={selected}
       />
-      {/* In the row's left padding, so the avatars line up with the text of every other row. */}
-      <GripVerticalIcon
-        aria-hidden
-        className={cn(
-          "pointer-events-none absolute top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/0 group-hover/row:text-muted-foreground/70",
-          indent ? "left-8" : "left-0.5",
-        )}
-      />
+      {branch ? (
+        <span aria-hidden className="pointer-events-none">
+          <span
+            className={cn(
+              "absolute left-[31.5px] w-px bg-foreground/15",
+              branch.first ? "-top-3" : "top-0",
+              branch.last ? "bottom-1/2" : "bottom-0",
+            )}
+          />
+          <span className="absolute left-[31.5px] top-1/2 h-px w-3 bg-foreground/15" />
+        </span>
+      ) : null}
       {children}
       {toggle}
     </div>
@@ -296,7 +262,6 @@ function AccountListRow({
   on,
   onToggle,
   lastOn,
-  drag,
 }: {
   account: MailAccount;
   selected: boolean;
@@ -304,7 +269,6 @@ function AccountListRow({
   on: boolean;
   onToggle: (on: boolean) => void;
   lastOn: boolean;
-  drag: RowDrag;
 }) {
   const sync = useSyncStatusOnly(account.id);
   const status = accountStatus(account, sync.data);
@@ -316,7 +280,6 @@ function AccountListRow({
       label={account.email}
       selected={selected}
       onSelect={onSelect}
-      drag={drag}
       toggle={
         <HintTooltip label={lastOn ? "Keep at least one mailbox on" : on ? "Turn off" : "Turn on"}>
           <span className="relative z-10 flex">
@@ -334,7 +297,7 @@ function AccountListRow({
         <AccountAvatar account={account} size="medium" />
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-1.5 text-sm text-foreground">
-            <ProviderMark provider={account.provider} />
+            <ProviderMark account={account} />
             <span className="truncate">{getAccountDisplayName(account)}</span>
             {provides ? (
               <span className="shrink-0 text-xs text-muted-foreground">{provides}</span>
@@ -368,7 +331,7 @@ function AliasMailboxListRow({
   on,
   parentOn,
   onToggle,
-  drag,
+  branch,
 }: {
   entry: AliasMailboxEntry;
   selected: boolean;
@@ -376,7 +339,7 @@ function AliasMailboxListRow({
   on: boolean;
   parentOn: boolean;
   onToggle: (on: boolean) => void;
-  drag: RowDrag;
+  branch: Branch;
 }) {
   const parentName = getAccountDisplayName(entry.parent);
   return (
@@ -384,8 +347,7 @@ function AliasMailboxListRow({
       label={entry.alias.address}
       selected={selected}
       onSelect={onSelect}
-      indent
-      drag={drag}
+      branch={branch}
       toggle={
         <HintTooltip
           label={!parentOn ? `Turn ${parentName} on first` : on ? "Turn off" : "Turn on"}
@@ -402,13 +364,17 @@ function AliasMailboxListRow({
       }
     >
       <span className={cn("pointer-events-none contents", !(on && parentOn) && "[&>*]:opacity-50")}>
-        <AccountAvatar account={aliasMailboxLook(entry)} size="medium" />
+        <AccountAvatar account={aliasMailboxLook(entry)} size="small" />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm text-foreground">{entry.name}</span>
           <span className="flex min-w-0 items-center gap-1.5 text-[13px] leading-[18px] text-muted-foreground">
             <span className="min-w-0 shrink truncate">{entry.alias.address}</span>
-            <span aria-hidden>·</span>
-            <span className="shrink-0">{on ? `in ${parentName}` : "Turned off"}</span>
+            {on ? null : (
+              <>
+                <span aria-hidden>·</span>
+                <span className="shrink-0">Turned off</span>
+              </>
+            )}
           </span>
         </span>
       </span>
@@ -679,7 +645,10 @@ function SendAsSection({ account }: { account: MailAccount }) {
   const editable = capabilitiesOf(account).sendAs === "device";
   const addresses = account.sendAs ?? [];
   const mailboxes = useAccounts().data ?? [];
-  const ownMailboxes = new Set(aliasMailboxesOf(account, mailboxes).map((a) => a.id));
+  const aliasMailboxes = aliasMailboxesOf(account, mailboxes);
+  const ownMailboxes = new Set(aliasMailboxes.map((a) => a.id));
+  const [aliasMailInParent, setAliasMailInParent] = useAliasMailInParent(account);
+  const name = getAccountDisplayName(account);
   const suggested = useQuery({
     queryKey: ["send-as-suggestions", account.id, addresses.join()],
     queryFn: () => mailApi.suggestSendAs(account.id),
@@ -758,6 +727,20 @@ function SendAsSection({ account }: { account: MailAccount }) {
           }
         />
       ))}
+      {aliasMailboxes.length > 0 ? (
+        <SettingsRow
+          {...searchableSetting("alias-mail-in-parent")}
+          title={`Their mail in ${name} too`}
+          description={`Mail for ${new Intl.ListFormat("en-GB").format(aliasMailboxes.map((a) => a.name))} also shows in ${name}'s tab. Off, ${name} shows only the rest.`}
+          control={
+            <Switch
+              checked={aliasMailInParent}
+              onCheckedChange={setAliasMailInParent}
+              aria-label={`Mail of ${name}'s own mailboxes in ${name} too`}
+            />
+          }
+        />
+      ) : null}
       {editable
         ? suggested?.map((address) => (
             <SettingsRow
@@ -1031,50 +1014,20 @@ function ConnectionsHub() {
   const navigate = useNavigate();
   const accountsQuery = useAccounts();
   const arrangement = useMailboxArrangement();
-  const rows = arrangeMailboxes(accountsQuery.data ?? [], arrangement);
-  const accounts = rows.flatMap((row) => (row.alias ? [] : [row.account]));
+  // In the sidebar's order, each account with its alias mailboxes.
+  const tabs = arrangeMailboxes(accountsQuery.data ?? [], arrangement);
+  const accounts = tabs.flatMap((tab) => (tab.alias ? [] : [tab.account]));
+  const aliasesOf = (account: MailAccount) =>
+    tabs.flatMap((tab) => (tab.alias?.parent.id === account.id ? [tab.alias] : []));
   const isOn = (key: string) => !arrangement.off.includes(key);
   const onCount = accounts.filter((a) => isOn(a.email)).length;
-  const [dragged, setDragged] = useState<MailboxTab | null>(null);
-  const [dropSpot, setDropSpot] = useState<DropSpot>(null);
-  // Accounts move among accounts, an alias mailbox among its parent's others.
-  const siblings = (a: MailboxTab, b: MailboxTab) =>
-    a.alias ? b.alias?.parent.id === a.alias.parent.id : !b.alias;
-  const dropMailbox = () => {
-    const key = dragged ? arrangementKey(dragged) : null;
-    if (key && dropSpot && key !== dropSpot.key) {
-      const order = rows.map(arrangementKey).filter((k) => k !== key);
-      const at = order.indexOf(dropSpot.key) + (dropSpot.after ? 1 : 0);
-      order.splice(at, 0, key);
-      setMailboxArrangement({ ...arrangement, order });
-    }
-    setDragged(null);
-    setDropSpot(null);
-  };
-  const dragOf = (row: MailboxTab): RowDrag => {
-    const key = arrangementKey(row);
-    return {
-      dragging: dragged !== null && arrangementKey(dragged) === key,
-      dropHere: dropSpot?.key === key ? dropSpot : null,
-      onDragStart: () => setDragged(row),
-      onDragOver: (after) =>
-        dragged && arrangementKey(dragged) !== key && siblings(dragged, row)
-          ? setDropSpot({ key, after })
-          : setDropSpot(null),
-      onDrop: dropMailbox,
-      onDragEnd: () => {
-        setDragged(null);
-        setDropSpot(null);
-      },
-    };
-  };
   const toggle = (key: string, on: boolean) =>
     setMailboxArrangement({
       ...arrangement,
       off: on ? arrangement.off.filter((e) => e !== key) : [...arrangement.off, key],
     });
   const [selectedId, setSelectedId] = useState<string | null>(takeRequestedMailbox);
-  const currentAlias = rows.find((row) => row.alias?.id === selectedId)?.alias;
+  const currentAlias = tabs.find((tab) => tab.alias?.id === selectedId)?.alias;
   const current = accounts.find((a) => a.id === selectedId) ?? currentAlias?.parent ?? accounts[0];
   useEffect(() => void mailApi.refreshSignatures().catch(() => {}), []);
 
@@ -1082,7 +1035,7 @@ function ConnectionsHub() {
     <SettingsPageContainer
       searchId={searchableSetting("mailboxes").id}
       title="Connections"
-      description="The accounts you've connected and what each gives Otter Mail. Mailboxes turn on or off and drag into order, on every device."
+      description="The accounts you've connected and what each gives Otter Mail. Mailboxes turn on or off on every device; drag the tabs in the sidebar to order them."
       action={
         <SignInButton
           label="Add account"
@@ -1109,31 +1062,33 @@ function ConnectionsHub() {
       {current ? (
         <>
           <SettingsGroup>
-            {rows.map((row) =>
-              row.alias ? (
-                <AliasMailboxListRow
-                  key={row.id}
-                  entry={row.alias}
-                  selected={row.alias === currentAlias}
-                  onSelect={() => setSelectedId(row.id)}
-                  on={isOn(row.alias.id)}
-                  parentOn={isOn(row.account.email)}
-                  onToggle={(next) => toggle(row.alias!.id, next)}
-                  drag={dragOf(row)}
-                />
-              ) : (
-                <AccountListRow
-                  key={row.id}
-                  account={row.account}
-                  selected={!currentAlias && row.account.id === current.id}
-                  onSelect={() => setSelectedId(row.account.id)}
-                  on={isOn(row.account.email)}
-                  lastOn={isOn(row.account.email) && onCount === 1}
-                  onToggle={(next) => toggle(row.account.email, next)}
-                  drag={dragOf(row)}
-                />
-              ),
-            )}
+            {accounts.map((account) => {
+              const aliases = aliasesOf(account);
+              return (
+                <div key={account.id} className="overflow-hidden">
+                  <AccountListRow
+                    account={account}
+                    selected={!currentAlias && account.id === current.id}
+                    onSelect={() => setSelectedId(account.id)}
+                    on={isOn(account.email)}
+                    lastOn={isOn(account.email) && onCount === 1}
+                    onToggle={(next) => toggle(account.email, next)}
+                  />
+                  {aliases.map((alias, i) => (
+                    <AliasMailboxListRow
+                      key={alias.id}
+                      entry={alias}
+                      selected={alias === currentAlias}
+                      onSelect={() => setSelectedId(alias.id)}
+                      on={isOn(alias.id)}
+                      parentOn={isOn(account.email)}
+                      onToggle={(next) => toggle(alias.id, next)}
+                      branch={{ first: i === 0, last: i === aliases.length - 1 }}
+                    />
+                  ))}
+                </div>
+              );
+            })}
           </SettingsGroup>
           <ConnectionExtensionsSection />
           {currentAlias ? (
