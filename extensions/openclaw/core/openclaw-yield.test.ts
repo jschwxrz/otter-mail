@@ -36,7 +36,8 @@ vi.mock("@openclaw/gateway-client/browser", () => ({
     request = fixture.request;
   },
 }));
-const { openClawProvider, agentRunsSince, waitingOnYield } = await import("./openclaw.js");
+const { openClawProvider, agentRunsSince, turnRows, waitingOnYield } =
+  await import("./openclaw.js");
 const settings = { url: "wss://gateway.test" } as OpenClawSettings;
 afterEach(() => {
   openClawProvider.shutdown();
@@ -196,6 +197,49 @@ describe("an OpenClaw turn that hands off with sessions_yield", () => {
   });
 });
 
+describe("a turn picked up again", () => {
+  it("follows a continuation that's already writing", async () => {
+    history = () => ({
+      messages: [
+        sent,
+        yieldCall,
+        yieldResult,
+        row("announce:1", [{ type: "text", text: "Halfway" }]),
+      ],
+      sessionInfo: { activeRunIds: ["announce:1"] },
+    });
+    gateway();
+    const events: ChatEvent[] = [];
+    const ended = openClawProvider.resume!({ requestId: "req-1", sessionId: "s" }, settings, (e) =>
+      events.push(e),
+    );
+    await vi.waitFor(() => expect(events.map((e) => e.type)).toEqual(["transcript"]));
+    event("chat", { runId: "announce:1", state: "final" });
+    await ended;
+    expect(events.at(-1)).toEqual({ requestId: "req-1", type: "done", responseId: null });
+  });
+
+  it("is its own run, its continuation and its steers, not a wake that came after", () => {
+    const steer = {
+      role: "user",
+      content: "also this",
+      __openclaw: { idempotencyKey: "steer-1:user" },
+    };
+    const rows = [
+      sent,
+      row("req-1", [{ type: "text", text: "First." }]),
+      steer,
+      row("steer-1", [{ type: "text", text: "Also done." }]),
+      row("wake-1", [{ type: "text", text: "A wake." }]),
+    ];
+    expect(turnRows(rows, "req-1", "req-1")?.map((m) => m.__openclaw)).toEqual([
+      { runId: "req-1" },
+      steer.__openclaw,
+      { runId: "steer-1" },
+    ]);
+  });
+});
+
 describe("an OpenClaw turn's steps", () => {
   it("show the tool's output, and steps whose result never came are read from the transcript", async () => {
     history = () => ({
@@ -280,6 +324,16 @@ describe("runs the agent starts on its own", () => {
       },
     });
     expect(started).toEqual([{ sessionId: "s", requestId: "run:wake-1" }]);
+
+    // Sent from another device, and the continuation of a run that yielded there: theirs.
+    event("session.message", {
+      message: { role: "user", content: "hi", __openclaw: { idempotencyKey: "elsewhere:user" } },
+    });
+    lifecycleStart("elsewhere");
+    event("chat", { runId: "elsewhere", state: "final", yielded: true });
+    lifecycleStart("announce:9");
+    lifecycleStart("wake-3");
+    expect(started.map((r) => r.requestId)).toEqual(["run:wake-1", "run:wake-3"]);
   });
 
   it("are followed from their first row, and a silent one just ends", async () => {

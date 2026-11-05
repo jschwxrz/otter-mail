@@ -905,14 +905,15 @@ async function followAgentRun(run: AgentRun): Promise<void> {
     (c) => c.provider === run.provider && c.sessionId === run.sessionId,
   );
   if (!convo) return;
-  if (get().runs[convo.id]) {
+  const wait = () => {
     waitingRuns.set(convo.id, [...(waitingRuns.get(convo.id) ?? []), run]);
-    return;
-  }
+  };
+  if (get().runs[convo.id]) return wait();
   if (!convo.loaded) await loadChat(convo.id);
   const turnId = `a-${run.requestId}`;
   const current = get().conversations.find((c) => c.id === convo.id);
-  if (!current || get().runs[convo.id] || current.turns.some((t) => t.id === turnId)) return;
+  if (!current || current.turns.some((t) => t.id === turnId)) return;
+  if (get().runs[convo.id]) return wait();
   console.log("[AgentChat:agentRun]", { provider: run.provider, requestId: run.requestId });
   set((s) => ({
     runs: {

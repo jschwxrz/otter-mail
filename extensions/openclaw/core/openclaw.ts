@@ -408,6 +408,8 @@ type Turn = {
   yielded: boolean;
   /** Settling: a run that starts now is the agent's own, not this turn's. */
   ending: boolean;
+  /** Its runs that are over. */
+  finals: Set<string>;
   gateway: Gateway;
   emit: Emit;
   text: OpenClawText;
@@ -447,6 +449,7 @@ function newTurn(requestId: string, sessionKey: string, gateway: Gateway, emit: 
     steers: new Set(),
     yielded: false,
     ending: false,
+    finals: new Set(),
     gateway,
     emit,
     text: new OpenClawText(requestId, emit),
@@ -528,40 +531,37 @@ type RunState = {
 };
 
 /**
- * Rows grouped by run into what each turn showed: a run that starts after
- * one that yielded is its continuation; any other is a turn of its own.
+ * Rows grouped by run into what each turn showed: a run that starts after one
+ * that yielded is its continuation, one after a message sent mid-turn (a
+ * steer) that message's run; any other is a turn of its own.
  */
 export function runChains(rows: Record<string, unknown>[]): Record<string, unknown>[][] {
   const chains: Record<string, unknown>[][] = [];
   let run: unknown;
+  let steered = false;
   for (const row of rows) {
     const id = runOf(row) ?? run;
     const last = chains.at(-1);
-    if (!last || (id !== run && !waitingOnYield(last))) chains.push([row]);
+    if (!last || (id !== run && !steered && !waitingOnYield(last))) chains.push([row]);
     else last.push(row);
+    if (row.role === "user") steered = true;
+    else if (id !== run) steered = false;
     run = id;
   }
   return chains;
 }
 
-/**
- * A turn's rows run from its message to the next one sent; a run the agent
- * started has its own rows and its continuations'.
- */
+/** A turn's rows: from its message (or a run the agent started, its first row), its chain. */
 export function turnRows(
   rows: Record<string, unknown>[],
   requestId: string,
   runId: string,
 ): Record<string, unknown>[] | null {
-  if (requestId.startsWith(AGENT_RUN)) {
-    const start = rows.findIndex((m) => runOf(m) === runId);
-    if (start < 0) return null;
-    const after = rows.slice(start);
-    const end = after.findIndex((m) => m.role === "user" && sendKeyOf(m));
-    return runChains(end < 0 ? after : after.slice(0, end))[0] ?? [];
-  }
-  const start = rows.findLastIndex((m) => m.role === "user" && sendKeyOf(m) === requestId);
-  return start < 0 ? null : rows.slice(start + 1);
+  const start = requestId.startsWith(AGENT_RUN)
+    ? rows.findIndex((m) => runOf(m) === runId)
+    : rows.findLastIndex((m) => m.role === "user" && sendKeyOf(m) === requestId) + 1;
+  if (requestId.startsWith(AGENT_RUN) ? start < 0 : start === 0) return null;
+  return runChains(rows.slice(start))[0] ?? [];
 }
 
 async function runState(turn: Turn): Promise<RunState> {
@@ -572,11 +572,13 @@ async function runState(turn: Turn): Promise<RunState> {
   const rows = turnRows(result.messages ?? [], turn.requestId, turn.runId);
   const info = result.sessionInfo ?? {};
   const waiting = rows ? waitingOnYield(rows) : false;
+  const chain = new Set((rows ?? []).map(runOf));
   const ids = info.activeRunIds ?? (info.hasActiveRun ? [turn.runId] : []);
   return {
     found: rows !== null,
     messages: rows ? transcript(rows) : [],
-    active: ids.filter((id) => ownsRun(turn, id) || waiting || turn.yielded),
+    // While it waits on a yield, the run that starts is its continuation.
+    active: ids.filter((id) => ownsRun(turn, id) || chain.has(id) || waiting),
     waiting,
   };
 }
@@ -762,7 +764,6 @@ async function follow(
   const open = new Set<string>();
   /** Steps whose result came without the output: the transcript has it. */
   const bare = new Set<string>();
-  const finals = new Set<string>();
   // What went unseen (a dropped socket), never ended (a step whose result
   // didn't come) or came bare is read from the transcript before the turn ends.
   const settle = async (state?: RunState) => {
@@ -782,7 +783,7 @@ async function follow(
     if (ownsRun(turn, runId)) return;
     logger.info("agent", "openclaw run continues the turn", { requestId, runId });
     // The runs before it yielded: they're over.
-    for (const id of [turn.runId, ...turn.steers]) finals.add(id);
+    for (const id of [turn.runId, ...turn.steers]) turn.finals.add(id);
     turn.steers.add(runId);
     turn.yielded = false;
     turn.text.nextRun();
@@ -797,7 +798,7 @@ async function follow(
     try {
       const state = await runState(turn);
       if (!ended) return;
-      turn.yielded ||= state.waiting;
+      turn.yielded = state.waiting;
       for (const id of state.active) adopt(id);
       if (state.active.length > 0 || turn.yielded) hush();
       else {
@@ -825,7 +826,7 @@ async function follow(
           waiting: state.waiting,
         });
         turn.resynced = true;
-        turn.yielded ||= state.waiting;
+        turn.yielded = state.waiting;
         for (const id of state.active) adopt(id);
         if (state.active.length === 0 && !turn.yielded) return await settle(state);
         catchUp(turn, state);
@@ -916,7 +917,8 @@ async function follow(
       return;
     }
     // A steer's run may end before its id is back from `chat.send`.
-    if (event === "chat" && p.state === "final" && typeof p.runId === "string") finals.add(p.runId);
+    if (event === "chat" && p.state === "final" && typeof p.runId === "string")
+      turn.finals.add(p.runId);
     if (
       turn.yielded &&
       event === "agent" &&
@@ -961,7 +963,7 @@ async function follow(
         if (p.yielded === true) {
           turn.yielded = true;
           hush();
-        } else if ([turn.runId, ...turn.steers].every((id) => finals.has(id))) void settle();
+        } else if ([turn.runId, ...turn.steers].every((id) => turn.finals.has(id))) void settle();
         else void check();
         break;
       case "aborted":
@@ -1022,7 +1024,10 @@ type Watching = {
 let watching: Watching | null = null;
 let watchedClient: Gateway["client"] | null = null;
 let rewatch: ReturnType<typeof setTimeout> | undefined;
+/** Runs already reported, or known not to be the agent's own: messages sent (from any device). */
 const announced = new Set<string>();
+/** Sessions whose run yielded: the run that starts next is its continuation, followed where it was sent. */
+const continuing = new Set<string>();
 
 function announce(sessionKey: string, runId: string): void {
   if (!watching?.sessions.has(sessionKey) || announced.has(runId)) return;
@@ -1034,11 +1039,17 @@ function announce(sessionKey: string, runId: string): void {
 }
 
 listeners.add(({ event, payload }) => {
-  const p = (payload ?? {}) as { sessionKey?: unknown; runId?: unknown; stream?: unknown };
-  const phase = (payload as { data?: { phase?: unknown } } | undefined)?.data?.phase;
+  const p = (payload ?? {}) as Record<string, unknown>;
+  if (typeof p.sessionKey !== "string" || !watching?.sessions.has(p.sessionKey)) return;
+  const row = p.message as Record<string, unknown> | undefined;
+  const sent = event === "session.message" && row?.role === "user" ? sendKeyOf(row) : undefined;
+  if (sent) announced.add(sent);
+  if (event === "chat" && p.state === "final" && p.yielded === true) continuing.add(p.sessionKey);
+  const phase = (p.data as { phase?: unknown } | undefined)?.phase;
   if (event !== "agent" || p.stream !== "lifecycle" || phase !== "start") return;
-  if (typeof p.sessionKey === "string" && typeof p.runId === "string")
-    announce(p.sessionKey, p.runId);
+  if (typeof p.runId !== "string") return;
+  if (continuing.delete(p.sessionKey)) announced.add(p.runId);
+  else announce(p.sessionKey, p.runId);
 });
 
 closeListeners.add((client) => {
@@ -1058,8 +1069,8 @@ async function ensureWatching(delay = 0): Promise<void> {
     const g = await gateway(watching.settings);
     if (g.client === watchedClient) return;
     await g.client.request("sessions.subscribe", {});
-    watchedClient = g.client;
     await catchUpSessions(g);
+    watchedClient = g.client;
   } catch (error) {
     logger.info("agent", "openclaw watch failed", { error: String(error) });
     scheduleWatch(Math.min(Math.max(delay * 2, RECONNECT_DELAYS_MS[0]), 60_000));
@@ -1076,9 +1087,9 @@ async function catchUpSessions(g: Gateway): Promise<void> {
     const key = String(row.key);
     const since = watching?.sessions.get(key);
     if (since === undefined) continue;
-    for (const id of (row.activeRunIds as string[] | undefined) ?? []) announce(key, id);
+    const active = ((row.activeRunIds as string[] | undefined) ?? []).length > 0;
     const activity = Number(row.lastActivityAt ?? row.updatedAt) || 0;
-    if (activity <= since) continue;
+    if (!active && activity <= since) continue;
     const { messages } = await g.client.request<{ messages?: Record<string, unknown>[] }>(
       "chat.history",
       { sessionKey: key, limit: 200 },
@@ -1263,6 +1274,7 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
     catchUp(turn, state);
     turn.yielded = state.waiting;
     for (const id of state.active) if (id !== turn.runId) turn.steers.add(id);
+    if (!state.active.includes(turn.runId)) turn.finals.add(turn.runId);
     if (state.active.length === 0 && !state.waiting)
       return emit({ requestId, type: "done", responseId: null });
     await follow(turn, settings, () => watch(turn));
