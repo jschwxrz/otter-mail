@@ -786,6 +786,7 @@ async function follow(
     // The runs before it yielded: they're over.
     for (const id of [turn.runId, ...turn.steers]) turn.finals.add(id);
     turn.steers.add(runId);
+    announced.add(runId);
     turn.yielded = false;
     turn.text.nextRun();
   };
@@ -1085,13 +1086,13 @@ async function ensureWatching(delay = 0): Promise<void> {
   }
 }
 
-/** Runs the agent started while this device wasn't listening: going now, or written since the chat last ended. */
 /**
  * Chats to catch up on whatever their last activity, from their last message
  * on (one just watched, or whose turn was just picked up again), until a catch-up gets through.
  */
 const fresh = new Set<string>();
 
+/** Runs the agent started while this device wasn't listening: going now, or written since the chat last ended. */
 async function catchUpSessions(g: Gateway): Promise<void> {
   const caught = new Set(fresh);
   const { sessions } = await g.client.request<{ sessions?: Record<string, unknown>[] }>(
@@ -1301,7 +1302,11 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
       );
     catchUp(turn, state);
     turn.yielded = state.waiting;
-    for (const id of state.active) if (id !== turn.runId) turn.steers.add(id);
+    for (const id of state.active)
+      if (id !== turn.runId) {
+        turn.steers.add(id);
+        announced.add(id);
+      }
     if (!state.active.includes(turn.runId)) turn.finals.add(turn.runId);
     if (state.active.length === 0 && !state.waiting)
       return emit({ requestId, type: "done", responseId: null });
