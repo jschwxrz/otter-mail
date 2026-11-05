@@ -652,7 +652,7 @@ final class ImapProvider: MailProvider {
         return try await session(retry: true) { client in
             var flags: [String: Set<String>] = [:]
             for (path, group) in Dictionary(grouping: ids, by: \.path) {
-                guard (try? await client.select(path)) != nil else { continue }
+                do { _ = try await client.select(path) } catch ImapError.server { continue }
                 for response in try await client.fetch(imapSet(group.map(\.uid)), "(UID FLAGS)") {
                     let items = response.values.first?.pairs ?? [:]
                     guard let uid = items["UID"]?.number, !Self.isDeleted(items) else { continue }
