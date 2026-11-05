@@ -91,6 +91,15 @@ export function registerAgentHandlers(): void {
     };
   });
 
+  handle("agent:watch", async (params: unknown) => {
+    const p = params as Params;
+    const sessions = (Array.isArray(p?.sessions) ? (p.sessions as Params[]) : [])
+      .map((s) => ({ id: str(s?.id), since: Number(s?.since) || 0 }))
+      .filter((s) => s.id);
+    await agent.watchSessions(providerOf(p), sessions);
+    return { ok: true };
+  });
+
   handle("agent:stageAttachments", async (params: unknown) => {
     const p = params as Params;
     const items = Array.isArray(p?.items) ? (p.items as Params[]) : [];

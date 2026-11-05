@@ -21,7 +21,7 @@ describe("OpenClaw", () => {
     expect(openClawStep("bash", { command: "bash -lc 'ls -la'" })).toMatchObject({
       detail: "ls -la",
     });
-    expect(openClawStep("web_search", { query: "otters" }).kind).toBe("tool");
+    expect(openClawStep("web_search", { query: "otters" }).kind).toBe("web");
   });
 
   it("reads the address and bootstrap token from a setup code", () => {

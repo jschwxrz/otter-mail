@@ -14,6 +14,8 @@
 import { registeredAgents } from "../../extensions.js";
 import { broadcast } from "../../ipc.js";
 import { logger } from "../../logger.js";
+import { platform } from "../../platform.js";
+import { getSettings } from "../settings-store.js";
 import { answerToolApproval } from "./tools/index.js";
 import {
   clearHermesKey,
@@ -36,6 +38,7 @@ import {
   type ProviderSnapshot,
   type ProvidersState,
   type ResumeTurnInput,
+  type WatchedSession,
   type SendTurnInput,
   type Skill,
 } from "./types.js";
@@ -225,6 +228,40 @@ function emit(event: ChatEvent): void {
   broadcast("agent:chatEvent", event);
 }
 
+/** A turn's events; what the agent asks of the user also notifies, as it may run long after they look away. */
+function emitFor(kind: ProviderKind): (event: ChatEvent) => void {
+  return (event) => {
+    emit(event);
+    if (event.type === "approval" || event.type === "question") void notifyAsk(kind, event);
+  };
+}
+
+const notified = new Set<string>();
+
+async function notifyAsk(
+  kind: ProviderKind,
+  event: Extract<ChatEvent, { type: "approval" | "question" }>,
+): Promise<void> {
+  // A turn picked up again asks again what it's still waiting on.
+  const id = event.type === "approval" ? event.approval.id : event.question.id;
+  if (notified.has(id)) return;
+  notified.add(id);
+  try {
+    if ((await getSettings()).notificationsMode === "off") return;
+    const first = event.type === "question" ? event.question.questions[0] : undefined;
+    platform().notify({
+      title:
+        event.type === "approval"
+          ? event.approval.title
+          : first?.header || first?.question || "A question for you",
+      subtitle: `${provider(kind).displayName} is waiting for you`,
+      body: event.type === "approval" ? event.approval.detail : first?.question,
+    });
+  } catch (error) {
+    logger.failure("agent", "notifying about a request failed", error);
+  }
+}
+
 export async function sendTurn(kind: ProviderKind, turn: SendTurnInput): Promise<void> {
   const settings = await agentSettings(kind);
   logger.info("agent", "send", {
@@ -243,7 +280,7 @@ export async function sendTurn(kind: ProviderKind, turn: SendTurnInput): Promise
     return;
   }
   void provider(kind)
-    .sendTurn(turn, settings, emit)
+    .sendTurn(turn, settings, emitFor(kind))
     .catch((error: unknown) => {
       logger.info("agent", "turn crashed", {
         provider: kind,
@@ -262,11 +299,20 @@ export async function resumeTurn(kind: ProviderKind, turn: ResumeTurnInput): Pro
   const settings = await agentSettings(kind);
   if (!found.resume || !settings.enabled) return false;
   logger.info("agent", "resume", { provider: kind, requestId: turn.requestId });
-  void found.resume(turn, settings, emit).catch((error: unknown) => {
+  void found.resume(turn, settings, emitFor(kind)).catch((error: unknown) => {
     logger.info("agent", "resume crashed", { provider: kind, error: String(error) });
     emit({ requestId: turn.requestId, type: "error", message: "detached" });
   });
   return true;
+}
+
+export async function watchSessions(kind: ProviderKind, sessions: WatchedSession[]): Promise<void> {
+  const found = provider(kind);
+  const settings = await agentSettings(kind);
+  if (!found.watch || !settings.enabled) return;
+  found.watch(settings, sessions, (run) =>
+    broadcast("agent:runStarted", { provider: kind, ...run }),
+  );
 }
 
 export async function answerQuestion(

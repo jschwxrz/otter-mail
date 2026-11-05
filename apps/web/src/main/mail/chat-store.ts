@@ -166,8 +166,10 @@ function withTranscript(
   requestId: string,
   messages: ChatSessionMessage[],
 ): ChatTurn[] {
+  // A run the agent started itself has no message of ours: its turn starts the run.
+  const own = turns.findIndex((t) => t.id === `a-${requestId}`);
   let at = turns.findIndex((t) => t.id === `u-${requestId}`);
-  if (at < 0) at = turns.findLastIndex((t) => t.role === "user");
+  if (at < 0) at = own >= 0 ? own - 1 : turns.findLastIndex((t) => t.role === "user");
   const local = turns.slice(at + 1);
   const recorded = turnsFromMessages(messages);
   const startedAt = local.find((t) => t.role === "assistant")?.startedAt;
@@ -182,7 +184,13 @@ function withTranscript(
     next = recorded.map((t, i) => (i === 0 && t.role === "assistant" ? { ...t, startedAt } : t));
   }
   if (next[next.length - 1]?.role !== "assistant")
-    next.push({ id: `a-${requestId}-rest`, role: "assistant", text: "", items: [], startedAt });
+    next.push({
+      id: next.length === 0 ? `a-${requestId}` : `a-${requestId}-rest`,
+      role: "assistant",
+      text: "",
+      items: [],
+      startedAt,
+    });
   return [...turns.slice(0, at + 1), ...next];
 }
 
@@ -365,6 +373,9 @@ function endRun(requestId: string): void {
     return { runs };
   });
   startQueued();
+  const waiting = waitingRuns.get(entry.convoId);
+  waitingRuns.delete(entry.convoId);
+  for (const run of waiting ?? []) void followAgentRun(run);
 }
 
 /**
@@ -860,6 +871,93 @@ export function resumeRuns(providers: ProviderSnapshot[]): void {
   }
 }
 
+const watchedSessions = new Map<ProviderKind, string>();
+
+/** This device's chats with a session, so the provider can show runs the agent starts itself. */
+function watchSessions(providers: ProviderSnapshot[]): void {
+  const { conversations, device } = get();
+  for (const host of providers) {
+    if (!isProviderUsable(host)) continue;
+    const sessions = conversations
+      .filter((c) => c.provider === host.kind && c.sessionId && !isElsewhere(c, device))
+      .map((c) => ({
+        id: c.sessionId!,
+        // A turn in flight is picked up again with all it led to: nothing to catch up on.
+        since: c.openRequest
+          ? Number.MAX_SAFE_INTEGER
+          : (c.turns.findLast((t) => t.finishedAt)?.finishedAt ?? c.updatedAt),
+      }));
+    const key = JSON.stringify(sessions);
+    if (watchedSessions.get(host.kind) === key) continue;
+    watchedSessions.set(host.kind, key);
+    void mailApi.agentWatch(host.kind, sessions).catch(() => watchedSessions.delete(host.kind));
+  }
+}
+
+type AgentRun = { provider: ProviderKind; sessionId: string; requestId: string };
+
+/** Runs that started while their chat had a turn going: followed once it ends. */
+const waitingRuns = new Map<string, AgentRun[]>();
+
+/** A run the agent started on its own (a completion it was woken for): a turn of its own, without a message. */
+async function followAgentRun(run: AgentRun): Promise<void> {
+  const convo = get().conversations.find(
+    (c) => c.provider === run.provider && c.sessionId === run.sessionId,
+  );
+  if (!convo) return;
+  if (get().runs[convo.id]) {
+    waitingRuns.set(convo.id, [...(waitingRuns.get(convo.id) ?? []), run]);
+    return;
+  }
+  if (!convo.loaded) await loadChat(convo.id);
+  const turnId = `a-${run.requestId}`;
+  const current = get().conversations.find((c) => c.id === convo.id);
+  if (!current || get().runs[convo.id] || current.turns.some((t) => t.id === turnId)) return;
+  console.log("[AgentChat:agentRun]", { provider: run.provider, requestId: run.requestId });
+  set((s) => ({
+    runs: {
+      ...s.runs,
+      [convo.id]: { requestId: run.requestId, convoId: convo.id, provider: run.provider },
+    },
+  }));
+  patchConversation(convo.id, (c) => ({
+    ...c,
+    turns: [
+      ...c.turns,
+      { id: turnId, role: "assistant", text: "", items: [], startedAt: Date.now() },
+    ],
+    openRequest: run.requestId,
+  }));
+  const drop = () => {
+    patchConversation(convo.id, (c) => ({
+      ...c,
+      turns: c.turns.filter((t) => t.id !== turnId),
+      openRequest: c.openRequest === run.requestId ? null : c.openRequest,
+    }));
+    endRun(run.requestId);
+  };
+  try {
+    const { resumed } = await mailApi.agentResume(run);
+    if (!resumed) drop();
+  } catch (error) {
+    console.log("[AgentChat:agentRun] failed", { error: String(error) });
+    drop();
+  }
+}
+
+/** A run of the agent's own that ended without writing anything (it had nothing to say) leaves no turn. */
+function isSilentAgentTurn(convoId: string, requestId: string): boolean {
+  const turns = get().conversations.find((c) => c.id === convoId)?.turns ?? [];
+  const turn = turns.find((t) => t.id === `a-${requestId}`);
+  return Boolean(
+    turn &&
+    !turns.some((t) => t.id === `u-${requestId}`) &&
+    !turn.text &&
+    !turn.error &&
+    !(turn.items ?? []).some((item) => item.kind === "step" || item.text.trim()),
+  );
+}
+
 function onChatEvent(raw: unknown): void {
   const event = raw as ChatEvent;
   const s = event
@@ -912,6 +1010,15 @@ function onChatEvent(raw: unknown): void {
     }));
     return;
   }
+  if (event.type === "done" && isSilentAgentTurn(s.convoId, event.requestId)) {
+    patchConversation(s.convoId, (c) => ({
+      ...c,
+      turns: c.turns.filter((t) => t.id !== `a-${event.requestId}`),
+      openRequest: c.openRequest === event.requestId ? null : c.openRequest,
+    }));
+    endRun(event.requestId);
+    return;
+  }
   patchConversation(s.convoId, (c) => {
     if (event.type === "session") return { ...c, sessionId: event.sessionId, sessionOwned: true };
     const nextTurns = [...c.turns];
@@ -942,12 +1049,19 @@ function onChatEvent(raw: unknown): void {
       const url = event.step.kind === "web" ? event.step.detail?.trim() : undefined;
       if (url && /^https?:\/\//i.test(url)) opens.pages.push(url);
     } else if (event.type === "toolResult") {
-      const index = items.findLastIndex(
-        (t) =>
-          t.kind === "step" &&
-          t.output === undefined &&
-          (event.id === undefined || t.id === undefined || t.id === event.id),
-      );
+      // A step with an id takes its latest result: a fuller one can follow a bare "done".
+      const byId = event.id
+        ? items.findLastIndex((t) => t.kind === "step" && t.id === event.id)
+        : -1;
+      const index =
+        byId >= 0
+          ? byId
+          : items.findLastIndex(
+              (t) =>
+                t.kind === "step" &&
+                t.output === undefined &&
+                (event.id === undefined || t.id === undefined || t.id === event.id),
+            );
       const step = items[index];
       if (step?.kind === "step") items[index] = { ...step, output: event.output };
     } else if (event.type === "error") {
@@ -955,6 +1069,10 @@ function onChatEvent(raw: unknown): void {
     }
     if (event.type === "done" || event.type === "error") {
       updated.finishedAt = Date.now();
+      // A step whose result never came isn't running any more.
+      items.forEach((item, i) => {
+        if (item.kind === "step" && item.output === undefined) items[i] = { ...item, output: "" };
+      });
       for (const item of items) {
         if (item.kind === "text") opens.files.push(...linkedFiles(item.text));
         else if (item.step.kind === "edit")
@@ -1016,8 +1134,10 @@ export function useChatEvents(): void {
   useEffect(() => {
     if (!providers) return;
     resumeRuns(providers);
+    if (get().ready) watchSessions(providers);
     return useChats.subscribe((s, prev) => {
       if (s.conversations !== prev.conversations || s.runs !== prev.runs) resumeRuns(providers);
+      if (s.ready && s.conversations !== prev.conversations) watchSessions(providers);
     });
   }, [providers]);
   useEffect(() => {
@@ -1026,6 +1146,10 @@ export function useChatEvents(): void {
     );
     const offs = [
       window.desktopBridge.on("agent:chatEvent", onChatEvent),
+      window.desktopBridge.on("agent:runStarted", (params: unknown) => {
+        const run = params as AgentRun | undefined;
+        if (run?.provider && run.sessionId && run.requestId) void followAgentRun(run);
+      }),
       window.desktopBridge.on("chats:changed", (params: unknown) => {
         const ids = (params as { ids?: string[] } | undefined)?.ids ?? [];
         if (ids.length > 0 && ids.every((id) => saving.has(id))) return;

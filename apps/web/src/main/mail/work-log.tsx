@@ -58,10 +58,13 @@ function blocksOf(items: TurnItem[]): Block[] {
 /* oxlint-disable react/no-array-index-key -- Transcript blocks append and update in place; position preserves streaming row state. */
 export function WorkLog({
   items,
+  live = false,
   onOpenFile,
   loadImage,
 }: {
   items: TurnItem[];
+  /** The turn is still going: a step without a result is running (else it never reported one). */
+  live?: boolean;
   onOpenFile?: (href: string) => void;
   loadImage?: (href: string) => Promise<string>;
 }) {
@@ -73,9 +76,9 @@ export function WorkLog({
             <ChatMarkdown text={block.text} onOpenFile={onOpenFile} loadImage={loadImage} />
           </div>
         ) : block.kind === "group" ? (
-          <StepGroup key={i} source={block.source} items={block.items} />
+          <StepGroup key={i} source={block.source} items={block.items} live={live} />
         ) : (
-          <StepRow key={i} item={block.item} />
+          <StepRow key={i} item={block.item} live={live} />
         ),
       )}
     </div>
@@ -139,7 +142,7 @@ function RowHead({
 }
 
 /* oxlint-disable react/no-array-index-key -- Transcript blocks append and update in place; position preserves streaming row state. */
-function StepGroup({ source, items }: { source: string; items: Step[] }) {
+function StepGroup({ source, items, live }: { source: string; items: Step[]; live: boolean }) {
   const [open, setOpen] = useState(true);
   return (
     <div className="flex flex-col">
@@ -148,17 +151,17 @@ function StepGroup({ source, items }: { source: string; items: Step[] }) {
         title={`Used ${source} integration`}
         open={open}
         expandable
-        pending={items.some((i) => i.output === undefined)}
+        pending={live && items.some((i) => i.output === undefined)}
         onToggle={() => setOpen((o) => !o)}
       />
 
-      {open ? items.map((item, i) => <StepRow key={i} item={item} />) : null}
+      {open ? items.map((item, i) => <StepRow key={i} item={item} live={live} />) : null}
     </div>
   );
 }
 /* oxlint-enable react/no-array-index-key */
 
-function StepRow({ item }: { item: Step }) {
+function StepRow({ item, live }: { item: Step; live: boolean }) {
   const [open, setOpen] = useState(false);
   const expandable = Boolean(item.output || item.step.detail);
   return (
@@ -168,10 +171,10 @@ function StepRow({ item }: { item: Step }) {
         title={item.step.title}
         open={open}
         expandable={expandable}
-        pending={item.output === undefined}
+        pending={live && item.output === undefined}
         onToggle={() => setOpen((o) => !o)}
       />
-      {open ? <StepResult step={item.step} output={item.output} /> : null}
+      {open ? <StepResult step={item.step} output={item.output} live={live} /> : null}
     </div>
   );
 }
@@ -233,7 +236,7 @@ function highlightJson(json: string): ReactNode[] {
   return parts;
 }
 
-function StepResult({ step, output }: { step: ToolStep; output?: string }) {
+function StepResult({ step, output, live }: { step: ToolStep; output?: string; live: boolean }) {
   const json = prettyJson(output);
   const detail = prettyJson(step.detail) ?? step.detail;
   return (
@@ -247,11 +250,11 @@ function StepResult({ step, output }: { step: ToolStep; output?: string }) {
           {detail}
         </pre>
       ) : null}
-      {output !== undefined ? (
+      {output ? (
         <FadingPre>{json ? highlightJson(json) : output}</FadingPre>
-      ) : (
+      ) : output === undefined && live ? (
         <p className="px-4 pb-3 pt-1 text-xs text-muted-foreground">Running…</p>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -208,8 +208,23 @@ export function openClawStep(name: string, args: unknown): ToolStep {
   const wrapped = args as { id?: unknown; args?: unknown } | null;
   if (name === "tool_call" && typeof wrapped?.id === "string")
     return openClawStep(wrapped.id, wrapped.args);
-  const command = (args as { command?: unknown } | null)?.command;
-  if ((name === "bash" || name === "exec") && typeof command === "string")
+  const arg = (key: string) => {
+    const value = (args as Record<string, unknown> | null)?.[key];
+    return typeof value === "string" ? value : "";
+  };
+  const command = arg("command");
+  if ((name === "bash" || name === "exec") && command)
     return commandStep(command.replace(/^(\S*\/)?bash -l?c /, "").replace(/^(['"])(.*)\1$/s, "$2"));
+  const path = arg("path") || arg("file_path");
+  if (name === "read" && path) return readStep(path);
+  if ((name === "write" || name === "edit") && path) return editStep([path]);
+  if (name === "web_search") return webSearchStep(arg("query"));
+  if (name === "web_fetch" && arg("url")) return fetchStep(arg("url"));
+  if (name === "sessions_spawn")
+    return {
+      kind: "tool",
+      title: arg("label") ? `Started ${arg("label")}` : "Started a subagent",
+      ...withDetail(arg("task")),
+    };
   return genericStep(name, args);
 }

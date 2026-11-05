@@ -67,6 +67,7 @@ export { TextStream } from "./services/agent/text-stream.js";
 export { agentTools, cancelToolApprovals, runAgentTool } from "./services/agent/tools/index.js";
 export type { ToolCaller, ToolFiles } from "./services/agent/tools/index.js";
 export type {
+  AgentRun,
   ApprovalDecision,
   ApprovalRequest,
   ChatAttachment,
@@ -80,6 +81,7 @@ export type {
   ProviderModelOption,
   ProviderSettings,
   Skill,
+  WatchedSession,
 } from "./services/agent/types.js";
 export { getAttachmentData } from "./services/attachment-cache.js";
 export * as mailStore from "./services/mail-store.js";

@@ -64,6 +64,13 @@ export class OpenClawText {
     this.stream.replay();
   }
 
+  /** A run that continues the turn (after a yield) writes text of its own, after what's there. */
+  nextRun(): void {
+    this.boundary();
+    this.agentSeen = false;
+    this.chatText = "";
+  }
+
   assistant(data: Record<string, unknown>): void {
     const text = typeof data.text === "string" ? data.text : undefined;
     const delta = typeof data.delta === "string" ? data.delta : "";

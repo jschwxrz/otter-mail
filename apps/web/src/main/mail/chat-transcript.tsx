@@ -329,7 +329,9 @@ export function ChatTranscript({
               onToggle={() => toggleFold(turn.id)}
             />
           ) : null}
-          {showWork ? <WorkLog items={work} onOpenFile={onOpenFile} loadImage={loadImage} /> : null}
+          {showWork ? (
+            <WorkLog items={work} live={live} onOpenFile={onOpenFile} loadImage={loadImage} />
+          ) : null}
           {answer ? (
             <div className="group min-w-0 px-1 py-2">
               <div data-cite-source>
