@@ -287,9 +287,9 @@ async function wakeWorker(extensionId: string, name: string): Promise<ServiceWor
   const running = runningWorker(ses, extensionId);
   if (running) return running;
   if (Date.now() - (failedWorkers.get(extensionId) ?? 0) < RETRY_FAILED_WORKER_MS) return null;
-  if (!manifestOf(ses.extensions.getExtension(extensionId)!)?.background?.service_worker) {
-    return null;
-  }
+  // The Web Store's updates unload an extension before loading the new version.
+  const extension = ses.extensions.getExtension(extensionId);
+  if (!extension || !manifestOf(extension).background?.service_worker) return null;
   const key = `${extensionId} ${name}`;
   const listened = new Promise<void>((resolve) => {
     listenWaiters.set(key, [...(listenWaiters.get(key) ?? []), resolve]);
