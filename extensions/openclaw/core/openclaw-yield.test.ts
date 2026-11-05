@@ -175,6 +175,18 @@ describe("an OpenClaw turn that hands off with sessions_yield", () => {
     expect(events.filter((e) => e.type === "delta")).toEqual([]);
   });
 
+  it("ends when a message is sent while it waits: that message is a turn of its own", async () => {
+    gateway();
+    const { events, ended } = send();
+    await vi.waitFor(() =>
+      expect(fixture.request).toHaveBeenCalledWith("chat.send", expect.anything()),
+    );
+    event("chat", { runId: "req-1", state: "final", yielded: true });
+    expect(await openClawProvider.steer("req-1", "and the docs?")).toBe(false);
+    await ended;
+    expect(events.at(-1)).toEqual({ requestId: "req-1", type: "done", responseId: null });
+  });
+
   it("stops waiting when asked to", async () => {
     gateway();
     const { events, ended } = send();
@@ -239,6 +251,18 @@ describe("a turn picked up again", () => {
     event("chat", { runId: "announce:1", state: "final" });
     await ended;
     expect(events.at(-1)).toEqual({ requestId: "req-1", type: "done", responseId: null });
+  });
+
+  it("ends at a yield when a message is sent after it", () => {
+    const later = { role: "user", content: "and?", __openclaw: { idempotencyKey: "req-2:user" } };
+    const rows = [
+      sent,
+      yieldCall,
+      yieldResult,
+      later,
+      row("req-2", [{ type: "text", text: "Sure." }]),
+    ];
+    expect(turnRows(rows, "req-1", "req-1")).toEqual([yieldCall, yieldResult]);
   });
 
   it("is its own run, its continuation and its steers, not a wake that came after", () => {
@@ -440,6 +464,19 @@ describe("runs the agent starts on its own", () => {
     ]);
     // Not the last message's own run, nor the continuation of a yield.
     expect(agentRunsSince([sent], 0, ["req-1"])).toEqual([]);
+    // The message's run wrote nothing (it failed): the run after it is still the agent's own.
+    expect(
+      agentRunsSince([sent, row("wake-8", [{ type: "text", text: "Hi." }], at(1))], 0),
+    ).toEqual(["wake-8"]);
+    // A run of its own that yielded before `since`, whose continuation is going now.
+    const own = [
+      sent,
+      row("req-1", [{ type: "text", text: "Ok." }], at(1)),
+      { ...yieldCall, __openclaw: { runId: "wake-9", ...at(2) } },
+      { ...yieldResult, __openclaw: { runId: "wake-9" } },
+      row("announce:9", [{ type: "toolCall", id: "t", name: "exec", arguments: {} }], at(9)),
+    ];
+    expect(agentRunsSince(own, 5, ["announce:9"])).toEqual(["wake-9"]);
     expect(
       agentRunsSince([sent, { ...yieldCall, __openclaw: { runId: "req-1" } }, yieldResult], 0, [
         "announce:1",

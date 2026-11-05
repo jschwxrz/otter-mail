@@ -181,7 +181,12 @@ function withTranscript(
         : t,
     );
   } else {
-    next = recorded.map((t, i) => (i === 0 && t.role === "assistant" ? { ...t, startedAt } : t));
+    // The turn keeps its id (a run of the agent's own is known by it).
+    next = recorded.map((t, i) =>
+      i === 0 && t.role === "assistant"
+        ? { ...t, id: local[0]?.role === "assistant" ? local[0].id : t.id, startedAt }
+        : t,
+    );
   }
   if (next[next.length - 1]?.role !== "assistant")
     next.push({

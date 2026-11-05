@@ -533,7 +533,8 @@ type RunState = {
 /**
  * Rows grouped by run into what each turn showed: a run that starts after one
  * that yielded is its continuation, one after a message sent mid-turn (a
- * steer) that message's run; any other is a turn of its own.
+ * steer) that message's run; any other is a turn of its own. A message sent
+ * after a yield starts a turn of its own, as it does in the chat.
  */
 export function runChains(rows: Record<string, unknown>[]): Record<string, unknown>[][] {
   const chains: Record<string, unknown>[][] = [];
@@ -542,7 +543,9 @@ export function runChains(rows: Record<string, unknown>[]): Record<string, unkno
   for (const row of rows) {
     const id = runOf(row) ?? run;
     const last = chains.at(-1);
-    if (!last || (id !== run && !steered && !waitingOnYield(last))) chains.push([row]);
+    const sentAfterYield = row.role === "user" && last !== undefined && waitingOnYield(last);
+    if (!last || sentAfterYield || (id !== run && !steered && !waitingOnYield(last)))
+      chains.push([row]);
     else last.push(row);
     if (row.role === "user") steered = true;
     else if (id !== run) steered = false;
@@ -1128,15 +1131,16 @@ export function agentRunsSince(
 ): string[] {
   const sent = rows.findLastIndex((m) => m.role === "user" && sendKeyOf(m));
   const chains = runChains(rows.slice(sent + 1));
-  const written = chains.slice(sent < 0 ? 0 : 1).flatMap((chain) => {
+  const own = sent < 0 ? undefined : sendKeyOf(rows[sent]);
+  const written = chains.flatMap((chain) => {
     const run = runOf(chain[0]);
+    if (typeof run !== "string" || run === own) return [];
     const at = Number((chain[0].__openclaw as { recordTimestampMs?: unknown })?.recordTimestampMs);
     const shown = transcript(chain).some((m) => m.role === "assistant");
-    if (typeof run !== "string") return [];
-    return active.includes(run) || (at > since && shown) ? [run] : [];
+    const going = chain.some((m) => active.includes(runOf(m) as string));
+    return going || (at > since && shown) ? [run] : [];
   });
   const known = new Set(rows.map(runOf));
-  const own = sent < 0 ? undefined : sendKeyOf(rows[sent]);
   const continuing = chains.length > 0 && waitingOnYield(chains[chains.length - 1]);
   const unwritten = active.filter((id) => !known.has(id) && id !== own && !continuing);
   return [...written, ...unwritten];
@@ -1333,6 +1337,12 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
   async steer(requestId, input) {
     const turn = turns.get(requestId);
     if (!turn) return false;
+    // A message sent after a hand-off starts a turn of its own; the
+    // continuation, when it comes, is a run the agent started.
+    if (turn.yielded) {
+      turn.finish({ requestId, type: "done", responseId: null });
+      return false;
+    }
     try {
       const sent = await turn.gateway.client.request<{ runId?: string }>("chat.send", {
         sessionKey: turn.sessionKey,
