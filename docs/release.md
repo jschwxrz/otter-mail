@@ -122,6 +122,8 @@ every Mac release. It started from the Mac app's 0.5.6, the last shared version.
 3. Only once the upload succeeded does it tag the commit `ios-vX.Y.Z` and commit the version to
    the Xcode project on `main`, so a failed run leaves nothing behind. It makes no GitHub Release:
    the Mac app updates from the latest one.
+   Beside it, the `sentry_release` job makes the build's Sentry release, with its commits since
+   the last iPhone tag (docs/error-reports.md).
 4. About half an hour later the build is in TestFlight for internal testers (everyone on the App
    Store Connect team). To put it in the App Store, pick the build in App Store Connect (Otter
    Mail: Calm Email → App Store) and submit it for review.
