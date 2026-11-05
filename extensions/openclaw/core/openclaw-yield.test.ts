@@ -402,6 +402,18 @@ describe("runs the agent starts on its own", () => {
     expect(agentRunsSince(rows, 5_000)).toEqual(["wake-2"]);
     const silent = row("wake-3", [{ type: "text", text: "" }], at(10_000));
     expect(agentRunsSince([...rows, silent], 5_000)).toEqual(["wake-2"]);
+    // Going now: one with nothing to show yet, and one that hasn't written anything.
+    expect(agentRunsSince([...rows, silent], 20_000, ["wake-3", "wake-4"])).toEqual([
+      "wake-3",
+      "wake-4",
+    ]);
+    // Not the last message's own run, nor the continuation of a yield.
+    expect(agentRunsSince([sent], 0, ["req-1"])).toEqual([]);
+    expect(
+      agentRunsSince([sent, { ...yieldCall, __openclaw: { runId: "req-1" } }, yieldResult], 0, [
+        "announce:1",
+      ]),
+    ).toEqual([]);
     expect(
       agentRunsSince([...rows, { ...sent, __openclaw: { idempotencyKey: "req-2:user" } }], 0),
     ).toEqual([]);

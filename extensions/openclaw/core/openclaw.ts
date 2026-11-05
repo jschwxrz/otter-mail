@@ -1074,6 +1074,8 @@ async function ensureWatching(delay = 0): Promise<void> {
     const g = await gateway(watching.settings);
     if (g.client === watchedClient) return;
     await g.client.request("sessions.subscribe", {});
+    // What yielded while this device wasn't listening is read from history now.
+    continuing.clear();
     await catchUpSessions(g);
     watchedClient = g.client;
   } catch (error) {
@@ -1092,33 +1094,41 @@ async function catchUpSessions(g: Gateway): Promise<void> {
     const key = String(row.key);
     const since = watching?.sessions.get(key);
     if (since === undefined) continue;
-    const active = ((row.activeRunIds as string[] | undefined) ?? []).length > 0;
+    const active = (row.activeRunIds as string[] | undefined) ?? [];
     const activity = Number(row.lastActivityAt ?? row.updatedAt) || 0;
-    if (!active && activity <= since) continue;
+    if (active.length === 0 && activity <= since) continue;
     const { messages } = await g.client.request<{ messages?: Record<string, unknown>[] }>(
       "chat.history",
       { sessionKey: key, limit: 200 },
     );
-    for (const id of agentRunsSince(messages ?? [], since)) announce(key, id);
+    for (const id of agentRunsSince(messages ?? [], since, active)) announce(key, id);
   }
 }
 
 /**
  * Runs the agent started after the last message sent to the session (not that
- * message's run or its continuations) since `since`, that have something to show.
+ * message's run or its continuations): those since `since` that have something
+ * to show, and those going now, written or not.
  */
-export function agentRunsSince(rows: Record<string, unknown>[], since: number): string[] {
+export function agentRunsSince(
+  rows: Record<string, unknown>[],
+  since: number,
+  active: string[] = [],
+): string[] {
   const sent = rows.findLastIndex((m) => m.role === "user" && sendKeyOf(m));
-  return runChains(rows.slice(sent + 1))
-    .slice(sent < 0 ? 0 : 1)
-    .flatMap((chain) => {
-      const run = runOf(chain[0]);
-      const at = Number(
-        (chain[0].__openclaw as { recordTimestampMs?: unknown })?.recordTimestampMs,
-      );
-      const shown = transcript(chain).some((m) => m.role === "assistant");
-      return typeof run === "string" && at > since && shown ? [run] : [];
-    });
+  const chains = runChains(rows.slice(sent + 1));
+  const written = chains.slice(sent < 0 ? 0 : 1).flatMap((chain) => {
+    const run = runOf(chain[0]);
+    const at = Number((chain[0].__openclaw as { recordTimestampMs?: unknown })?.recordTimestampMs);
+    const shown = transcript(chain).some((m) => m.role === "assistant");
+    if (typeof run !== "string") return [];
+    return active.includes(run) || (at > since && shown) ? [run] : [];
+  });
+  const known = new Set(rows.map(runOf));
+  const own = sent < 0 ? undefined : sendKeyOf(rows[sent]);
+  const continuing = chains.length > 0 && waitingOnYield(chains[chains.length - 1]);
+  const unwritten = active.filter((id) => !known.has(id) && id !== own && !continuing);
+  return [...written, ...unwritten];
 }
 
 export const openClawProvider: ChatProvider<OpenClawSettings> = {
@@ -1459,7 +1469,11 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
     watching = { settings, sessions: next, started };
     if (next.size === 0) return;
     // A chat newly watched (or the first) is caught up on; the rest are followed live.
-    if (added && watchedClient) void current?.ready.then(catchUpSessions).catch(() => {});
+    if (added && watchedClient)
+      void current?.ready.then(catchUpSessions).catch(() => {
+        watchedClient = null;
+        scheduleWatch(RECONNECT_DELAYS_MS[0]);
+      });
     else void ensureWatching();
   },
 
