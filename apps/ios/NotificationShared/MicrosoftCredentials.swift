@@ -19,6 +19,7 @@ nonisolated enum MicrosoftCredentials {
             Keychain.set(accessKey(email), nil)
         }
     }
+    @concurrent
     static func refresh(_ email: String, force: Bool = false) async throws -> Tokens {
         try await PushState.locked("microsoft-oauth:" + email) {
             guard let saved = Keychain.get(refreshKey(email)) else { throw Failure.revoked }

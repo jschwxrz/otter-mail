@@ -39,10 +39,14 @@ final class GoogleAuth {
         }
     }
 
-    private var tokens: [String: Tokens] = [:]
+    private var tokens: [String: Tokens]
     private var refreshing: [String: Task<Tokens, Error>] = [:]
     private var credentialVersions: [String: UUID] = [:]
     private let presenter = Presenter()
+
+    init(tokens: [String: Tokens] = [:]) {
+        self.tokens = tokens
+    }
 
     private static var redirectScheme: String { clientID.split(separator: ".").reversed().joined(separator: ".") }
     private static var redirectURI: String { "\(redirectScheme):/oauth2redirect" }
@@ -95,7 +99,6 @@ final class GoogleAuth {
     }
 
     func accessToken(_ email: String, force: Bool = false) async throws -> String {
-        guard isSignedIn(email) else { throw Failure.signedOut(email) }
         if !force, let cached = tokens[email.lowercased()], cached.expiresAt > .now { return cached.accessToken }
         return try await refresh(email, force: force).accessToken
     }
@@ -129,7 +132,6 @@ final class GoogleAuth {
         let version = credentialVersions[key]
         if let running = refreshing[key] { return try await running.value }
         let task = Task { () throws -> Tokens in
-            guard isSignedIn(email) else { throw Failure.signedOut(email) }
             do {
                 return try await GoogleCredentials.refresh(email, force: force)
             } catch GoogleCredentials.Failure.revoked {
