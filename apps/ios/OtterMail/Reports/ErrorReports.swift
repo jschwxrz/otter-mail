@@ -24,37 +24,43 @@ nonisolated enum ErrorReports {
         guard ProcessInfo.processInfo.environment["OTTER_MAIL_ERROR_REPORTS"] == "1" else { return }
         #endif
         guard !dsn.isEmpty else { return }
-        let info = Bundle.main.infoDictionary ?? [:]
-        SentrySDK.start { options in
-            options.dsn = dsn
-            options.releaseName = "otter-mail-ios@\(info["CFBundleShortVersionString"] ?? "0")+\(info["CFBundleVersion"] ?? "0")"
-            #if DEBUG
-            options.environment = "development"
-            #else
-            options.environment = "production"
-            #endif
-            options.sendDefaultPii = false
-            options.maxBreadcrumbs = 50
-            options.sendClientReports = false
-            options.enableCrashHandler = true
-            options.tracesSampleRate = 0
-            options.enableAutoPerformanceTracing = false
-            options.enableAutoSessionTracking = false
-            options.sessionReplay.sessionSampleRate = 0
-            options.sessionReplay.onErrorSampleRate = 0
-            options.attachScreenshot = false
-            options.attachViewHierarchy = false
-            options.enableSwizzling = false
-            options.enableUserInteractionTracing = false
-            options.enableAutoBreadcrumbTracking = false
-            options.enableNetworkBreadcrumbs = false
-            options.enableNetworkTracking = false
-            options.enableCaptureFailedRequests = false
-            options.enableLogs = false
-            options.beforeBreadcrumb = { Scrubber.scrub($0) }
-            options.beforeSend = { isOn ? Scrubber.scrub($0) : nil }
-        }
+        SentrySDK.start(configureOptions: configure)
         SentrySDK.setUser(User(userId: reportID))
+    }
+
+    static func configure(_ options: Options) {
+        let info = Bundle.main.infoDictionary ?? [:]
+        options.dsn = dsn
+        options.releaseName = "otter-mail-ios@\(info["CFBundleShortVersionString"] ?? "0")+\(info["CFBundleVersion"] ?? "0")"
+        #if DEBUG
+        options.environment = "development"
+        #else
+        options.environment = "production"
+        #endif
+        options.sendDefaultPii = false
+        options.maxBreadcrumbs = 50
+        options.sendClientReports = false
+        options.enableCrashHandler = true
+        options.tracesSampleRate = 0
+        options.enableAutoPerformanceTracing = false
+        options.enableAutoSessionTracking = false
+        options.sessionReplay.sessionSampleRate = 0
+        options.sessionReplay.onErrorSampleRate = 0
+        options.attachScreenshot = false
+        options.attachViewHierarchy = false
+        options.enableSwizzling = false
+        options.enableUserInteractionTracing = false
+        options.enableAutoBreadcrumbTracking = false
+        options.enableNetworkBreadcrumbs = false
+        options.enableNetworkTracking = false
+        options.enableCaptureFailedRequests = false
+        options.enableLogs = false
+        // Its hang tracker reads frames that stop while the app is idle as a blocked main thread
+        // (getsentry/sentry-cocoa#8317, OTTER-MAIL-IOS-5); iOS's own hang reports don't.
+        options.enableAppHangTracking = false
+        options.enableMetricKit = true
+        options.beforeBreadcrumb = { Scrubber.scrub($0) }
+        options.beforeSend = { isOn ? Scrubber.scrub($0) : nil }
     }
 
     /** Offline, timeouts and rate limits are breadcrumbs; what the user did (cancelled, signed out) is nothing. */

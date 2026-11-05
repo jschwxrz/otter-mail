@@ -1,12 +1,22 @@
-import Foundation
-@preconcurrency @_spi(Private) import Sentry
+import Sentry
 import Testing
+@testable import Otter_Mail
 
 struct ErrorReportsTests {
-    // ErrorReports.start() runs in App.init, before UIApplication exists. Before 9.31.0
-    // (getsentry/sentry-cocoa#8988) the SDK then took a background launch (app refresh) for an
-    // active app, and reported its idle, suspended main thread as a fatal app hang (OTTER-MAIL-IOS-5).
-    @Test func sdkKnowsABackgroundLaunchWhenStartedFromAppInit() {
-        #expect(SentryMeta.versionString.compare("9.31.0", options: .numeric) != .orderedAscending)
+    @Test func hangsComeFromMetricKitNotTheHangTracker() {
+        let options = Options()
+        ErrorReports.configure(options)
+        #expect(!options.enableAppHangTracking)
+        #expect(options.enableMetricKit)
+    }
+
+    @Test func reportsStayScrubbedAndMinimal() {
+        let options = Options()
+        ErrorReports.configure(options)
+        #expect(!options.sendDefaultPii)
+        #expect(!options.attachScreenshot)
+        #expect(!options.attachViewHierarchy)
+        #expect(!options.enableMetricKitRawPayload)
+        #expect(options.beforeSend != nil)
     }
 }

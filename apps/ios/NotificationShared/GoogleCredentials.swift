@@ -40,6 +40,7 @@ nonisolated enum GoogleCredentials {
         return true
     }
 
+    @concurrent
     static func refresh(_ email: String, force: Bool = false) async throws -> Tokens {
         try await PushState.locked("oauth:" + email) {
             let refreshKey = refreshKey(email)

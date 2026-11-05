@@ -44,9 +44,13 @@ final class MicrosoftAuth {
         }
     }
 
-    private var tokens: [String: Tokens] = [:]
+    private var tokens: [String: Tokens]
     private var refreshing: [String: Task<Tokens, Error>] = [:]
     private let presenter = Presenter()
+
+    init(tokens: [String: Tokens] = [:]) {
+        self.tokens = tokens
+    }
 
     private static var redirectScheme: String { "msauth.\(Bundle.main.bundleIdentifier ?? "dev.otterware.mail")" }
     private static var redirectURI: String { "\(redirectScheme)://auth" }
@@ -104,7 +108,6 @@ final class MicrosoftAuth {
     }
 
     func accessToken(_ email: String, force: Bool = false) async throws -> String {
-        guard isSignedIn(email) else { throw Failure.signedOut(email) }
         if !force, let cached = tokens[email.lowercased()], cached.expiresAt > .now { return cached.accessToken }
         return try await refresh(email).accessToken
     }
