@@ -179,11 +179,13 @@ export function useDocumentActions(
       id: "download",
       label: "Download",
       Icon: DownloadIcon,
-      run: () =>
+      run: () => {
+        const id = toast.loading(`Downloading ${a.title}…`);
         void driveApi.download(a.id, folderId, version ?? undefined).then(
-          (saved) => saved && toast.success("Downloaded"),
-          (error: unknown) => toast.error(errorText(error)),
-        ),
+          (saved) => (saved ? toast.update(id, "success", "Downloaded") : toast.close(id)),
+          (error: unknown) => toast.update(id, "error", errorText(error)),
+        );
+      },
     },
     separator("edit"),
     ...(canEdit && !a.archived
