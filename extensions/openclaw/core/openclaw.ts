@@ -1087,10 +1087,13 @@ async function ensureWatching(delay = 0): Promise<void> {
 
 /** Runs the agent started while this device wasn't listening: going now, or written since the chat last ended. */
 /**
- * `fresh`: chats to catch up on whatever their last activity, from their last
- * message on (one just watched, or whose turn was just picked up again).
+ * Chats to catch up on whatever their last activity, from their last message
+ * on (one just watched, or whose turn was just picked up again), until a catch-up gets through.
  */
-async function catchUpSessions(g: Gateway, fresh = new Set<string>()): Promise<void> {
+const fresh = new Set<string>();
+
+async function catchUpSessions(g: Gateway): Promise<void> {
+  const caught = new Set(fresh);
   const { sessions } = await g.client.request<{ sessions?: Record<string, unknown>[] }>(
     "sessions.list",
     { limit: 200 },
@@ -1109,6 +1112,7 @@ async function catchUpSessions(g: Gateway, fresh = new Set<string>()): Promise<v
     );
     for (const id of agentRunsSince(messages ?? [], since, active)) announce(key, id);
   }
+  for (const key of caught) fresh.delete(key);
 }
 
 /**
@@ -1472,28 +1476,25 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
   watch(settings, sessions, started) {
     const next = new Map(sessions.map((s) => [s.id, s.since]));
     const before = watching?.sessions;
-    // A chat newly watched, or whose turn was picked up again (it caught up on nothing meanwhile).
-    const fresh = new Set(
-      [...next].flatMap(([id, since]) => {
-        const was = before?.get(id);
-        const reopened = was === Number.MAX_SAFE_INTEGER && since !== was;
-        return was === undefined || reopened ? [id] : [];
-      }),
-    );
+    // A chat watched after the first, or whose turn was picked up again (it caught up on nothing meanwhile).
+    for (const [id, since] of next) {
+      const was = before?.get(id);
+      if (before && (was === undefined || (was === Number.MAX_SAFE_INTEGER && since !== was)))
+        fresh.add(id);
+    }
     watching = { settings, sessions: next, started };
     if (next.size === 0) return;
     if (fresh.size > 0 && watchedClient)
-      void current?.ready
-        .then((g) => catchUpSessions(g, fresh))
-        .catch(() => {
-          watchedClient = null;
-          scheduleWatch(RECONNECT_DELAYS_MS[0]);
-        });
+      void current?.ready.then(catchUpSessions).catch(() => {
+        watchedClient = null;
+        scheduleWatch(RECONNECT_DELAYS_MS[0]);
+      });
     else void ensureWatching();
   },
 
   shutdown() {
     watching = null;
+    fresh.clear();
     watchedClient = null;
     clearTimeout(rewatch);
     for (const [requestId, turn] of turns)

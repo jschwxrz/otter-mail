@@ -367,6 +367,28 @@ describe("runs the agent starts on its own", () => {
     expect(started.map((r) => r.requestId)).toEqual(["run:wake-1", "run:wake-3", "run:wake-5"]);
   });
 
+  it("are caught up on in a chat whose turn was picked up again, once that turn ends", async () => {
+    const wake = row("wake-7", [{ type: "text", text: "Done while you were away." }], {
+      recordTimestampMs: 5,
+    });
+    history = () => ({ messages: [sent, row("req-1", [{ type: "text", text: "Ok." }]), wake] });
+    gateway((method) =>
+      method === "sessions.list" ? { sessions: [{ key: "s", lastActivityAt: 5 }] } : undefined,
+    );
+    const started: AgentRun[] = [];
+    openClawProvider.watch!(settings, [{ id: "s", since: Number.MAX_SAFE_INTEGER }], (run) =>
+      started.push(run),
+    );
+    await vi.waitFor(() =>
+      expect(fixture.request).toHaveBeenCalledWith("sessions.list", { limit: 200 }),
+    );
+    await tick();
+    expect(started).toEqual([]);
+    // The resumed turn ended now, long after the wake.
+    openClawProvider.watch!(settings, [{ id: "s", since: Date.now() }], (run) => started.push(run));
+    await vi.waitFor(() => expect(started).toEqual([{ sessionId: "s", requestId: "run:wake-7" }]));
+  });
+
   it("are followed from their first row, and a silent one just ends", async () => {
     history = () => ({
       messages: [
