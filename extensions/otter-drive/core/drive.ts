@@ -108,6 +108,18 @@ async function call(
     headers.set("authorization", `Bearer ${auth.token}`);
     if (folderId) headers.set("x-otterdrive-folder", folderId);
   }
+  // A limit on silence, not on the whole transfer: Drive zips a big document
+  // as it sends it, which can take minutes.
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const waitForMore = () => {
+    clearTimeout(timer);
+    timer = setTimeout(
+      () => controller.abort(new Error("Otter Drive stopped answering. Try again.")),
+      60_000,
+    );
+  };
+  waitForMore();
   let response: Response;
   try {
     response = await fetch(path.startsWith("https:") ? path : `${BASE}${path}`, {
@@ -115,10 +127,28 @@ async function call(
       headers,
       credentials: "omit",
       redirect: "error",
-      signal: AbortSignal.timeout(60_000),
+      signal: controller.signal,
     });
   } catch {
+    clearTimeout(timer);
+    if (controller.signal.aborted) throw controller.signal.reason;
     throw new Error("Could not reach Otter Drive. Check your connection and try again.");
+  }
+  if (!response.body) clearTimeout(timer);
+  else {
+    waitForMore();
+    response = new Response(
+      response.body.pipeThrough(
+        new TransformStream<Uint8Array, Uint8Array>({
+          transform(chunk, out) {
+            waitForMore();
+            out.enqueue(chunk);
+          },
+          flush: () => clearTimeout(timer),
+        }),
+      ),
+      response,
+    );
   }
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as {
