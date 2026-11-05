@@ -914,6 +914,8 @@ async function followAgentRun(run: AgentRun): Promise<void> {
   const current = get().conversations.find((c) => c.id === convo.id);
   if (!current || current.turns.some((t) => t.id === turnId)) return;
   if (get().runs[convo.id]) return wait();
+  // A turn about to be picked up again follows what it led to itself.
+  if (current.openRequest) return;
   console.log("[AgentChat:agentRun]", { provider: run.provider, requestId: run.requestId });
   set((s) => ({
     runs: {
@@ -1007,7 +1009,7 @@ function onChatEvent(raw: unknown): void {
     patchConversation(s.convoId, (c) => ({
       ...c,
       turns: withTranscript(c.turns, event.requestId, event.messages),
-      updatedAt: Date.now(),
+      updatedAt: event.messages.length > 0 ? Date.now() : c.updatedAt,
     }));
     return;
   }

@@ -780,7 +780,8 @@ async function follow(
   };
 
   const adopt = (runId: string) => {
-    if (ownsRun(turn, runId)) return;
+    // A message sent meanwhile (from any device) starts a run of its own.
+    if (ownsRun(turn, runId) || sent.has(runId)) return;
     logger.info("agent", "openclaw run continues the turn", { requestId, runId });
     // The runs before it yielded: they're over.
     for (const id of [turn.runId, ...turn.steers]) turn.finals.add(id);
@@ -857,13 +858,14 @@ async function follow(
   const endStep = (id: string | undefined, failed: boolean, result?: unknown) => {
     if (id?.startsWith("tool_call:") || (id && unshown.has(id))) return;
     const output = toolOutput(result);
+    const reported = result !== undefined;
     if (id && (seen.has(`${id}:output`) || (seen.has(`${id}:done`) && !output))) return;
     if (id) {
       seen.add(`${id}:done`);
       if (output) seen.add(`${id}:output`);
       open.delete(id);
-      if (output) bare.delete(id);
-      else bare.add(id);
+      if (reported) bare.delete(id);
+      else if (!output) bare.add(id);
     }
     emit({ requestId, type: "toolResult", id, output: output || (failed ? "(failed)" : "(done)") });
   };
@@ -1024,13 +1026,15 @@ type Watching = {
 let watching: Watching | null = null;
 let watchedClient: Gateway["client"] | null = null;
 let rewatch: ReturnType<typeof setTimeout> | undefined;
-/** Runs already reported, or known not to be the agent's own: messages sent (from any device). */
+/** Runs already reported, or another device's continuation. */
 const announced = new Set<string>();
+/** Runs of messages sent to a watched session, from any device. */
+const sent = new Set<string>();
 /** Sessions whose run yielded: the run that starts next is its continuation, followed where it was sent. */
 const continuing = new Set<string>();
 
 function announce(sessionKey: string, runId: string): void {
-  if (!watching?.sessions.has(sessionKey) || announced.has(runId)) return;
+  if (!watching?.sessions.has(sessionKey) || announced.has(runId) || sent.has(runId)) return;
   for (const turn of turns.values())
     if (turn.sessionKey === sessionKey && (!turn.ending || ownsRun(turn, runId))) return;
   announced.add(runId);
@@ -1042,12 +1046,13 @@ listeners.add(({ event, payload }) => {
   const p = (payload ?? {}) as Record<string, unknown>;
   if (typeof p.sessionKey !== "string" || !watching?.sessions.has(p.sessionKey)) return;
   const row = p.message as Record<string, unknown> | undefined;
-  const sent = event === "session.message" && row?.role === "user" ? sendKeyOf(row) : undefined;
-  if (sent) announced.add(sent);
+  const key = event === "session.message" && row?.role === "user" ? sendKeyOf(row) : undefined;
+  if (key) sent.add(key);
   if (event === "chat" && p.state === "final" && p.yielded === true) continuing.add(p.sessionKey);
   const phase = (p.data as { phase?: unknown } | undefined)?.phase;
   if (event !== "agent" || p.stream !== "lifecycle" || phase !== "start") return;
   if (typeof p.runId !== "string") return;
+  if (sent.has(p.runId) || announced.has(p.runId)) return;
   if (continuing.delete(p.sessionKey)) announced.add(p.runId);
   else announce(p.sessionKey, p.runId);
 });
@@ -1100,16 +1105,19 @@ async function catchUpSessions(g: Gateway): Promise<void> {
 
 /**
  * Runs the agent started after the last message sent to the session (not that
- * message's run or its continuations) since `since`.
+ * message's run or its continuations) since `since`, that have something to show.
  */
 export function agentRunsSince(rows: Record<string, unknown>[], since: number): string[] {
   const sent = rows.findLastIndex((m) => m.role === "user" && sendKeyOf(m));
   return runChains(rows.slice(sent + 1))
     .slice(sent < 0 ? 0 : 1)
-    .flatMap(([first]) => {
-      const run = runOf(first);
-      const at = Number((first.__openclaw as { recordTimestampMs?: unknown })?.recordTimestampMs);
-      return typeof run === "string" && at > since ? [run] : [];
+    .flatMap((chain) => {
+      const run = runOf(chain[0]);
+      const at = Number(
+        (chain[0].__openclaw as { recordTimestampMs?: unknown })?.recordTimestampMs,
+      );
+      const shown = transcript(chain).some((m) => m.role === "assistant");
+      return typeof run === "string" && at > since && shown ? [run] : [];
     });
 }
 
@@ -1283,8 +1291,9 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
   cancel(requestId) {
     const turn = turns.get(requestId);
     if (!turn) return;
-    // Waiting on a yield, no run is going to report it stopped.
+    // Waiting on a yield, no run is going to report it stopped, or continue it.
     const waiting = turn.yielded;
+    if (waiting) continuing.delete(turn.sessionKey);
     void turn.gateway.client
       .request("chat.abort", {
         sessionKey: turn.sessionKey,

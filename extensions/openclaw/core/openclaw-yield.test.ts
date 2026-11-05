@@ -140,6 +140,28 @@ describe("an OpenClaw turn that hands off with sessions_yield", () => {
     expect(events.at(-1)).toEqual({ requestId: "req-1", type: "done", responseId: null });
   });
 
+  it("doesn't take a message sent meanwhile from another device for its continuation", async () => {
+    gateway((method) => (method === "sessions.list" ? { sessions: [] } : undefined));
+    openClawProvider.watch!(settings, [{ id: "s", since: 0 }], () => {});
+    const { events, ended } = send();
+    await vi.waitFor(() =>
+      expect(fixture.request).toHaveBeenCalledWith("chat.send", expect.anything()),
+    );
+    event("chat", { runId: "req-1", state: "final", yielded: true });
+    event("session.message", {
+      message: { role: "user", content: "hi", __openclaw: { idempotencyKey: "elsewhere:user" } },
+    });
+    lifecycleStart("elsewhere");
+    say("elsewhere", "i-x", "Their reply.");
+    lifecycleStart("announce:1");
+    say("announce:1", "i-2", "All checks passed.");
+    event("chat", { runId: "announce:1", state: "final" });
+    await ended;
+    expect(events.filter((e) => e.type === "delta").map((e) => e.text)).toEqual([
+      "All checks passed.",
+    ]);
+  });
+
   it("ends when a run finishes without yielding, and ignores other runs then", async () => {
     gateway();
     const { events, ended } = send();
@@ -378,6 +400,8 @@ describe("runs the agent starts on its own", () => {
     ];
     expect(agentRunsSince(rows, 0)).toEqual(["wake-1", "wake-2"]);
     expect(agentRunsSince(rows, 5_000)).toEqual(["wake-2"]);
+    const silent = row("wake-3", [{ type: "text", text: "" }], at(10_000));
+    expect(agentRunsSince([...rows, silent], 5_000)).toEqual(["wake-2"]);
     expect(
       agentRunsSince([...rows, { ...sent, __openclaw: { idempotencyKey: "req-2:user" } }], 0),
     ).toEqual([]);

@@ -486,8 +486,7 @@ it, and the chat follows that too. When the agent hands off to wait for its suba
 (`sessions_yield`), the turn waits with it and shows the reply their completion brings, also
 after a relaunch. A reply the agent writes on its own later (a background command or subagent
 finishing, a scheduled job) appears in its chat as a turn of its own, including those written
-while the app was closed. Tool steps show the tool's output, and an approval or question it
-asks notifies, as new mail does.
+while the app was closed. Tool steps show the tool's output.
 
 Other agents on the Mac (Claude Code or Codex in a terminal, Cursor, …) get the same tools from
 that server while the app is open, with a token made in Settings › Agents (its address stays the
