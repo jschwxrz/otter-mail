@@ -8,7 +8,7 @@
  */
 
 import { fromBase64, toBase64Url, utf8Decode, utf8Encode } from "../../bytes.js";
-import { SIGNED_OUT_MESSAGE } from "../../google.js";
+import { GMAIL_ACCESS_MISSING_MESSAGE, SIGNED_OUT_MESSAGE } from "../../google.js";
 import { logger } from "../../logger.js";
 import { platform } from "../../platform.js";
 import { mapPool } from "../../pool.js";
@@ -51,6 +51,13 @@ function isRateLimited(status: number, body: string): boolean {
   return (
     status === 403 &&
     /rateLimitExceeded|userRateLimitExceeded|RATE_LIMIT_EXCEEDED|Quota exceeded/.test(body)
+  );
+}
+
+function isScopeMissing(status: number, body: string): boolean {
+  return (
+    status === 403 &&
+    /insufficient(Permissions| authentication scopes)|ACCESS_TOKEN_SCOPE_INSUFFICIENT/i.test(body)
   );
 }
 
@@ -105,13 +112,14 @@ export function errorKind(err: unknown): ErrorKind | null {
 
 function isSignInError(err: unknown): boolean {
   if (err instanceof GmailApiError) {
-    return (
-      err.status === 401 ||
-      (err.status === 403 && /insufficient(Permissions| authentication scopes)/i.test(err.body))
-    );
+    return err.status === 401 || isScopeMissing(err.status, err.body);
   }
   const text = String(err);
-  return text.includes(SIGNED_OUT_MESSAGE) || text.includes("Google sign-in expired");
+  return (
+    text.includes(SIGNED_OUT_MESSAGE) ||
+    text.includes(GMAIL_ACCESS_MISSING_MESSAGE) ||
+    text.includes("Google sign-in expired")
+  );
 }
 
 export function describeError(err: unknown): string {
@@ -121,6 +129,7 @@ export function describeError(err: unknown): string {
   if (text.includes(SIGNED_OUT_MESSAGE) || text.includes("Google sign-in expired")) {
     return SIGNED_OUT_MESSAGE;
   }
+  if (text.includes(GMAIL_ACCESS_MISSING_MESSAGE)) return GMAIL_ACCESS_MISSING_MESSAGE;
   if (err instanceof GmailApiError) {
     if (err.status === 401) {
       return "Gmail rejected this account's sign-in — sign in to it again";
@@ -213,7 +222,12 @@ async function gmailFetch(
         transientRetries: tries + 1,
       });
     }
-    throw new GmailApiError(response.status, response.statusText, body);
+    const error = new GmailApiError(response.status, response.statusText, body);
+    // Settings need their own optional scope (signatures); anything else needs Gmail itself.
+    if (isScopeMissing(response.status, body) && !path.startsWith("/settings/")) {
+      throw new Error(GMAIL_ACCESS_MISSING_MESSAGE, { cause: error });
+    }
+    throw error;
   }
 
   const text = await response.text();

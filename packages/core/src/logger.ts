@@ -1,7 +1,7 @@
 import type { ReportTags } from "@otter-mail/shared/error-reports";
 import { supportError } from "@otter-mail/shared/support";
 
-import { SIGNED_OUT_MESSAGE } from "./google.js";
+import { GMAIL_ACCESS_MISSING_MESSAGE, SIGNED_OUT_MESSAGE } from "./google.js";
 import { OUTLOOK_SIGNED_OUT_MESSAGE } from "./microsoft.js";
 import { platform } from "./platform.js";
 import { recordSupportError } from "./services/support-errors.js";
@@ -16,7 +16,12 @@ function log(level: Level, scope: string, message: string, data?: unknown): void
 /** The network's doing, or a mailbox the user has to sign in to again: theirs to see, not ours to fix. */
 function expected(message: string, error: unknown): boolean {
   const reason = error instanceof Error ? error.message : String(error);
-  if (reason === SIGNED_OUT_MESSAGE || reason === OUTLOOK_SIGNED_OUT_MESSAGE) return true;
+  if (
+    reason === SIGNED_OUT_MESSAGE ||
+    reason === GMAIL_ACCESS_MISSING_MESSAGE ||
+    reason === OUTLOOK_SIGNED_OUT_MESSAGE
+  )
+    return true;
   const category = supportError("", "backend", `${message} ${reason}`)?.category;
   return category === "network" || category === "timeout" || category === "rate limit";
 }

@@ -1,5 +1,7 @@
+export const GMAIL_MAIL_SCOPE = "https://mail.google.com/";
+
 export const GMAIL_SCOPES = [
-  "https://mail.google.com/",
+  GMAIL_MAIL_SCOPE,
   "openid",
   "email",
   "profile",
