@@ -131,10 +131,12 @@ async function call(
     });
   } catch {
     clearTimeout(timer);
+    if (controller.signal.aborted) throw controller.signal.reason;
     throw new Error("Could not reach Otter Drive. Check your connection and try again.");
   }
   if (!response.body) clearTimeout(timer);
-  else
+  else {
+    waitForMore();
     response = new Response(
       response.body.pipeThrough(
         new TransformStream<Uint8Array, Uint8Array>({
@@ -147,6 +149,7 @@ async function call(
       ),
       response,
     );
+  }
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as {
       error?: { message?: string } | string;
