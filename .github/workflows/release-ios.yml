@@ -69,6 +69,8 @@ jobs:
     # refuses beta builds).
     runs-on: xcode-27
     timeout-minutes: 45
+    outputs:
+      build: ${{ steps.upload.outputs.build }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -131,16 +133,49 @@ jobs:
             echo "OTTER_MAIL_ASC_ISSUER=$APPLE_API_ISSUER"
           } >> "$GITHUB_ENV"
 
-      - name: Build and upload
+      - id: upload
+        name: Build and upload
         env:
           VERSION: ${{ needs.preflight.outputs.version }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
-        run: node scripts/release-ios.ts --version "$VERSION"
+        run: node scripts/release-ios.ts --version "$VERSION" --github-output
 
       - name: Remove signing
         if: always()
         run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+
+  # Once App Store Connect has the build: the release the app reports under, with every commit
+  # since the last iPhone release, so `Fixes OTTER-MAIL-IOS-…` resolves its issue. Its own job,
+  # so a Sentry failure doesn't hold back the tag (rerun it alone).
+  sentry_release:
+    name: Sentry release
+    needs: [preflight, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.preflight.outputs.ref }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
+          package-manager-cache: false
+
+      - name: Create, attach commits and finalize
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+          BUILD: ${{ needs.build.outputs.build }}
+          REPOSITORY: ${{ github.repository }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+        run: >-
+          node scripts/sentry-release-ios.ts --version "$VERSION" --build "$BUILD"
+          --repository "$REPOSITORY"
 
   finalize:
     name: Tag and bump the version on main

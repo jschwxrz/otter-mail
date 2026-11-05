@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { bumpVersion, nightlyReleaseMetadata } from "./resolve-release-version.ts";
 import { createBuildConfig, resolvePublishConfig } from "./build-desktop-artifact.ts";
 import { versionMatchesChannel } from "../packages/shared/src/release-channel.ts";
+import { iosCommitSpec, iosSentryRelease, previousIosTag } from "./sentry-release-ios.ts";
 
 const nightly = "0.13.10-nightly.20261013.123";
 
@@ -93,4 +94,28 @@ test("signed Mac builds notarize through our hook, which retries stapling", () =
   assert.equal((signed.mac as { notarize: boolean }).notarize, false);
   assert.match(String(signed.afterSign), /scripts\/notarize-mac\.ts$/);
   assert.equal(build(false).afterSign, undefined);
+});
+
+test("the iPhone's Sentry release is the one the app reports, with commits since the last iPhone tag", () => {
+  assert.equal(iosSentryRelease("0.8.4", "202611040931"), "otter-mail-ios@0.8.4+202611040931");
+  for (const [version, build] of [
+    ["0.8", "202611040931"],
+    ["0.8.4", "1"],
+    ["0.8.4", ""],
+  ]) {
+    assert.throws(() => iosSentryRelease(version!, build!));
+  }
+
+  const tags = ["v0.13.9", "ios-v0.8.10", "ios-v0.8.9", "ios-v0.8.4", "ios-v0.9.0", "ios-v1.0"];
+  assert.equal(previousIosTag(tags, "0.8.11"), "ios-v0.8.10");
+  assert.equal(previousIosTag(tags, "0.9.0"), "ios-v0.8.10");
+  assert.equal(previousIosTag(tags, "0.8.4"), undefined);
+
+  const [a, b] = ["a".repeat(40), "b".repeat(40)];
+  assert.equal(
+    iosCommitSpec("otterware-app/otter-mail", a, b),
+    `otterware-app/otter-mail@${a}..${b}`,
+  );
+  assert.throws(() => iosCommitSpec("otter-mail", a, b));
+  assert.throws(() => iosCommitSpec("otterware-app/otter-mail", "HEAD", b));
 });

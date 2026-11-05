@@ -79,3 +79,18 @@ release; `OTTER_MAIL_ERROR_REPORTS=1` lets a development build (`pnpm dev:fake`,
    `Fixes <SHORT-ID>` (the issue's ID, e.g. `OTTER-MAIL-DESKTOP-1A`, not the number in its URL)
    links to the issue, and the issue resolves when a release holding that commit is made; an
    event from a later version reopens it as a regression.
+
+   Sentry resolves an issue only through a release in the issue's own project, so the iPhone has
+   its own: the Release iPhone workflow's `sentry_release` job (`scripts/sentry-release-ios.ts`)
+   runs once App Store Connect has the build, and creates `otter-mail-ios@<version>+<build>` in
+   `otter-mail-ios`, the exact name the app reports (`ErrorReports.swift`). It attaches every
+   commit from the previous `ios-vX.Y.Z` tag to the released commit, then finalizes the release.
+   An iPhone fix says `Fixes OTTER-MAIL-IOS-<n>` and resolves with the next iPhone release. If
+   the job fails, the build and tag still go out: rerun the failed job.
+
+   iPhone releases before this job (up to `ios-v0.8.5`) have no commits in Sentry, so fixes they
+   shipped (OTTER-MAIL-IOS-2, in 0.8.5) stay open. To reconcile one, by hand and on purpose:
+   `node scripts/sentry-release-ios.ts --version 0.8.5 --build 202611042249 --ref ios-v0.8.5`
+   with `SENTRY_AUTH_TOKEN` and `SENTRY_ORG` set. The build is in that run's log ("Uploaded
+   0.8.5 (…)") and in TestFlight; a name that differs from what devices report makes a release
+   no event belongs to. Or resolve the issue in Sentry's UI.

@@ -122,6 +122,9 @@ if (sentryToken && sentryOrg) {
 }
 
 NodeFS.rmSync(work, { recursive: true, force: true });
+if (process.argv.includes("--github-output") && process.env.GITHUB_OUTPUT) {
+  NodeFS.appendFileSync(process.env.GITHUB_OUTPUT, `build=${build}\n`);
+}
 console.log(
   `[release-ios] Uploaded ${version} (${build}). It shows up in TestFlight once Apple has processed it.`,
 );
