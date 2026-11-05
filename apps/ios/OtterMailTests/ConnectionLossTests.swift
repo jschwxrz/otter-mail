@@ -23,4 +23,19 @@ struct ConnectionLossTests {
         #expect(NWTransport.lost(.posix(.ECONNREFUSED)) as? NWError == .posix(.ECONNREFUSED))
         #expect(NWTransport.lost(.tls(errSSLBadCert)) as? NWError == .tls(errSSLBadCert))
     }
+
+    @Test func aServerHangingUpIsTheConnectionNotTheSync() {
+        #expect(ImapError.closed.isConnectionFailure)
+        #expect(ImapError.timedOut.isConnectionFailure)
+        #expect(!ImapError.server("NO").isConnectionFailure)
+        #expect(!ImapError.protocolError("Bad").isConnectionFailure)
+    }
+
+    @Test func onlyADroppedConnectionIsTriedAgain() {
+        #expect(ImapProvider.lostConnection(ImapError.closed))
+        #expect(ImapProvider.lostConnection(URLError(.networkConnectionLost)))
+        #expect(!ImapProvider.lostConnection(ImapError.timedOut))
+        #expect(!ImapProvider.lostConnection(ImapError.server("NO")))
+        #expect(!ImapProvider.lostConnection(URLError(.cancelled)))
+    }
 }
