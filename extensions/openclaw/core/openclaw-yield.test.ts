@@ -265,6 +265,27 @@ describe("a turn picked up again", () => {
     expect(turnRows(rows, "req-1", "req-1")).toEqual([yieldCall, yieldResult]);
   });
 
+  it("is over when a message was sent after its yield, even if the continuation came later", async () => {
+    const later = { role: "user", content: "and?", __openclaw: { idempotencyKey: "req-2:user" } };
+    history = () => ({
+      messages: [
+        sent,
+        yieldCall,
+        yieldResult,
+        later,
+        row("req-2", [{ type: "text", text: "Sure." }]),
+        row("announce:1", [{ type: "text", text: "Checks passed." }]),
+      ],
+      sessionInfo: { activeRunIds: [] },
+    });
+    gateway();
+    const events: ChatEvent[] = [];
+    await openClawProvider.resume!({ requestId: "req-1", sessionId: "s" }, settings, (e) =>
+      events.push(e),
+    );
+    expect(events.at(-1)).toEqual({ requestId: "req-1", type: "done", responseId: null });
+  });
+
   it("is its own run, its continuation and its steers, not a wake that came after", () => {
     const steer = {
       role: "user",

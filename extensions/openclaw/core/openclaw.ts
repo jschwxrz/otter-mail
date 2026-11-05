@@ -572,9 +572,12 @@ async function runState(turn: Turn): Promise<RunState> {
     messages?: Record<string, unknown>[];
     sessionInfo?: { hasActiveRun?: boolean; activeRunIds?: string[] };
   }>("chat.history", { sessionKey: turn.sessionKey, limit: 200 });
-  const rows = turnRows(result.messages ?? [], turn.requestId, turn.runId);
+  const all = result.messages ?? [];
+  const rows = turnRows(all, turn.requestId, turn.runId);
   const info = result.sessionInfo ?? {};
-  const waiting = rows ? waitingOnYield(rows) : false;
+  // A continuation joins the chain: anything after it (a message sent since) ends the wait.
+  const last = rows?.at(-1);
+  const waiting = rows && last ? waitingOnYield(rows) && all.at(-1) === last : false;
   const chain = new Set((rows ?? []).map(runOf));
   const ids = info.activeRunIds ?? (info.hasActiveRun ? [turn.runId] : []);
   return {
