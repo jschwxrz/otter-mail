@@ -30,6 +30,9 @@ nonisolated enum ImapError: LocalizedError, Equatable {
         }
     }
 
+    /** The server hung up or stopped answering: the network's kind of failure, as on the Mac. */
+    var isConnectionFailure: Bool { self == .closed || self == .timedOut }
+
     var errorDescription: String? {
         switch self {
         case .closed: "The mail server closed the connection."

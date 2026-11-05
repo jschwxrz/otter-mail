@@ -33,10 +33,29 @@ final class ImapProvider: MailProvider {
         try await SMTP.verify(settings.smtp, username: settings.username, auth: .password(password))
     }
 
-    /** Runs `body` on the connection, a job at a time (jobs open folders, so they can't interleave). */
-    private func session<T>(_ body: (ImapClient) async throws -> T) async throws -> T {
+    /**
+     * Runs `body` on the connection, a job at a time (jobs open folders, so
+     * they can't interleave). With `retry`, a reused connection the server
+     * dropped meanwhile is reopened and `body` run once more, as on the Mac;
+     * only for jobs that are safe to run twice (never APPEND or a move).
+     */
+    private func session<T>(retry: Bool = false, _ body: (ImapClient) async throws -> T) async throws -> T {
         if busy { await withCheckedContinuation { waiting.append($0) } } else { busy = true }
         defer { if waiting.isEmpty { busy = false } else { waiting.removeFirst().resume() } }
+        let reused = client != nil
+        do {
+            return try await attempt(body)
+        } catch where retry && reused && Self.lostConnection(error) {
+            return try await attempt(body)
+        }
+    }
+
+    /** The server hung up, or the network dropped the connection under it. */
+    static func lostConnection(_ error: Error) -> Bool {
+        error as? ImapError == .closed || (error as? URLError)?.code == .networkConnectionLost
+    }
+
+    private func attempt<T>(_ body: (ImapClient) async throws -> T) async throws -> T {
         let client = try await connection()
         do {
             let result = try await body(client)
@@ -177,7 +196,7 @@ final class ImapProvider: MailProvider {
     var hasArchive: Bool { roles[.archive] != nil }
 
     func labels() async throws -> [MailLabel] {
-        if folders.isEmpty { try await session { try await refreshFolders($0) } }
+        if folders.isEmpty { try await session(retry: true) { try await refreshFolders($0) } }
         let special = Set(roles.values)
         return folders.filter { !special.contains($0.path) }
             .map { MailLabel(id: $0.path, name: Self.name($0), color: nil) }
@@ -200,7 +219,10 @@ final class ImapProvider: MailProvider {
     }
 
     func sync(_ state: inout MailboxState, known: [MailThread]) async throws -> MailDelta {
-        try await session { client in
+        let before = state
+        return try await session(retry: true) { client in
+            // A second run starts over: the first may have moved folders on without their mail.
+            state = before
             try await refreshFolders(client)
             var changes = Changes()
             if state.folders == nil {
@@ -322,7 +344,9 @@ final class ImapProvider: MailProvider {
     }
 
     func loadMore(_ folder: Folder, _ state: inout MailboxState, known: [MailThread]) async throws -> MailDelta {
-        try await session { client in
+        let before = state
+        return try await session(retry: true) { client in
+            state = before
             guard let path = path(folder), folders.contains(where: { $0.path == path }) else {
                 state.pages[MailSync.key(folder)] = ""
                 return MailDelta()
@@ -625,7 +649,7 @@ final class ImapProvider: MailProvider {
 
     func refresh(_ thread: MailThread, _ state: inout MailboxState, known: [MailThread]) async throws -> MailDelta {
         let ids = thread.messages.compactMap { ImapID($0.id) }
-        return try await session { client in
+        return try await session(retry: true) { client in
             var flags: [String: Set<String>] = [:]
             for (path, group) in Dictionary(grouping: ids, by: \.path) {
                 guard (try? await client.select(path)) != nil else { continue }
@@ -722,7 +746,7 @@ final class ImapProvider: MailProvider {
         guard let id = ImapID(message.id), let spec = attachment.id?.split(separator: " "), spec.count == 2 else {
             throw ImapError.protocolError("No file to open.")
         }
-        return try await session { client in
+        return try await session(retry: true) { client in
             try await client.open(id.path)
             let response = try await client.fetch("\(id.uid)", "(UID BODY.PEEK[\(spec[0])])").first
             guard let data = response?.values.first?.pairs["BODY[\(spec[0])]"]?.data else {
