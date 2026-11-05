@@ -3,11 +3,12 @@ import * as fs from "node:fs/promises";
 import * as http from "node:http";
 import * as path from "node:path";
 
-import { GMAIL_SCOPES } from "@otter-mail/contracts";
+import { GMAIL_MAIL_SCOPE, GMAIL_SCOPES } from "@otter-mail/contracts";
 import type { DemoGmailMailbox } from "@otter-mail/contracts/demo";
 import {
   accountStore,
   broadcast,
+  GMAIL_ACCESS_MISSING_MESSAGE,
   logger,
   SIGNED_OUT_MESSAGE,
   SignInCancelledError,
@@ -281,6 +282,10 @@ async function addAccount(loginHint?: string): Promise<MailAccount> {
   } catch (err) {
     if (err instanceof SignInCancelledError || err instanceof SignInTimedOutError) throw err;
     throw new Error(`Google OAuth authorization failed: ${String(err)}`, { cause: err });
+  }
+  // The other scopes are optional: the features that need them fall back without them.
+  if (tokens.scope && !tokens.scope.split(" ").includes(GMAIL_MAIL_SCOPE)) {
+    throw new Error(GMAIL_ACCESS_MISSING_MESSAGE);
   }
   return saveAccount(tokens);
 }
