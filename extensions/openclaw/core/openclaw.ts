@@ -1052,8 +1052,9 @@ listeners.add(({ event, payload }) => {
   const phase = (p.data as { phase?: unknown } | undefined)?.phase;
   if (event !== "agent" || p.stream !== "lifecycle" || phase !== "start") return;
   if (typeof p.runId !== "string") return;
-  if (sent.has(p.runId) || announced.has(p.runId)) return;
-  if (continuing.delete(p.sessionKey)) announced.add(p.runId);
+  // Only the first run after a yield can be its continuation, whatever it is.
+  const continues = continuing.delete(p.sessionKey) && !sent.has(p.runId);
+  if (continues) announced.add(p.runId);
   else announce(p.sessionKey, p.runId);
 });
 
@@ -1085,15 +1086,20 @@ async function ensureWatching(delay = 0): Promise<void> {
 }
 
 /** Runs the agent started while this device wasn't listening: going now, or written since the chat last ended. */
-async function catchUpSessions(g: Gateway): Promise<void> {
+/**
+ * `fresh`: chats to catch up on whatever their last activity, from their last
+ * message on (one just watched, or whose turn was just picked up again).
+ */
+async function catchUpSessions(g: Gateway, fresh = new Set<string>()): Promise<void> {
   const { sessions } = await g.client.request<{ sessions?: Record<string, unknown>[] }>(
     "sessions.list",
     { limit: 200 },
   );
   for (const row of sessions ?? []) {
     const key = String(row.key);
-    const since = watching?.sessions.get(key);
-    if (since === undefined) continue;
+    const watched = watching?.sessions.get(key);
+    if (watched === undefined) continue;
+    const since = fresh.has(key) ? 0 : watched;
     const active = (row.activeRunIds as string[] | undefined) ?? [];
     const activity = Number(row.lastActivityAt ?? row.updatedAt) || 0;
     if (active.length === 0 && activity <= since) continue;
@@ -1465,15 +1471,24 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
 
   watch(settings, sessions, started) {
     const next = new Map(sessions.map((s) => [s.id, s.since]));
-    const added = [...next.keys()].some((id) => !watching?.sessions.has(id));
+    const before = watching?.sessions;
+    // A chat newly watched, or whose turn was picked up again (it caught up on nothing meanwhile).
+    const fresh = new Set(
+      [...next].flatMap(([id, since]) => {
+        const was = before?.get(id);
+        const reopened = was === Number.MAX_SAFE_INTEGER && since !== was;
+        return was === undefined || reopened ? [id] : [];
+      }),
+    );
     watching = { settings, sessions: next, started };
     if (next.size === 0) return;
-    // A chat newly watched (or the first) is caught up on; the rest are followed live.
-    if (added && watchedClient)
-      void current?.ready.then(catchUpSessions).catch(() => {
-        watchedClient = null;
-        scheduleWatch(RECONNECT_DELAYS_MS[0]);
-      });
+    if (fresh.size > 0 && watchedClient)
+      void current?.ready
+        .then((g) => catchUpSessions(g, fresh))
+        .catch(() => {
+          watchedClient = null;
+          scheduleWatch(RECONNECT_DELAYS_MS[0]);
+        });
     else void ensureWatching();
   },
 

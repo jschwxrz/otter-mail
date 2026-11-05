@@ -356,6 +356,15 @@ describe("runs the agent starts on its own", () => {
     lifecycleStart("announce:9");
     lifecycleStart("wake-3");
     expect(started.map((r) => r.requestId)).toEqual(["run:wake-1", "run:wake-3"]);
+
+    // A message sent while a run waits on a yield: the wake after it is still the agent's own.
+    event("chat", { runId: "wake-3", state: "final", yielded: true });
+    event("session.message", {
+      message: { role: "user", content: "and?", __openclaw: { idempotencyKey: "steer-9:user" } },
+    });
+    lifecycleStart("steer-9");
+    lifecycleStart("wake-5");
+    expect(started.map((r) => r.requestId)).toEqual(["run:wake-1", "run:wake-3", "run:wake-5"]);
   });
 
   it("are followed from their first row, and a silent one just ends", async () => {
