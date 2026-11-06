@@ -6,6 +6,7 @@ import { broadcast, handle } from "../ipc.js";
 import { logger } from "../logger.js";
 import { platform } from "../platform.js";
 import { listAccounts } from "../services/account-store.js";
+import { agentDelivered } from "../services/agent/service.js";
 import { getAccount } from "../services/account-store.js";
 import { getImapPassword } from "../services/imap-passwords.js";
 import type { NotificationConnection } from "@otter-mail/contracts/relay";
@@ -113,6 +114,10 @@ async function onEvent(event: RelayEvent): Promise<void> {
   }
   if (event.type === "preferences") {
     await syncPreferences();
+    return;
+  }
+  if (event.type === "agent") {
+    await agentDelivered();
     return;
   }
   if (event.type !== "mail") return;

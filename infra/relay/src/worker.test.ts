@@ -1393,6 +1393,74 @@ describe("chats", () => {
   });
 });
 
+describe("agent channels", () => {
+  const pointer = {
+    kind: "message",
+    agentId: "main",
+    sessionKey: "agent:main:otter:inbox",
+    at: 1_800_000_000_000,
+  };
+  const send = (token: string | undefined, body: unknown) =>
+    fetch(`${base}/channel/v1/pointers`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+  async function channel(token: string, label = "OpenClaw") {
+    const response = await call("POST", "/v1/agent-channels", token, { label });
+    expect(response.status).toBe(200);
+    return (await response.json()) as { channel: { id: string }; token: string };
+  }
+
+  it("passes a gateway's pointer on to the account's devices, and keeps nothing", async () => {
+    const { token } = await signIn("channels@example.com", "channels-sub");
+    const made = await channel(token);
+    expect(made.token).toMatch(/^otter_ch_/);
+    const device = await connect(token);
+    expect((await send(made.token, pointer)).status).toBe(202);
+    await until(() => device.events.length > 0, "the agent event");
+    expect(device.events).toEqual([
+      { type: "agent", email: "", pointer: { ...pointer, channel: made.channel.id } },
+    ]);
+    device.socket.close();
+    const listed = (await (await call("GET", "/v1/agent-channels", token)).json()) as {
+      channels: { id: string; label: string; lastUsedAt: number | null }[];
+    };
+    expect(listed.channels).toEqual([
+      expect.objectContaining({ id: made.channel.id, label: "OpenClaw" }),
+    ]);
+    expect(listed.channels[0].lastUsedAt).toBeGreaterThan(0);
+    expect(JSON.stringify(listed)).not.toContain(made.token);
+  });
+
+  it("refuses text, unknown tokens and deleted channels", async () => {
+    const { token } = await signIn("channels-refused@example.com");
+    const made = await channel(token);
+    expect((await send(made.token, { ...pointer, text: "Your bank statement" })).status).toBe(400);
+    expect((await send(undefined, pointer)).status).toBe(401);
+    expect((await send("otter_ch_nope", pointer)).status).toBe(401);
+    expect((await send(token, pointer)).status).toBe(401);
+    expect((await call("DELETE", `/v1/agent-channels/${made.channel.id}`, token)).status).toBe(204);
+    expect((await send(made.token, pointer)).status).toBe(401);
+  });
+
+  it("lets only the account see and delete its channels", async () => {
+    const { token } = await signIn("channels-a@example.com");
+    const { token: other } = await signIn("channels-b@example.com");
+    const made = await channel(token);
+    await call("DELETE", `/v1/agent-channels/${made.channel.id}`, other);
+    expect((await send(made.token, pointer)).status).toBe(202);
+    const listed = (await (await call("GET", "/v1/agent-channels", other)).json()) as {
+      channels: unknown[];
+    };
+    expect(listed.channels).toEqual([]);
+    expect((await call("GET", "/v1/agent-channels")).status).toBe(401);
+  });
+});
+
 describe("web app", () => {
   it("lets the web app's origin call with credentials, and nobody else", async () => {
     const preflight = (origin: string) =>

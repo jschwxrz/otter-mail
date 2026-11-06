@@ -191,4 +191,32 @@ export type RelayEvent =
    * is empty for builds before chats, which take an event they don't know for
    * a mailbox's: they find none and go on.
    */
-  | { type: "chats"; email: "" };
+  | { type: "chats"; email: "" }
+  /** An agent's gateway has something for the user: the device reads it from the gateway itself. */
+  | { type: "agent"; email: ""; pointer: AgentPointer };
+
+/**
+ * What an agent's gateway tells the relay when it delivers something to Otter
+ * (a message, a question, an approval): never its text, only where to read it.
+ * The relay passes it on to the account's devices and keeps nothing.
+ */
+export interface AgentPointer {
+  /** The gateway's channel, one of the account's (`AgentChannel`). */
+  channel: string;
+  kind: "message" | "question" | "approval";
+  agentId: string;
+  sessionKey: string | null;
+  approvalId?: string;
+  approvalKind?: "exec" | "plugin";
+  resolved?: boolean;
+  questionId?: string;
+  at: number;
+}
+
+/** A gateway allowed to send the account's devices pointers, with a token shown once. */
+export interface AgentChannel {
+  id: string;
+  label: string;
+  createdAt: number;
+  lastUsedAt: number | null;
+}

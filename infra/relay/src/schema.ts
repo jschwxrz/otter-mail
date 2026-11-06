@@ -239,6 +239,25 @@ export const chats = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.id] })],
 );
 
+/**
+ * An agent's gateway allowed to tell the account's devices it has something for them
+ * (agent-channels.ts). Only the token's hash is kept.
+ */
+export const agentChannels = sqliteTable(
+  "agent_channels",
+  {
+    id: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    tokenHash: text().notNull().unique(),
+    label: text().notNull(),
+    createdAt: integer({ mode: "timestamp_ms" }).notNull(),
+    lastUsedAt: integer({ mode: "timestamp_ms" }),
+  },
+  (t) => [index("agent_channels_user_idx").on(t.userId)],
+);
+
 export const jwks = sqliteTable("jwks", {
   id: text().primaryKey(),
   publicKey: text().notNull(),

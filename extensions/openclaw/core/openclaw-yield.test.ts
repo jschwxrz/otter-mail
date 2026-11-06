@@ -604,3 +604,103 @@ describe("waitingOnYield", () => {
     expect(waitingOnYield([sent, yieldCall, nothing])).toBe(false);
   });
 });
+
+describe("what an agent delivers to Otter", () => {
+  const delivered = (id: string, text: string, at: number, model = "automation-result") => ({
+    role: "assistant",
+    content: [{ type: "text", text }],
+    model,
+    __openclaw: { id, recordTimestampMs: at },
+  });
+
+  it("is a turn of its own for each delivery, after the last message sent", () => {
+    const rows = [
+      delivered("d-1", "Waiting on your approval: move 2 emails to Junk.", 10),
+      sent,
+      row("req-1", [{ type: "text", text: "Moved." }]),
+      delivered("d-2", "Daily summary.", 30, "delivery-mirror"),
+      delivered("d-3", "Checks passed.", 40),
+    ];
+    expect(agentRunsSince(rows, 0)).toEqual(["delivery:d-2", "delivery:d-3"]);
+    expect(agentRunsSince(rows, 35)).toEqual(["delivery:d-3"]);
+    expect(turnRows(rows, "run:delivery:d-2", "delivery:d-2")).toEqual([rows[3]]);
+  });
+
+  it("starts a chat named for the agent when it has none, with what's new, and catches up when told", async () => {
+    const now = Date.now();
+    let messages = [delivered("d-old", "Old news.", now - 2 * 24 * 60 * 60 * 1000)];
+    gateway((method) => {
+      if (method === "sessions.list")
+        return {
+          sessions: [
+            { key: "agent:main:otter:inbox", lastActivityAt: now },
+            { key: "agent:main:main", lastActivityAt: now },
+          ],
+        };
+      if (method === "agents.list")
+        return { agents: [{ id: "main", identity: { name: "Rowan" } }] };
+      if (method === "chat.history") return { messages };
+      return undefined;
+    });
+    const started: AgentRun[] = [];
+    openClawProvider.watch!(settings, [], (run) => started.push(run));
+    await vi.waitFor(() =>
+      expect(fixture.request).toHaveBeenCalledWith("sessions.list", { limit: 200 }),
+    );
+    await tick();
+    expect(started).toEqual([]);
+
+    messages = [...messages, delivered("d-new", "Waiting on your approval.", now)];
+    openClawProvider.delivered!(settings);
+    await vi.waitFor(() =>
+      expect(started).toEqual([
+        {
+          sessionId: "agent:main:otter:inbox",
+          requestId: "run:delivery:d-new",
+          chat: { title: "Rowan" },
+          deliveredAt: now,
+        },
+      ]),
+    );
+    expect(fixture.request).not.toHaveBeenCalledWith("chat.history", {
+      sessionKey: "agent:main:main",
+      limit: 200,
+    });
+
+    // Once the chat exists it's watched like any other, from its last turn.
+    openClawProvider.watch!(settings, [{ id: "agent:main:otter:inbox", since: now }], (run) =>
+      started.push(run),
+    );
+    messages = [...messages, delivered("d-next", "Done.", now + 1)];
+    openClawProvider.delivered!(settings);
+    await vi.waitFor(() =>
+      expect(started.at(-1)).toEqual({
+        sessionId: "agent:main:otter:inbox",
+        requestId: "run:delivery:d-next",
+        deliveredAt: now + 1,
+      }),
+    );
+  });
+
+  it("is followed like a run: its text, then done", async () => {
+    history = () => ({
+      messages: [delivered("d-1", "Waiting on your approval.", 10)],
+      sessionInfo: { activeRunIds: [] },
+    });
+    gateway();
+    const events: ChatEvent[] = [];
+    await openClawProvider.resume!(
+      { requestId: "run:delivery:d-1", sessionId: "agent:main:otter:inbox" },
+      settings,
+      (e) => events.push(e),
+    );
+    expect(events).toEqual([
+      {
+        requestId: "run:delivery:d-1",
+        type: "transcript",
+        messages: [{ role: "assistant", text: "Waiting on your approval." }],
+      },
+      { requestId: "run:delivery:d-1", type: "done", responseId: null },
+    ]);
+  });
+});

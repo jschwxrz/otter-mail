@@ -613,6 +613,7 @@ export const mailApi = {
     provider: ProviderKind;
     key: string;
     title: string;
+    subtitle?: string;
     body?: string;
     focused: boolean;
   }): Promise<{ ok: boolean }> => ipc("agent:notifyAsk", params),

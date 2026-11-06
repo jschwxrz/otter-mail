@@ -16,6 +16,7 @@ import {
 import { useEffect, useState } from "react";
 
 import { openClawApi } from "./api";
+import { OpenClawDeliveries } from "./deliveries";
 
 const SITE_ORIGIN = window.desktopBridge.platform === "web" ? location.origin : null;
 
@@ -241,6 +242,7 @@ export function OpenClawSettings({ provider, update }: AgentSettingsProps) {
           </SettingsRow>
         ) : null}
       </SettingsSection>
+      {connected ? <OpenClawDeliveries /> : null}
       {connected ? (
         <ModelsSection
           provider={provider}

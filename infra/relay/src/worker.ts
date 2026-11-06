@@ -25,6 +25,7 @@ import type { MailProviderKind } from "@otter-mail/contracts/mail";
 import { CHAT_LIMITS, type Chat, type ListChatsResponse } from "@otter-mail/contracts/chats";
 
 import { createAuth, googleClientIds, googleKeys, type Auth } from "./auth.ts";
+import * as agentChannels from "./agent-channels.ts";
 import * as chats from "./chats.ts";
 import * as gmail from "./gmail.ts";
 import { InvalidTokenError, remoteKeys, verifyGoogleJwt } from "./google-jwt.ts";
@@ -298,6 +299,7 @@ authed.use(async (c, next) => {
 });
 
 authed.route("/", notificationConnections.routes());
+authed.route("/", agentChannels.routes());
 authed.all("/agent/*", async (c) => {
   if (c.req.header("origin") && c.req.header("origin") !== c.env.APP_ORIGIN)
     throw new HTTPException(403, { message: "Not from the web app." });
@@ -753,6 +755,12 @@ authed.get(
 );
 
 app.route("/v1", authed);
+app.route(
+  "/",
+  agentChannels.gatewayRoutes((env, userId, pointer) =>
+    hub(env, userId).publish({ type: "agent", email: "", pointer }),
+  ),
+);
 
 const gmailNotification = z.object({
   emailAddress: mailbox,

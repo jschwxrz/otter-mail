@@ -409,6 +409,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["openclaw gateway address token connect pair approve device tailscale"],
   },
   {
+    id: "openclaw-deliveries",
+    title: "Messages from your agents",
+    pane: "agents",
+    item: "openclaw",
+    searchTerms: ["openclaw channel cron scheduled job deliver announce notify approval inbox"],
+  },
+  {
     id: "follow-up-behavior",
     title: "Follow-up behavior",
     pane: "agents",
