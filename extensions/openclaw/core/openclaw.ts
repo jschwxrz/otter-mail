@@ -494,7 +494,7 @@ function transcript(messages: Record<string, unknown>[]): ChatSessionMessage[] {
     const toolCalls = (Array.isArray(m.content) ? (m.content as Record<string, unknown>[]) : [])
       .filter((part) => part.type === "toolCall" && !unshown.has(part.id))
       .map((part) => openClawStep(String(part.name ?? "tool"), part.arguments));
-    const text = textOf(m);
+    const text = isDelivery(m) ? withoutInspectLink(textOf(m)) : textOf(m);
     if (!text && toolCalls.length === 0) return [];
     return [{ role: "assistant", text, ...(toolCalls.length > 0 ? { toolCalls } : {}) }];
   });
@@ -521,6 +521,10 @@ const runOf = (row: Record<string, unknown>) => {
 };
 
 const isDelivery = (row: Record<string, unknown>) => String(runOf(row)).startsWith("delivery:");
+
+/** A cron job's announce ends with a link to the run in the gateway's own UI, which needs its own login. */
+const withoutInspectLink = (text: string) =>
+  text.replace(/\n+Inspect: https?:\/\/\S+\/cron\/\S+\s*$/, "");
 
 /** The session where the Otter channel plugin (extensions/openclaw/gateway) keeps what an agent delivered to Otter. */
 const INBOX = /^agent:([^:]+):otter:inbox$/;
