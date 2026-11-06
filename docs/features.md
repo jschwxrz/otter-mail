@@ -482,7 +482,11 @@ foreground or is opened again. When OpenClaw stops to ask something (its `ask_us
 question takes the composer's place, with its options and room for an answer of your own; a
 device paired before this asks the gateway for that permission from Settings › Agents. A message
 sent while it works steers the run, or, when the runtime can't take it mid-turn, runs right after
-it, and the chat follows that too.
+it, and the chat follows that too. When the agent hands off to wait for its subagents
+(`sessions_yield`), the turn waits with it and shows the reply their completion brings, also
+after a relaunch. A reply the agent writes on its own later (a background command or subagent
+finishing, a scheduled job) appears in its chat as a turn of its own, including those written
+while the app was closed. Tool steps show the tool's output.
 
 Other agents on the Mac (Claude Code or Codex in a terminal, Cursor, …) get the same tools from
 that server while the app is open, with a token made in Settings › Agents (its address stays the

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { claudeStep, codexStep, hermesStep } from "./steps.ts";
+import { claudeStep, codexStep, hermesStep, openClawStep } from "./steps.ts";
 
 describe("tool steps", () => {
   it("names Otter Mail's tools by their titles, whichever agent calls them", () => {
@@ -60,5 +60,29 @@ describe("tool steps", () => {
   it("leaves out Claude's own bookkeeping and messages that aren't steps", () => {
     expect(claudeStep("ToolSearch", { query: "select:mcp__otter-mail__search_mail" })).toBeNull();
     expect(codexStep({ type: "agentMessage", text: "Hi" })).toBeNull();
+  });
+});
+
+describe("openClawStep", () => {
+  it("names OpenClaw's own tools like the others", () => {
+    expect(openClawStep("exec", { command: "gh pr checks 268 --watch" }).title).toBe(
+      "Ran gh pr checks 268 --watch",
+    );
+    expect(openClawStep("read", { path: "/srv/notes/plan.md" }).title).toBe("Read plan.md");
+    expect(openClawStep("edit", { path: "src/app.ts" }).title).toBe("Edited app.ts");
+    expect(openClawStep("web_search", { query: "otter facts" })).toEqual({
+      kind: "web",
+      title: "Searched the web",
+      detail: "otter facts",
+    });
+    expect(openClawStep("web_fetch", { url: "https://docs.openclaw.ai/x" }).title).toBe(
+      "Read docs.openclaw.ai",
+    );
+    expect(openClawStep("sessions_spawn", { label: "Checker", task: "Watch CI" })).toEqual({
+      kind: "tool",
+      title: "Started Checker",
+      detail: "Watch CI",
+    });
+    expect(openClawStep("sessions_spawn", { task: "Watch CI" }).title).toBe("Started a subagent");
   });
 });

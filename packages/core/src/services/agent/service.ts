@@ -36,6 +36,7 @@ import {
   type ProviderSnapshot,
   type ProvidersState,
   type ResumeTurnInput,
+  type WatchedSession,
   type SendTurnInput,
   type Skill,
 } from "./types.js";
@@ -267,6 +268,15 @@ export async function resumeTurn(kind: ProviderKind, turn: ResumeTurnInput): Pro
     emit({ requestId: turn.requestId, type: "error", message: "detached" });
   });
   return true;
+}
+
+export async function watchSessions(kind: ProviderKind, sessions: WatchedSession[]): Promise<void> {
+  const found = provider(kind);
+  const settings = await agentSettings(kind);
+  if (!found.watch || !settings.enabled) return;
+  found.watch(settings, sessions, (run) =>
+    broadcast("agent:runStarted", { provider: kind, ...run }),
+  );
 }
 
 export async function answerQuestion(

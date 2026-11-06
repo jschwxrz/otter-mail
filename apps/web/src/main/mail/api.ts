@@ -608,6 +608,12 @@ export const mailApi = {
     sessionId: string;
   }): Promise<{ resumed: boolean }> => ipc("agent:resume", params),
 
+  /** Watches these chats' sessions for runs the agent starts itself; they arrive as `agent:runStarted`. */
+  agentWatch: (
+    provider: ProviderKind,
+    sessions: { id: string; since: number }[],
+  ): Promise<{ ok: boolean }> => ipc("agent:watch", { provider, sessions }),
+
   agentStageAttachments: (
     items: { name: string; mime: string; bytes: Uint8Array }[],
   ): Promise<{ attachments: ChatAttachment[]; errors: string[] }> =>

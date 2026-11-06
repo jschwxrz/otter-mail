@@ -186,6 +186,12 @@ export type SendTurnInput = {
 
 export type ResumeTurnInput = { requestId: string; sessionId: string };
 
+/** A chat whose session is watched for runs the agent starts itself; `since` is when its last turn ended. */
+export type WatchedSession = { id: string; since: number };
+
+/** A run the agent started on its own in a watched session: followed with `resume` under `requestId`. */
+export type AgentRun = { sessionId: string; requestId: string };
+
 export interface ChatProvider<S extends AgentSettings = AgentSettings> {
   readonly kind: ProviderKind;
   readonly displayName: string;
@@ -209,6 +215,12 @@ export interface ChatProvider<S extends AgentSettings = AgentSettings> {
    * the app have it.
    */
   resume?(input: ResumeTurnInput, settings: S, emit: Emit): Promise<void>;
+  /**
+   * Watches these chats' sessions (replacing the last list) for runs no turn
+   * started: a completion the agent was woken for, a scheduled job. Each is
+   * reported once, and those since a chat's `since` are caught up on.
+   */
+  watch?(settings: S, sessions: WatchedSession[], started: (run: AgentRun) => void): void;
   cancel(requestId: string): void;
   /** Adds a message to the running turn; false when it can't (then queue it). */
   steer(requestId: string, input: string): Promise<boolean>;
