@@ -185,6 +185,20 @@ export function watcher(env: Env, userId: string, address: string) {
     env.NOTIFICATION_MAILBOX.idFromName(JSON.stringify([userId, address])),
   );
 }
+/**
+ * Brings a watcher's next check forward. A watcher Cloudflare resets mid-call (its storage stalled
+ * past the runtime's 30-second limit, or new code rolled out) keeps its own alarm, so that check
+ * still runs; nothing is lost but the head start.
+ */
+export async function nudge(env: Env, userId: string, address: string): Promise<void> {
+  try {
+    await watcher(env, userId, address).changed();
+  } catch (error) {
+    if (!(error instanceof Error && (error as { durableObjectReset?: boolean }).durableObjectReset))
+      throw error;
+    console.warn("Notification watcher was reset", { message: error.message });
+  }
+}
 export async function remove(env: Env, userId: string, address: string): Promise<void> {
   await env.DB.batch([
     env.DB.prepare("DELETE FROM notification_connections WHERE user_id=? AND email=?").bind(

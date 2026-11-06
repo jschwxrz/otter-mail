@@ -11,6 +11,7 @@ import {
   credential,
   connection,
   failureDetail,
+  nudge,
   remove,
   routes,
   save,
@@ -335,5 +336,36 @@ describe("verified notification credentials", () => {
         expect((error as Error).message).not.toContain("mail.google.com");
       }
     }
+  });
+});
+
+describe("nudging a watcher", () => {
+  function watcherThrowing(error: Error) {
+    const changed = vi.fn().mockRejectedValue(error);
+    env.NOTIFICATION_MAILBOX = {
+      idFromName: (name: string) => name,
+      get: () => ({ changed }),
+    } as unknown as Env["NOTIFICATION_MAILBOX"];
+    return changed;
+  }
+  it("lets a watcher Cloudflare reset keep its own alarm", async () => {
+    const reset = Object.assign(
+      new Error(
+        "Durable Object storage operation exceeded timeout which caused object to be reset.",
+      ),
+      { durableObjectReset: true, overloaded: true },
+    );
+    const changed = watcherThrowing(reset);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(nudge(env, "owner", mailbox)).resolves.toBeUndefined();
+    expect(changed).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith("Notification watcher was reset", {
+      message: reset.message,
+    });
+    warn.mockRestore();
+  });
+  it("still fails on any other error", async () => {
+    watcherThrowing(new Error("bug"));
+    await expect(nudge(env, "owner", mailbox)).rejects.toThrow("bug");
   });
 });

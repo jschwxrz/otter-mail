@@ -462,7 +462,7 @@ authed.put(
     await push.register(c.env, c.var.session, c.req.valid("json"));
     for (const email of c.req.valid("json").mailboxes) {
       if (await notificationConnections.connection(c.env, c.var.session.user.id, email)) {
-        await notificationConnections.watcher(c.env, c.var.session.user.id, email).changed();
+        await notificationConnections.nudge(c.env, c.var.session.user.id, email);
       }
     }
     return c.body(null, 204);
