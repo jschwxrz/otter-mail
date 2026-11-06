@@ -14,10 +14,12 @@ export function TeamPicker({ onClose }: { onClose: () => void }) {
   const [highlight, setHighlight] = useState(0);
 
   useEffect(() => {
+    const q = query.trim();
+    if (!q) return;
     let live = true;
     const timer = setTimeout(() => {
       mailApi
-        .suggestContacts({ q: query.trim(), limit: 8 })
+        .suggestContacts({ q, limit: 8 })
         .then((list) => {
           if (live) setFound(list);
         })
@@ -32,9 +34,10 @@ export function TeamPicker({ onClose }: { onClose: () => void }) {
   }, [query]);
 
   const typed = query.trim();
+  const suggested = typed ? found : [];
   const options: Teammate[] = [
-    ...found.map((c) => ({ email: c.email, name: c.name || c.email })),
-    ...(EMAIL.test(typed) && !found.some((c) => c.email.toLowerCase() === typed.toLowerCase())
+    ...suggested.map((c) => ({ email: c.email, name: c.name || c.email })),
+    ...(EMAIL.test(typed) && !suggested.some((c) => c.email.toLowerCase() === typed.toLowerCase())
       ? [{ email: typed, name: typed }]
       : []),
   ];
