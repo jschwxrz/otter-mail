@@ -230,7 +230,10 @@ export function openTabWindow(from: WebContents, tab: CarriedTab, grab: Point): 
     { tab: "1", title: tab.title, icon: tab.icon },
     `#${tab.href}`,
   );
-  loaded.catch((error: unknown) => logger.error("main", "Failed to load a tab's window", error));
+  // A tab dropped back on a tab bar before its window loaded destroys it, which aborts the load.
+  loaded.catch((error: unknown) => {
+    if (!win.isDestroyed()) logger.error("main", "Failed to load a tab's window", error);
+  });
   // Inactive: the window the drag began in keeps the pointer until it's let go.
   win.showInactive();
   carry(win, from, tab, grab);
