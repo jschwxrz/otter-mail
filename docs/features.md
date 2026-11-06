@@ -340,16 +340,17 @@ color, the others their color in Google or Outlook. IMAP mailboxes have none.
 
 ## Notifications & live mail
 
-| Feature                                                    | Mac                                         | Web                     | iPhone                                                               |
-| ---------------------------------------------------------- | ------------------------------------------- | ----------------------- | -------------------------------------------------------------------- |
-| New-mail notifications (Off / Inbox / All), click opens it | ✓                                           | ✓ (browser)             | ✓ (verified APNs for connected Gmail, Outlook, IMAP; local fallback) |
-| Mail for an alias mailbox: named after it, opens there     | ✓ (copies of one message: once)             | ✓                       | ✓ (copies of one message: once)                                      |
-| Sign-in codes in notifications                             | ✓ (Copy & trash button; Linux: in the text) | in the text             | —                                                                    |
-| Gmail push via relay                                       | ✓ (with an Otter account)                   | ✓                       | ✓ (WebSocket + verified APNs)                                        |
-| Outlook push via relay (Graph subscription)                | ✓ (with an Otter account)                   | ✓                       | ✓ (WebSocket + verified APNs)                                        |
-| IMAP IDLE                                                  | ✓ (while running)                           | ✓ (while a tab is open) | while open; server watcher for connected APNs                        |
-| Background sync                                            | ✓ (15 s – 15 min, or manual)                | ✓ (while a tab is open) | BGAppRefresh, ≥ 15 min                                               |
-| Unread badge                                               | Dock                                        | tab title, app badge    | app icon                                                             |
+| Feature                                                        | Mac                                         | Web                     | iPhone                                                               |
+| -------------------------------------------------------------- | ------------------------------------------- | ----------------------- | -------------------------------------------------------------------- |
+| New-mail notifications (Off / Inbox / All), click opens it     | ✓                                           | ✓ (browser)             | ✓ (verified APNs for connected Gmail, Outlook, IMAP; local fallback) |
+| Mail for an alias mailbox: named after it, opens there         | ✓ (copies of one message: once)             | ✓                       | ✓ (copies of one message: once)                                      |
+| Sign-in codes in notifications                                 | ✓ (Copy & trash button; Linux: in the text) | in the text             | —                                                                    |
+| An agent waiting on you (approval, question), app not in front | ✓                                           | ✓ (browser)             | —                                                                    |
+| Gmail push via relay                                           | ✓ (with an Otter account)                   | ✓                       | ✓ (WebSocket + verified APNs)                                        |
+| Outlook push via relay (Graph subscription)                    | ✓ (with an Otter account)                   | ✓                       | ✓ (WebSocket + verified APNs)                                        |
+| IMAP IDLE                                                      | ✓ (while running)                           | ✓ (while a tab is open) | while open; server watcher for connected APNs                        |
+| Background sync                                                | ✓ (15 s – 15 min, or manual)                | ✓ (while a tab is open) | BGAppRefresh, ≥ 15 min                                               |
+| Unread badge                                                   | Dock                                        | tab title, app badge    | app icon                                                             |
 
 iPhone APNs alerts require a per-mailbox background-notification connection. Gmail uses a
 server metadata grant; Outlook uses a separate basic-mail grant; IMAP uses an explicitly enabled,
