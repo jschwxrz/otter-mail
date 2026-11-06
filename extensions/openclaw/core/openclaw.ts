@@ -508,8 +508,25 @@ export function toolOutput(result: unknown): string {
   return text.length > MAX_TOOL_OUTPUT ? `${text.slice(0, MAX_TOOL_OUTPUT)}…` : text;
 }
 
-const runOf = (row: Record<string, unknown>) =>
-  (row.__openclaw as { runId?: unknown } | undefined)?.runId;
+/** What OpenClaw wrote into a session as delivered to a channel (a cron job's announce, the message tool), not by a run. */
+const DELIVERED_MODELS = new Set(["delivery-mirror", "automation-result"]);
+
+/** A row's run; a delivery, which no run wrote, is a run of its own: `delivery:<row id>`. */
+const runOf = (row: Record<string, unknown>) => {
+  const meta = row.__openclaw as { runId?: unknown; id?: unknown } | undefined;
+  if (meta?.runId !== undefined) return meta.runId;
+  if (row.role === "assistant" && DELIVERED_MODELS.has(String(row.model)) && meta?.id)
+    return `delivery:${String(meta.id)}`;
+  return undefined;
+};
+
+const isDelivery = (row: Record<string, unknown>) => String(runOf(row)).startsWith("delivery:");
+
+/** The session where the Otter channel plugin (extensions/openclaw/gateway) keeps what an agent delivered to Otter. */
+const INBOX = /^agent:([^:]+):otter:inbox$/;
+/** How far back a device that has no chat for an agent's Otter session yet shows what it delivered. */
+const INBOX_BACKLOG_MS = 24 * 60 * 60 * 1000;
+const DELIVERY_WRITTEN_MS = 3000;
 
 /** Whether the rows end with an accepted `sessions_yield`: the run's continuation hasn't come yet. */
 export function waitingOnYield(rows: Record<string, unknown>[]): boolean {
@@ -540,13 +557,19 @@ export function runChains(rows: Record<string, unknown>[]): Record<string, unkno
   const chains: Record<string, unknown>[][] = [];
   let run: unknown;
   let steered = false;
+  let last: Record<string, unknown>[] | undefined;
   for (const row of rows) {
-    const id = runOf(row) ?? run;
-    const last = chains.at(-1);
-    const sentAfterYield = row.role === "user" && last !== undefined && waitingOnYield(last);
-    if (!last || sentAfterYield || (id !== run && !steered && !waitingOnYield(last)))
+    // A delivery is a turn of its own that leaves the runs around it as they were.
+    if (isDelivery(row)) {
       chains.push([row]);
-    else last.push(row);
+      continue;
+    }
+    const id = runOf(row) ?? run;
+    const sentAfterYield = row.role === "user" && last !== undefined && waitingOnYield(last);
+    if (!last || sentAfterYield || (id !== run && !steered && !waitingOnYield(last))) {
+      last = [row];
+      chains.push(last);
+    } else last.push(row);
     if (row.role === "user") steered = true;
     else if (id !== run) steered = false;
     run = id;
@@ -577,7 +600,8 @@ async function runState(turn: Turn): Promise<RunState> {
   const info = result.sessionInfo ?? {};
   // A continuation joins the chain: anything after it (a message sent since) ends the wait.
   const last = rows?.at(-1);
-  const waiting = rows && last ? waitingOnYield(rows) && all.at(-1) === last : false;
+  const waiting =
+    rows && last ? waitingOnYield(rows) && all.findLast((m) => !isDelivery(m)) === last : false;
   const chain = new Set((rows ?? []).map(runOf));
   const ids = info.activeRunIds ?? (info.hasActiveRun ? [turn.runId] : []);
   return {
@@ -1040,13 +1064,24 @@ const sent = new Set<string>();
 /** Sessions whose run yielded: the run that starts next is its continuation, followed where it was sent. */
 const continuing = new Set<string>();
 
-function announce(sessionKey: string, runId: string): void {
-  if (!watching?.sessions.has(sessionKey) || announced.has(runId) || sent.has(runId)) return;
+function announce(
+  sessionKey: string,
+  runId: string,
+  { title, deliveredAt }: { title?: string; deliveredAt?: number } = {},
+): void {
+  const watched = watching?.sessions.has(sessionKey);
+  if (!watching || (!watched && !INBOX.test(sessionKey))) return;
+  if (announced.has(runId) || sent.has(runId)) return;
   for (const turn of turns.values())
     if (turn.sessionKey === sessionKey && (!turn.ending || ownsRun(turn, runId))) return;
   announced.add(runId);
   logger.info("agent", "openclaw run of its own", { runId });
-  watching.started({ sessionId: sessionKey, requestId: `${AGENT_RUN}${runId}` });
+  watching.started({
+    sessionId: sessionKey,
+    requestId: `${AGENT_RUN}${runId}`,
+    ...(!watched && { chat: { title: title ?? "OpenClaw" } }),
+    ...(deliveredAt !== undefined && { deliveredAt }),
+  });
 }
 
 listeners.add(({ event, payload }) => {
@@ -1085,7 +1120,7 @@ function scheduleWatch(delay: number): void {
 }
 
 async function ensureWatching(delay = 0): Promise<void> {
-  if (!watching || watching.sessions.size === 0) return;
+  if (!watching) return;
   try {
     const g = await gateway(watching.settings);
     if (g.client === watchedClient) return;
@@ -1095,6 +1130,8 @@ async function ensureWatching(delay = 0): Promise<void> {
     await catchUpSessions(g);
     watchedClient = g.client;
   } catch (error) {
+    // No gateway to watch until one is connected (which watches again).
+    if (error instanceof Error && error.message === "not_configured") return;
     logger.info("agent", "openclaw watch failed", { error: String(error) });
     scheduleWatch(Math.min(Math.max(delay * 2, RECONNECT_DELAYS_MS[0]), 60_000));
   }
@@ -1113,11 +1150,14 @@ async function catchUpSessions(g: Gateway): Promise<void> {
     "sessions.list",
     { limit: 200 },
   );
+  let names: Map<string, string> | undefined;
   for (const row of sessions ?? []) {
     const key = String(row.key);
     const watched = watching?.sessions.get(key);
-    if (watched === undefined) continue;
-    const since = fresh.has(key) ? 0 : watched;
+    const inbox = INBOX.exec(key);
+    if (watched === undefined && !inbox) continue;
+    const since =
+      watched === undefined ? Date.now() - INBOX_BACKLOG_MS : fresh.has(key) ? 0 : watched;
     const active = (row.activeRunIds as string[] | undefined) ?? [];
     const activity = Number(row.lastActivityAt ?? row.updatedAt) || 0;
     if (active.length === 0 && activity <= since) continue;
@@ -1125,9 +1165,41 @@ async function catchUpSessions(g: Gateway): Promise<void> {
       "chat.history",
       { sessionKey: key, limit: 200 },
     );
-    for (const id of agentRunsSince(messages ?? [], since, active)) announce(key, id);
+    const runs = agentRunsSince(messages ?? [], since, active);
+    if (watched === undefined && inbox && runs.length > 0) names ??= await agentNames(g);
+    const title = inbox ? names?.get(inbox[1]) : undefined;
+    for (const id of runs) announce(key, id, { title, deliveredAt: deliveredAt(messages, id) });
   }
   for (const key of caught) fresh.delete(key);
+}
+
+/** When a delivery (`delivery:<row id>`) was written; nothing for a run. */
+function deliveredAt(
+  rows: Record<string, unknown>[] | undefined,
+  runId: string,
+): number | undefined {
+  if (!runId.startsWith("delivery:")) return undefined;
+  const row = rows?.find((m) => runOf(m) === runId);
+  const at = Number(
+    (row?.__openclaw as { recordTimestampMs?: unknown } | undefined)?.recordTimestampMs,
+  );
+  return Number.isFinite(at) ? at : undefined;
+}
+
+/** The gateway's agents' names (an agent's identity: Rowan), by id. */
+async function agentNames(g: Gateway): Promise<Map<string, string>> {
+  const { agents } = await g.client
+    .request<{ agents?: { id: string; name?: string; identity?: { name?: string } }[] }>(
+      "agents.list",
+      {},
+    )
+    .catch(() => ({ agents: [] }));
+  return new Map(
+    (agents ?? []).flatMap((a) => {
+      const name = a.identity?.name ?? a.name;
+      return name ? [[a.id, name] as const] : [];
+    }),
+  );
 }
 
 /**
@@ -1152,7 +1224,8 @@ export function agentRunsSince(
     return going || (at > since && shown) ? [run] : [];
   });
   const known = new Set(rows.map(runOf));
-  const continuing = chains.length > 0 && waitingOnYield(chains[chains.length - 1]);
+  const lastRun = chains.findLast((chain) => !isDelivery(chain[0]));
+  const continuing = lastRun !== undefined && waitingOnYield(lastRun);
   const unwritten = active.filter((id) => !known.has(id) && id !== own && !continuing);
   return [...written, ...unwritten];
 }
@@ -1515,13 +1588,27 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
         fresh.add(id);
     }
     watching = { settings, sessions: next, started };
-    if (next.size === 0) return;
     if (fresh.size > 0 && watchedClient)
       void current?.ready.then(catchUpSessions).catch(() => {
         watchedClient = null;
         scheduleWatch(RECONNECT_DELAYS_MS[0]);
       });
     else void ensureWatching();
+  },
+
+  delivered() {
+    const catchUp = () => {
+      if (!watching) return;
+      if (watchedClient)
+        void current?.ready.then(catchUpSessions).catch(() => {
+          watchedClient = null;
+          scheduleWatch(RECONNECT_DELAYS_MS[0]);
+        });
+      else void ensureWatching();
+    };
+    catchUp();
+    // The gateway writes a delivery into the session only once the plugin has told the relay.
+    setTimeout(catchUp, DELIVERY_WRITTEN_MS);
   },
 
   shutdown() {

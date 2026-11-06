@@ -489,6 +489,15 @@ after a relaunch. A reply the agent writes on its own later (a background comman
 finishing, a scheduled job) appears in its chat as a turn of its own, including those written
 while the app was closed. Tool steps show the tool's output.
 
+Otter is also an OpenClaw channel, `otter` (the gateway plugin in `extensions/openclaw/gateway`,
+set up from Settings › Agents › OpenClaw on Mac and web). What an agent delivers to it (a
+scheduled job's `--announce --channel otter --to inbox`, the message tool, a forwarded
+approval) is kept on the gateway, in that agent's own Otter session, which shows up as a chat
+named for the agent (Rowan), a turn per delivery, that you can reply in; a new one notifies
+when no window is in front. The plugin sends the relay only a pointer (which agent, which
+session, an approval's or question's id), never the text, with a token made in Settings; the
+relay passes it to the account's open devices, which read the delivery from the gateway.
+
 Other agents on the Mac (Claude Code or Codex in a terminal, Cursor, …) get the same tools from
 that server while the app is open, with a token made in Settings › Agents (its address stays the
 same from launch to launch). Each token is read only, safe or full access, and nothing asks

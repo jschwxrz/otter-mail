@@ -882,7 +882,11 @@ const watchedSessions = new Map<ProviderKind, string>();
 function watchSessions(providers: ProviderSnapshot[]): void {
   const { conversations, device } = get();
   for (const host of providers) {
-    if (!isProviderUsable(host)) continue;
+    if (!isProviderUsable(host)) {
+      // Turned off, it stopped watching: watched again once it's back.
+      watchedSessions.delete(host.kind);
+      continue;
+    }
     const sessions = conversations
       .filter((c) => c.provider === host.kind && c.sessionId && !isElsewhere(c, device))
       .map((c) => ({
@@ -892,24 +896,52 @@ function watchSessions(providers: ProviderSnapshot[]): void {
           ? Number.MAX_SAFE_INTEGER
           : (c.turns.findLast((t) => t.finishedAt)?.finishedAt ?? c.updatedAt),
       }));
-    const key = JSON.stringify(sessions);
+    // Watched again once it's connected: an agent's sessions with no chat yet are found then too.
+    const key = JSON.stringify([host.installed, host.status, sessions]);
     if (watchedSessions.get(host.kind) === key) continue;
     watchedSessions.set(host.kind, key);
     void mailApi.agentWatch(host.kind, sessions).catch(() => watchedSessions.delete(host.kind));
   }
 }
 
-type AgentRun = { provider: ProviderKind; sessionId: string; requestId: string };
+type AgentRun = {
+  provider: ProviderKind;
+  sessionId: string;
+  requestId: string;
+  chat?: { title: string };
+  deliveredAt?: number;
+};
+
+/** What an agent delivered recently enough to notify about once it's read (by request id: its title). */
+const deliveries = new Map<string, string>();
+const DELIVERY_NOTIFIES_MS = 10 * 60 * 1000;
+
+/** The chat for a session that has none: what an agent delivered to Otter. Every device makes the same one. */
+function chatForSession(run: AgentRun, title: string): Conversation {
+  const id = `${run.provider}-${run.sessionId}`.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 64);
+  const existing = get().conversations.find((c) => c.id === id);
+  if (existing) return existing;
+  const convo: Conversation = {
+    ...newConversation(run.provider),
+    id,
+    title: clampTitle(title),
+    sessionId: run.sessionId,
+  };
+  set((s) => ({ conversations: [convo, ...s.conversations] }));
+  return convo;
+}
 
 /** Runs that started while their chat had a turn going: followed once it ends. */
 const waitingRuns = new Map<string, AgentRun[]>();
 
 /** A run the agent started on its own (a completion it was woken for): a turn of its own, without a message. */
 async function followAgentRun(run: AgentRun): Promise<void> {
-  const convo = get().conversations.find(
-    (c) => c.provider === run.provider && c.sessionId === run.sessionId,
-  );
+  const convo =
+    get().conversations.find((c) => c.provider === run.provider && c.sessionId === run.sessionId) ??
+    (run.chat ? chatForSession(run, run.chat.title) : undefined);
   if (!convo) return;
+  if (run.deliveredAt !== undefined && Date.now() - run.deliveredAt < DELIVERY_NOTIFIES_MS)
+    deliveries.set(run.requestId, convo.title);
   const wait = () => {
     waitingRuns.set(convo.id, [...(waitingRuns.get(convo.id) ?? []), run]);
   };
@@ -975,6 +1007,27 @@ function notifyAsk(run: Run, id: string, title: string, body?: string): void {
     .catch(() => {});
 }
 
+/** What an agent delivered, once read: notifies like an ask, only when no window has focus. */
+function notifyDelivered(run: Run): void {
+  const title = deliveries.get(run.requestId);
+  if (title === undefined) return;
+  deliveries.delete(run.requestId);
+  const convo = get().conversations.find((c) => c.id === run.convoId);
+  const text = convo?.turns.find((t) => t.id === `a-${run.requestId}`)?.text.trim();
+  if (!text) return;
+  const key = `${run.provider}:${run.requestId}`;
+  void mailApi
+    .agentNotifyAsk({
+      provider: run.provider,
+      key,
+      title,
+      subtitle: "Sent you a message",
+      body: text.length > 200 ? `${text.slice(0, 200)}…` : text,
+      focused: document.hasFocus(),
+    })
+    .catch(() => {});
+}
+
 function onChatEvent(raw: unknown): void {
   const event = raw as ChatEvent;
   const s = event
@@ -1035,6 +1088,7 @@ function onChatEvent(raw: unknown): void {
     }));
     return;
   }
+  if (event.type === "done") notifyDelivered(s);
   if (event.type === "done" && isSilentAgentTurn(s.convoId, event.requestId)) {
     patchConversation(s.convoId, (c) => ({
       ...c,

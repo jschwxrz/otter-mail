@@ -281,6 +281,15 @@ export async function watchSessions(kind: ProviderKind, sessions: WatchedSession
   );
 }
 
+/** An agent's gateway delivered something to Otter: the providers that watch catch up on it. */
+export async function agentDelivered(): Promise<void> {
+  for (const found of registeredAgents().values()) {
+    if (!found.delivered) continue;
+    const settings = await agentSettings(found.kind);
+    if (settings.enabled) found.delivered(settings);
+  }
+}
+
 /** Asks already reported, by key, and whether a window that had focus reported them. */
 const asks = new Map<string, { focused: boolean }>();
 /** How long every window (each web tab, the desktop window) gets to report an ask. */
@@ -293,7 +302,7 @@ const ASK_SETTLE_MS = 500;
  */
 export function notifyAsk(
   kind: ProviderKind,
-  ask: { key: string; title: string; body?: string; focused: boolean },
+  ask: { key: string; title: string; subtitle?: string; body?: string; focused: boolean },
 ): void {
   const seen = asks.get(ask.key);
   if (seen) {
@@ -308,7 +317,7 @@ export function notifyAsk(
       if (settings.notificationsMode === "off") return;
       platform().notify({
         title: ask.title,
-        subtitle: `${provider(kind).displayName} is waiting for you`,
+        subtitle: ask.subtitle ?? `${provider(kind).displayName} is waiting for you`,
         body: ask.body,
       });
     });

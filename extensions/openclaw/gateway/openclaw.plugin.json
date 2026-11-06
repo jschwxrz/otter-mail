@@ -1,0 +1,25 @@
+{
+  "id": "otter",
+  "name": "Otter",
+  "description": "Send what your agents want you to see to Otter.",
+  "activation": { "onStartup": true },
+  "channels": ["otter"],
+  "configSchema": { "type": "object", "additionalProperties": false, "properties": {} },
+  "channelConfigs": {
+    "otter": {
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "relayUrl": { "type": "string" },
+          "token": { "type": "string" }
+        }
+      },
+      "uiHints": {
+        "relayUrl": { "label": "Otter relay" },
+        "token": { "label": "Otter channel token", "sensitive": true }
+      }
+    }
+  }
+}
