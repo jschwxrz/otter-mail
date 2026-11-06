@@ -102,9 +102,15 @@ export function registerAgentHandlers(): void {
 
   handle("agent:notifyAsk", async (params: unknown) => {
     const p = params as Params;
+    const key = str(p?.key);
     const title = str(p?.title);
-    if (!title) throw new Error("A title is required.");
-    await agent.notifyAsk(providerOf(p), { title, body: str(p?.body) || undefined });
+    if (!key || !title) throw new Error("A key and a title are required.");
+    agent.notifyAsk(providerOf(p), {
+      key,
+      title,
+      body: str(p?.body) || undefined,
+      focused: p?.focused === true,
+    });
     return { ok: true };
   });
 

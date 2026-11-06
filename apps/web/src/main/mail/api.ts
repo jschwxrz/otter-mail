@@ -611,8 +611,10 @@ export const mailApi = {
   /** Notifies that an agent is waiting on the user (an approval, a question). */
   agentNotifyAsk: (params: {
     provider: ProviderKind;
+    key: string;
     title: string;
     body?: string;
+    focused: boolean;
   }): Promise<{ ok: boolean }> => ipc("agent:notifyAsk", params),
 
   /** Watches these chats' sessions for runs the agent starts itself; they arrive as `agent:runStarted`. */

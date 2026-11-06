@@ -966,14 +966,13 @@ function isSilentAgentTurn(convoId: string, requestId: string): boolean {
   );
 }
 
-const asked = new Set<string>();
-
-/** What an agent asks of the user notifies once, when they're away from the app (a turn picked up again asks again). */
-function notifyAsk(provider: ProviderKind, id: string, title: string, body?: string): void {
-  if (asked.has(id)) return;
-  asked.add(id);
-  if (document.hasFocus()) return;
-  void mailApi.agentNotifyAsk({ provider, title, body }).catch(() => {});
+/** Every window reports what an agent asks; core notifies once, when none of them had focus. */
+function notifyAsk(run: Run, id: string, title: string, body?: string): void {
+  const key = `${run.provider}:${run.requestId}:${id}`;
+  const focused = document.hasFocus();
+  void mailApi
+    .agentNotifyAsk({ provider: run.provider, key, title, body, focused })
+    .catch(() => {});
 }
 
 function onChatEvent(raw: unknown): void {
@@ -991,7 +990,7 @@ function onChatEvent(raw: unknown): void {
     set((st) => ({
       approvals: [...st.approvals, { requestId: event.requestId, approval: event.approval }],
     }));
-    notifyAsk(s.provider, event.approval.id, event.approval.title, event.approval.detail);
+    notifyAsk(s, `approval:${event.approval.id}`, event.approval.title, event.approval.detail);
     return;
   }
   if (event.type === "approvalResolved") {
@@ -1007,8 +1006,8 @@ function onChatEvent(raw: unknown): void {
     }));
     const first = event.question.questions[0];
     notifyAsk(
-      s.provider,
-      event.question.id,
+      s,
+      `question:${event.question.id}`,
       first?.header || "A question for you",
       first?.question,
     );

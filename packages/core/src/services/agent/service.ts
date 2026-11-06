@@ -281,17 +281,38 @@ export async function watchSessions(kind: ProviderKind, sessions: WatchedSession
   );
 }
 
-/** What an agent asks of the user (an approval, a question), while they're away from the app. */
-export async function notifyAsk(
+/** Asks already reported, by key, and whether a window that had focus reported them. */
+const asks = new Map<string, { focused: boolean }>();
+/** How long every window (each web tab, the desktop window) gets to report an ask. */
+const ASK_SETTLE_MS = 500;
+
+/**
+ * What an agent asks of the user (an approval, a question) notifies once, when
+ * no window that showed it had focus: every window reports it, a turn picked up
+ * again reports it again.
+ */
+export function notifyAsk(
   kind: ProviderKind,
-  ask: { title: string; body?: string },
-): Promise<void> {
-  if ((await getSettings()).notificationsMode === "off") return;
-  platform().notify({
-    title: ask.title,
-    subtitle: `${provider(kind).displayName} is waiting for you`,
-    body: ask.body,
-  });
+  ask: { key: string; title: string; body?: string; focused: boolean },
+): void {
+  const seen = asks.get(ask.key);
+  if (seen) {
+    seen.focused ||= ask.focused;
+    return;
+  }
+  const entry = { focused: ask.focused };
+  asks.set(ask.key, entry);
+  setTimeout(() => {
+    if (entry.focused) return;
+    void getSettings().then((settings) => {
+      if (settings.notificationsMode === "off") return;
+      platform().notify({
+        title: ask.title,
+        subtitle: `${provider(kind).displayName} is waiting for you`,
+        body: ask.body,
+      });
+    });
+  }, ASK_SETTLE_MS);
 }
 
 export async function answerQuestion(
