@@ -76,20 +76,19 @@ export const DEFAULT_READING_WIDTH: ReadingWidth = "full";
 const READING_WIDTH_KEY = "otter:reading-width";
 
 export const MAIL_LAYOUTS = {
+  auto: {
+    label: "Auto",
+    description: "Split view when the window has room, Full inbox when it doesn't.",
+  },
   split: { label: "Split view", description: "Keep the message list beside the conversation." },
   full: { label: "Full inbox", description: "A wide inbox. Open a message to read it in full." },
-  floating: {
-    label: "Floating",
-    description: "Open mail in a bottom-right panel. Keep browsing your inbox.",
-  },
 } as const;
 export type MailLayout = keyof typeof MAIL_LAYOUTS;
-export const DEFAULT_MAIL_LAYOUT: MailLayout = "split";
+export const DEFAULT_MAIL_LAYOUT: MailLayout = "auto";
 const MAIL_LAYOUT_KEY = "otter:mail-layout";
 
 export function getMailLayout(): MailLayout {
   const value = localStorage.getItem(MAIL_LAYOUT_KEY);
-  if (value === "flow" || value === "popup") return "floating";
   return value !== null && Object.hasOwn(MAIL_LAYOUTS, value)
     ? (value as MailLayout)
     : DEFAULT_MAIL_LAYOUT;

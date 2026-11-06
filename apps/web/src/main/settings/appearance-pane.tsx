@@ -5,6 +5,7 @@ import type { NativeThemeInfo } from "@otter-mail/contracts";
 import {
   CopyIcon,
   EllipsisIcon,
+  MoveHorizontalIcon,
   PaintbrushIcon,
   PenLineIcon,
   PlusIcon,
@@ -744,7 +745,7 @@ function MailLayoutPicker() {
                 <span
                   className={cn(
                     "flex flex-col",
-                    value === "split" ? "w-1/3 border-r border-border/70" : "flex-1",
+                    value !== "full" ? "w-1/3 border-r border-border/70" : "flex-1",
                   )}
                 >
                   <span className="flex h-6 shrink-0 items-center border-b border-border/60 px-2">
@@ -755,29 +756,29 @@ function MailLayoutPicker() {
                       key={row}
                       className={cn(
                         "flex gap-1.5 border-b border-border/40 px-2 py-2",
-                        value === "split" ? "flex-col" : "items-center",
-                        row === 0 && value === "split" && "bg-sidebar-row-active",
+                        value !== "full" ? "flex-col" : "items-center",
+                        row === 0 && value !== "full" && "bg-sidebar-row-active",
                       )}
                     >
                       <span
                         className={cn(
                           "h-1 rounded-full bg-foreground/40",
-                          value === "split" ? "w-3/5" : "w-1/5",
+                          value !== "full" ? "w-3/5" : "w-1/5",
                         )}
                       />
                       <span
                         className={cn(
                           "h-1 rounded-full bg-muted-foreground/25",
-                          value === "split" ? "w-4/5" : "flex-1",
+                          value !== "full" ? "w-4/5" : "flex-1",
                         )}
                       />
-                      {value !== "split" ? (
+                      {value === "full" ? (
                         <span className="h-1 w-3 rounded-full bg-muted-foreground/25" />
                       ) : null}
                     </span>
                   ))}
                 </span>
-                {value === "split" ? (
+                {value !== "full" ? (
                   <span className="flex min-w-0 flex-1 flex-col gap-2 p-2 pt-4">
                     <span className="h-1.5 w-4/5 rounded-full bg-foreground/50" />
                     <span className="mt-2 h-1 w-3/5 rounded-full bg-muted-foreground/30" />
@@ -786,20 +787,9 @@ function MailLayoutPicker() {
                     <span className="h-1 w-full rounded-full bg-muted-foreground/20" />
                   </span>
                 ) : null}
-                {value === "floating" ? (
-                  <span className="absolute inset-0 flex items-end justify-end p-1.5">
-                    <span className="flex h-20 w-2/3 flex-col overflow-hidden rounded-md border border-border bg-canvas shadow-lg">
-                      <span className="flex h-6 shrink-0 items-center justify-between border-b border-border/60 px-2">
-                        <span className="h-1 w-2/5 rounded-full bg-foreground/50" />
-                        <span className="text-[10px] leading-none text-muted-foreground">×</span>
-                      </span>
-                      <span className="flex flex-col gap-1.5 p-2">
-                        <span className="h-1 w-2/5 rounded-full bg-foreground/40" />
-                        <span className="mt-1 h-1 w-full rounded-full bg-muted-foreground/25" />
-                        <span className="h-1 w-4/5 rounded-full bg-muted-foreground/25" />
-                        <span className="h-1 w-3/5 rounded-full bg-muted-foreground/25" />
-                      </span>
-                    </span>
+                {value === "auto" ? (
+                  <span className="absolute right-1.5 bottom-1.5 flex size-5 items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-sm">
+                    <MoveHorizontalIcon className="size-3" />
                   </span>
                 ) : null}
               </span>

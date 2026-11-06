@@ -393,7 +393,7 @@ On iPhone, a glass bar under the list holds the mailbox's picture (tap to switch
 | Unread messages on a soft background, in every mail layout                                                       | ✓   | ✓   | ✓                                                                          |
 | Keyboard navigation highlights rows; Enter opens (optional open with arrows)                                     | ✓   | ✓   | —                                                                          |
 | Configurable delay before keyboard previews are marked read (2 seconds by default); clicks mark read immediately | ✓   | ✓   | —                                                                          |
-| Mail layouts: Split view, Full inbox, Floating                                                                   | ✓   | ✓   | —                                                                          |
+| Mail layouts: Auto, Split view, Full inbox                                                                       | ✓   | ✓   | —                                                                          |
 | Floating reader: move, snap, resize, minimize, expand                                                            | ✓   | ✓   | —                                                                          |
 | Keyboard shortcuts, rebindable (incl. move to label)                                                             | ✓   | ✓   | —                                                                          |
 | Command palette (⌘K)                                                                                             | ✓   | ✓   | —                                                                          |

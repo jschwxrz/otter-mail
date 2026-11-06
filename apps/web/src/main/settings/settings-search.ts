@@ -242,8 +242,8 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Mail layout",
     pane: "appearance",
     searchTerms: [
-      "split view full inbox floating",
-      "reading pane columns wide list layout floating window popup bottom right panel",
+      "auto split view full inbox",
+      "reading pane columns wide list layout automatic responsive narrow window",
     ],
   },
   {
