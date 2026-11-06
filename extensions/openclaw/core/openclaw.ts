@@ -1054,7 +1054,15 @@ listeners.add(({ event, payload }) => {
   if (typeof p.sessionKey !== "string" || !watching?.sessions.has(p.sessionKey)) return;
   const row = p.message as Record<string, unknown> | undefined;
   const key = event === "session.message" && row?.role === "user" ? sendKeyOf(row) : undefined;
-  if (key) sent.add(key);
+  if (key) {
+    sent.add(key);
+    // A message sent from elsewhere after a yield ends the turn waiting on it, as one sent here does.
+    for (const turn of turns.values())
+      if (turn.sessionKey === p.sessionKey && turn.yielded && !ownsRun(turn, key)) {
+        continuing.delete(turn.sessionKey);
+        turn.finish({ requestId: turn.requestId, type: "done", responseId: null });
+      }
+  }
   if (event === "chat" && p.state === "final" && p.yielded === true) continuing.add(p.sessionKey);
   const phase = (p.data as { phase?: unknown } | undefined)?.phase;
   if (event !== "agent" || p.stream !== "lifecycle" || phase !== "start") return;
@@ -1343,6 +1351,7 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
     // A message sent after a hand-off starts a turn of its own; the
     // continuation, when it comes, is a run the agent started.
     if (turn.yielded) {
+      continuing.delete(turn.sessionKey);
       turn.finish({ requestId, type: "done", responseId: null });
       return false;
     }

@@ -187,6 +187,25 @@ describe("an OpenClaw turn that hands off with sessions_yield", () => {
     expect(events.at(-1)).toEqual({ requestId: "req-1", type: "done", responseId: null });
   });
 
+  it("ends when a message is sent from another device while it waits", async () => {
+    gateway((method) => (method === "sessions.list" ? { sessions: [] } : undefined));
+    const started: AgentRun[] = [];
+    openClawProvider.watch!(settings, [{ id: "s", since: 0 }], (run) => started.push(run));
+    const { events, ended } = send();
+    await vi.waitFor(() =>
+      expect(fixture.request).toHaveBeenCalledWith("chat.send", expect.anything()),
+    );
+    event("chat", { runId: "req-1", state: "final", yielded: true });
+    event("session.message", {
+      message: { role: "user", content: "hi", __openclaw: { idempotencyKey: "phone:user" } },
+    });
+    await ended;
+    expect(events.at(-1)).toEqual({ requestId: "req-1", type: "done", responseId: null });
+    lifecycleStart("phone");
+    lifecycleStart("announce:5");
+    expect(started).toEqual([{ sessionId: "s", requestId: "run:announce:5" }]);
+  });
+
   it("stops waiting when asked to", async () => {
     gateway();
     const { events, ended } = send();
