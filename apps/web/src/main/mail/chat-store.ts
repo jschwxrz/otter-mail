@@ -966,6 +966,16 @@ function isSilentAgentTurn(convoId: string, requestId: string): boolean {
   );
 }
 
+const asked = new Set<string>();
+
+/** What an agent asks of the user notifies once, when they're away from the app (a turn picked up again asks again). */
+function notifyAsk(provider: ProviderKind, id: string, title: string, body?: string): void {
+  if (asked.has(id)) return;
+  asked.add(id);
+  if (document.hasFocus()) return;
+  void mailApi.agentNotifyAsk({ provider, title, body }).catch(() => {});
+}
+
 function onChatEvent(raw: unknown): void {
   const event = raw as ChatEvent;
   const s = event
@@ -981,6 +991,7 @@ function onChatEvent(raw: unknown): void {
     set((st) => ({
       approvals: [...st.approvals, { requestId: event.requestId, approval: event.approval }],
     }));
+    notifyAsk(s.provider, event.approval.id, event.approval.title, event.approval.detail);
     return;
   }
   if (event.type === "approvalResolved") {
@@ -994,6 +1005,13 @@ function onChatEvent(raw: unknown): void {
         { requestId: event.requestId, question: event.question },
       ],
     }));
+    const first = event.question.questions[0];
+    notifyAsk(
+      s.provider,
+      event.question.id,
+      first?.header || "A question for you",
+      first?.question,
+    );
     return;
   }
   if (event.type === "questionResolved") {

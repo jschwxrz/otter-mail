@@ -100,6 +100,14 @@ export function registerAgentHandlers(): void {
     return { ok: true };
   });
 
+  handle("agent:notifyAsk", async (params: unknown) => {
+    const p = params as Params;
+    const title = str(p?.title);
+    if (!title) throw new Error("A title is required.");
+    await agent.notifyAsk(providerOf(p), { title, body: str(p?.body) || undefined });
+    return { ok: true };
+  });
+
   handle("agent:stageAttachments", async (params: unknown) => {
     const p = params as Params;
     const items = Array.isArray(p?.items) ? (p.items as Params[]) : [];

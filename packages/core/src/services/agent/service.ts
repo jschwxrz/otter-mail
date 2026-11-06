@@ -14,6 +14,8 @@
 import { registeredAgents } from "../../extensions.js";
 import { broadcast } from "../../ipc.js";
 import { logger } from "../../logger.js";
+import { platform } from "../../platform.js";
+import { getSettings } from "../settings-store.js";
 import { answerToolApproval } from "./tools/index.js";
 import {
   clearHermesKey,
@@ -277,6 +279,19 @@ export async function watchSessions(kind: ProviderKind, sessions: WatchedSession
   found.watch(settings, sessions, (run) =>
     broadcast("agent:runStarted", { provider: kind, ...run }),
   );
+}
+
+/** What an agent asks of the user (an approval, a question), while they're away from the app. */
+export async function notifyAsk(
+  kind: ProviderKind,
+  ask: { title: string; body?: string },
+): Promise<void> {
+  if ((await getSettings()).notificationsMode === "off") return;
+  platform().notify({
+    title: ask.title,
+    subtitle: `${provider(kind).displayName} is waiting for you`,
+    body: ask.body,
+  });
 }
 
 export async function answerQuestion(
