@@ -1355,16 +1355,21 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
       turn.finish({ requestId, type: "done", responseId: null });
       return false;
     }
+    // The gateway runs a send under its key: the turn owns it before its message
+    // row can arrive, which would otherwise read as one sent from elsewhere.
+    const key = crypto.randomUUID();
+    turn.steers.add(key);
     try {
       const sent = await turn.gateway.client.request<{ runId?: string }>("chat.send", {
         sessionKey: turn.sessionKey,
         message: input,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: key,
         queueMode: "steer",
       });
       if (sent.runId) turn.steers.add(sent.runId);
       return true;
     } catch {
+      turn.steers.delete(key);
       return false;
     }
   },

@@ -187,6 +187,40 @@ describe("an OpenClaw turn that hands off with sessions_yield", () => {
     expect(events.at(-1)).toEqual({ requestId: "req-1", type: "done", responseId: null });
   });
 
+  it("keeps a steer its own when the run yields before the steer's send comes back", async () => {
+    let answer: (value: unknown) => void = () => {};
+    let steerKey = "";
+    gateway((method, params) => {
+      if (method === "sessions.list") return { sessions: [] };
+      const p = params as { queueMode?: string; idempotencyKey?: string };
+      if (method !== "chat.send" || p.queueMode !== "steer") return undefined;
+      steerKey = p.idempotencyKey ?? "";
+      return new Promise((resolve) => (answer = resolve));
+    });
+    openClawProvider.watch!(settings, [{ id: "s", since: 0 }], () => {});
+    const { events, ended } = send();
+    await vi.waitFor(() =>
+      expect(fixture.request).toHaveBeenCalledWith("chat.send", expect.anything()),
+    );
+    const steered = openClawProvider.steer("req-1", "and the docs?");
+    await vi.waitFor(() => expect(steerKey).not.toBe(""));
+    event("chat", { runId: "req-1", state: "final", yielded: true });
+    event("session.message", {
+      message: {
+        role: "user",
+        content: "and the docs?",
+        __openclaw: { idempotencyKey: `${steerKey}:user` },
+      },
+    });
+    await tick();
+    expect(settled(events)).toBe(false);
+    answer({ runId: steerKey });
+    expect(await steered).toBe(true);
+    event("chat", { runId: steerKey, state: "final" });
+    await ended;
+    expect(events.at(-1)).toEqual({ requestId: "req-1", type: "done", responseId: null });
+  });
+
   it("ends when a message is sent from another device while it waits", async () => {
     gateway((method) => (method === "sessions.list" ? { sessions: [] } : undefined));
     const started: AgentRun[] = [];
