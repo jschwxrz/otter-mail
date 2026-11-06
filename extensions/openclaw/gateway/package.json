@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "description": "Otter as an OpenClaw channel: what your agents send you waits in Otter, and Otter tells your devices.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/otterware-app/otter-mail.git",
+    "directory": "extensions/openclaw/gateway"
+  },
   "files": [
     "index.js",
     "otter.js",
