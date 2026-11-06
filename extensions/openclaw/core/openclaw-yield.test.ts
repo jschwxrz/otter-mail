@@ -626,6 +626,19 @@ describe("what an agent delivers to Otter", () => {
     expect(turnRows(rows, "run:delivery:d-2", "delivery:d-2")).toEqual([rows[3]]);
   });
 
+  it("doesn't come between a run that yielded and its continuation", () => {
+    const delivery = delivered("d-1", "Daily summary.", 20);
+    const continuation = row("announce:1", [{ type: "text", text: "Subagents done." }]);
+    const rows = [sent, yieldCall, yieldResult, delivery, continuation];
+    expect(turnRows(rows, "req-1", "req-1")).toEqual([yieldCall, yieldResult, continuation]);
+    expect(turnRows(rows, "run:delivery:d-1", "delivery:d-1")).toEqual([delivery]);
+    expect(agentRunsSince(rows, 0)).toEqual(["delivery:d-1"]);
+    // Still waiting on the yield with a delivery after it: what starts next is the continuation.
+    expect(agentRunsSince([sent, yieldCall, yieldResult, delivery], 0, ["announce:2"])).toEqual([
+      "delivery:d-1",
+    ]);
+  });
+
   it("starts a chat named for the agent when it has none, with what's new, and catches up when told", async () => {
     const now = Date.now();
     let messages = [delivered("d-old", "Old news.", now - 2 * 24 * 60 * 60 * 1000)];

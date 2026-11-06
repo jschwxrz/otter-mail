@@ -882,7 +882,11 @@ const watchedSessions = new Map<ProviderKind, string>();
 function watchSessions(providers: ProviderSnapshot[]): void {
   const { conversations, device } = get();
   for (const host of providers) {
-    if (!isProviderUsable(host)) continue;
+    if (!isProviderUsable(host)) {
+      // Turned off, it stopped watching: watched again once it's back.
+      watchedSessions.delete(host.kind);
+      continue;
+    }
     const sessions = conversations
       .filter((c) => c.provider === host.kind && c.sessionId && !isElsewhere(c, device))
       .map((c) => ({

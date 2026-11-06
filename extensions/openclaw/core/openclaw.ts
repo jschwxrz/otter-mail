@@ -520,6 +520,8 @@ const runOf = (row: Record<string, unknown>) => {
   return undefined;
 };
 
+const isDelivery = (row: Record<string, unknown>) => String(runOf(row)).startsWith("delivery:");
+
 /** The session where the Otter channel plugin (extensions/openclaw/gateway) keeps what an agent delivered to Otter. */
 const INBOX = /^agent:([^:]+):otter:inbox$/;
 /** How far back a device that has no chat for an agent's Otter session yet shows what it delivered. */
@@ -555,13 +557,19 @@ export function runChains(rows: Record<string, unknown>[]): Record<string, unkno
   const chains: Record<string, unknown>[][] = [];
   let run: unknown;
   let steered = false;
+  let last: Record<string, unknown>[] | undefined;
   for (const row of rows) {
-    const id = runOf(row) ?? run;
-    const last = chains.at(-1);
-    const sentAfterYield = row.role === "user" && last !== undefined && waitingOnYield(last);
-    if (!last || sentAfterYield || (id !== run && !steered && !waitingOnYield(last)))
+    // A delivery is a turn of its own that leaves the runs around it as they were.
+    if (isDelivery(row)) {
       chains.push([row]);
-    else last.push(row);
+      continue;
+    }
+    const id = runOf(row) ?? run;
+    const sentAfterYield = row.role === "user" && last !== undefined && waitingOnYield(last);
+    if (!last || sentAfterYield || (id !== run && !steered && !waitingOnYield(last))) {
+      last = [row];
+      chains.push(last);
+    } else last.push(row);
     if (row.role === "user") steered = true;
     else if (id !== run) steered = false;
     run = id;
@@ -592,7 +600,8 @@ async function runState(turn: Turn): Promise<RunState> {
   const info = result.sessionInfo ?? {};
   // A continuation joins the chain: anything after it (a message sent since) ends the wait.
   const last = rows?.at(-1);
-  const waiting = rows && last ? waitingOnYield(rows) && all.at(-1) === last : false;
+  const waiting =
+    rows && last ? waitingOnYield(rows) && all.findLast((m) => !isDelivery(m)) === last : false;
   const chain = new Set((rows ?? []).map(runOf));
   const ids = info.activeRunIds ?? (info.hasActiveRun ? [turn.runId] : []);
   return {
@@ -1215,7 +1224,8 @@ export function agentRunsSince(
     return going || (at > since && shown) ? [run] : [];
   });
   const known = new Set(rows.map(runOf));
-  const continuing = chains.length > 0 && waitingOnYield(chains[chains.length - 1]);
+  const lastRun = chains.findLast((chain) => !isDelivery(chain[0]));
+  const continuing = lastRun !== undefined && waitingOnYield(lastRun);
   const unwritten = active.filter((id) => !known.has(id) && id !== own && !continuing);
   return [...written, ...unwritten];
 }
