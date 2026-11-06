@@ -517,7 +517,10 @@ html[data-window-controls="none"] {
     [data-read],
     [data-selected],
     [data-checked]
-  ):hover {
+  ):hover,
+.message-list-row:not([data-read], [data-selected], [data-checked]):has(
+    ~ .message-list-hover-actions:hover
+  ) {
   background-color: color-mix(in srgb, var(--foreground) 7%, transparent);
 }
 
@@ -526,25 +529,30 @@ html[data-window-controls="none"] {
 }
 
 @container message-list (min-width: 44rem) {
-  :is([data-mail-layout="full"], [data-mail-layout="floating"])
-    .message-list-scroll
-    .message-list-row {
+  [data-mail-layout="full"] .message-list-scroll .message-list-row {
     align-items: center;
     padding-block: 0.5rem;
     padding-inline-end: 2.5rem;
   }
 
-  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-avatar {
+  [data-mail-layout="full"] .message-list-avatar {
     margin-top: 0;
   }
 
-  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-face {
+  [data-mail-layout="full"] .message-list-face {
     width: 1.5rem;
     height: 1.5rem;
     font-size: 0.6875rem;
   }
 
-  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-flag {
+  [data-mail-layout="full"] .message-list-hover-actions {
+    inset-inline-end: 0.5rem;
+    bottom: auto;
+    top: 50%;
+    translate: 0 -50%;
+  }
+
+  [data-mail-layout="full"] .message-list-flag {
     position: absolute;
     inset-inline-end: 1rem;
     top: 50%;
@@ -552,29 +560,29 @@ html[data-window-controls="none"] {
     margin: 0;
   }
 
-  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-row-content {
+  [data-mail-layout="full"] .message-list-row-content {
     display: grid;
     grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) auto auto;
     align-items: center;
     column-gap: 1rem;
   }
 
-  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-row-header {
+  [data-mail-layout="full"] .message-list-row-header {
     display: contents;
   }
 
-  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-sender {
+  [data-mail-layout="full"] .message-list-sender {
     grid-column: 1;
     grid-row: 1;
   }
 
-  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-meta {
+  [data-mail-layout="full"] .message-list-meta {
     grid-column: 4;
     grid-row: 1;
     justify-self: end;
   }
 
-  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-preview {
+  [data-mail-layout="full"] .message-list-preview {
     grid-column: 2;
     grid-row: 1;
     flex-direction: row;
@@ -582,49 +590,33 @@ html[data-window-controls="none"] {
     gap: 0.5rem;
   }
 
-  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-subject {
+  [data-mail-layout="full"] .message-list-subject {
     flex: 0 1 auto;
     max-width: 60%;
   }
 
-  :is([data-mail-layout="full"], [data-mail-layout="floating"])
-    .message-list-preview
-    .message-list-snippet {
+  [data-mail-layout="full"] .message-list-preview .message-list-snippet {
     flex: 1;
     min-width: 0;
   }
 
-  :is([data-mail-layout="full"], [data-mail-layout="floating"])
-    .message-list-preview
-    .message-list-snippet::before {
+  [data-mail-layout="full"] .message-list-preview .message-list-snippet::before {
     content: "— ";
   }
 
   /* Chips on the row's line, before the date (Linear's), not under it. */
-  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-labels {
+  [data-mail-layout="full"] .message-list-labels {
     grid-column: 3;
     grid-row: 1;
     margin-top: 0;
   }
 
-  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-skeleton {
+  [data-mail-layout="full"] .message-list-skeleton {
     flex-direction: row;
     align-items: center;
     gap: 1rem;
     padding-block: 0.125rem;
   }
-}
-
-.floating-reader {
-  background: var(--canvas);
-  border-color: var(--border);
-  box-shadow: 0 24px 80px -16px rgb(0 0 0 / 40%);
-}
-
-.floating-reader [data-toolbar] {
-  border-bottom: 1px solid var(--border);
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
 }
 
 /* A light sweeping across text while it's under way (Otter Code's live-tool-shine). */

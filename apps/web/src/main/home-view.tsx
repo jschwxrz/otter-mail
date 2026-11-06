@@ -51,7 +51,6 @@ import { SettingsNav } from "./settings/settings-nav";
 import { isTypingTarget } from "./mail/keyboard";
 import { cn, HintTooltip, IconBtn } from "./mail/ui";
 import { useMailLayout } from "./theme/interface-settings";
-import { FloatingReader } from "./mail/floating-reader";
 import { usePanelAnimationSettings, usePanelPresence } from "./panel-animations";
 import {
   keybindingContext,
@@ -142,6 +141,8 @@ import {
 } from "./onboarding/onboarding";
 
 const READER_MIN_WIDTH = 360;
+// Auto layout: below this, the reader beside the list is too narrow to read in.
+const AUTO_SPLIT_READER_WIDTH = 560;
 const BROWSER_OPEN_WIDTH = 720;
 const FRAME_INSET = 4;
 
@@ -224,6 +225,7 @@ function useStoredWidth(
   dir: 1 | -1 = 1,
   room?: () => number,
   cssVar?: string,
+  onDrag?: (width: number | null) => void,
 ) {
   const [width, setWidth] = useState(() => {
     const saved = Number(localStorage.getItem(key));
@@ -262,6 +264,7 @@ function useStoredWidth(
       if (paneRef.current) paneRef.current.style.width = `${latest}px`;
       if (frameRef.current) frameRef.current.style.width = `${latest}px`;
       if (cssVar) document.documentElement.style.setProperty(cssVar, `${latest}px`);
+      onDrag?.(latest);
     };
     const move = (ev: PointerEvent) => {
       if (ev.pointerId !== pointerId) return;
@@ -292,6 +295,7 @@ function useStoredWidth(
       apply();
       widthRef.current = latest;
       setWidth(latest);
+      onDrag?.(null);
       localStorage.setItem(key, String(latest));
     };
     const up = (ev: PointerEvent) => {
@@ -314,6 +318,8 @@ function useStoredWidth(
 
   return { width: shown, start, widen, paneRef, frameRef };
 }
+
+type PaneWidths = { sidebar: number; list: number; browser: number };
 
 function PaneResizer({ onPointerDown }: { onPointerDown: (e: ReactPointerEvent) => void }) {
   return (
@@ -462,13 +468,8 @@ function MailHome() {
     if (!mailLoc) return;
     const next = { ...mailLoc, ...to };
     const params = { mailbox: next.mailbox, label: next.label };
-    const resetScroll =
-      !floatingLayout ||
-      !!settingsRoute ||
-      next.mailbox !== mailLoc.mailbox ||
-      next.label !== mailLoc.label;
     if (!next.messageId) {
-      void navigate({ to: "/$mailbox/$label", params, replace, resetScroll });
+      void navigate({ to: "/$mailbox/$label", params, replace });
       return;
     }
     void navigate({
@@ -479,7 +480,6 @@ function MailHome() {
         message: next.focusId ?? undefined,
       },
       replace,
-      resetScroll,
     });
   };
   const closeMessage = () => go({ messageId: null });
@@ -524,11 +524,7 @@ function MailHome() {
   // Turning one off re-reads where we are (spaceOf drops it).
   useWorkspaces();
   const ownsMain = isChats || isCalendar || workspace !== undefined;
-  const mailLayout = useMailLayout();
-  const fullInbox = mailLayout === "full" && !ownsMain;
-  const floatingLayout = mailLayout === "floating" && !ownsMain;
-  const wideInbox = fullInbox || floatingLayout;
-  const [mailWorkspace, setMailWorkspace] = useState<HTMLDivElement | null>(null);
+  const mailLayoutSetting = useMailLayout();
   const viewSpace = space?.kind === "view" ? space.view : null;
   const spansMailboxes = spanning(space);
 
@@ -560,6 +556,11 @@ function MailHome() {
   }, [router]);
   useChatEvents();
 
+  // Panes resize outside React while dragged; this re-renders only when Auto's choice flips.
+  const [dragSplit, setDragSplit] = useState<boolean | null>(null);
+  const splitFitsRef = useRef<(dragged: Partial<PaneWidths>) => boolean>(() => true);
+  const dragAutoLayout = (pane: keyof PaneWidths, width: number | null) =>
+    setDragSplit(width === null ? null : splitFitsRef.current({ [pane]: width }));
   const {
     width: sidebarWidth,
     start: sidebarStart,
@@ -573,12 +574,15 @@ function MailHome() {
     1,
     undefined,
     "--workspace-sidebar-width",
+    (width) => dragAutoLayout("sidebar", width),
   );
   const {
     width: listWidth,
     start: listStart,
     paneRef: listPaneRef,
-  } = useStoredWidth("gmail:pane:list", 380, 280, 640);
+  } = useStoredWidth("gmail:pane:list", 380, 280, 640, 1, undefined, undefined, (width) =>
+    dragAutoLayout("list", width),
+  );
   const [browserOpen, setBrowserOpen] = useState(
     () => features.browser && localStorage.getItem("gmail:browser-open") === "1",
   );
@@ -596,7 +600,7 @@ function MailHome() {
     window.innerWidth -
     FRAME_INSET -
     (sidebarOpen ? sidebarWidth : 0) -
-    (wideInbox ? 0 : listWidth) -
+    (mailLayoutSetting === "full" ? 0 : listWidth) -
     READER_MIN_WIDTH;
   const {
     width: browserWidth,
@@ -604,10 +608,31 @@ function MailHome() {
     widen: widenBrowser,
     paneRef: browserPaneRef,
     frameRef: browserFrameRef,
-  } = useStoredWidth("gmail:pane:browser", 340, 280, 1200, -1, browserRoom);
+  } = useStoredWidth("gmail:pane:browser", 340, 280, 1200, -1, browserRoom, undefined, (width) =>
+    dragAutoLayout("browser", width),
+  );
   const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } =
     usePanelAnimationSettings(settingsRoute ? "settings" : "mail");
   const browserVisible = browserOpen && !settingsRoute && !isChats;
+  const windowWidth = useSyncExternalStore(onWindowResize, () => window.innerWidth);
+  const splitFits = ({ sidebar, list, browser }: PaneWidths) =>
+    windowWidth -
+      FRAME_INSET -
+      (sidebarOpen ? sidebar : 0) -
+      list -
+      (browserVisible ? browser : 0) >=
+    AUTO_SPLIT_READER_WIDTH;
+  const paneWidths = { sidebar: sidebarWidth, list: listWidth, browser: browserWidth };
+  useLayoutEffect(() => {
+    splitFitsRef.current = (dragged) => splitFits({ ...paneWidths, ...dragged });
+  });
+  const mailLayout =
+    mailLayoutSetting !== "auto"
+      ? mailLayoutSetting
+      : (dragSplit ?? splitFits(paneWidths))
+        ? "split"
+        : "full";
+  const fullInbox = mailLayout === "full" && !ownsMain;
   const sidebarPresent = usePanelPresence(
     sidebarOpen,
     panelAnimationsActive,
@@ -1479,12 +1504,8 @@ function MailHome() {
   };
   const hasListTarget = effectiveAccountId != null && !ownsMain;
   const showMain =
-    !!settingsRoute ||
-    !wideInbox ||
-    !hasListTarget ||
-    (fullInbox && !!selectedMessageId) ||
-    composeOpen;
-  const listVisible = hasListTarget && !settingsRoute && !composeOpen && (!wideInbox || !showMain);
+    !!settingsRoute || !fullInbox || !hasListTarget || !!selectedMessageId || composeOpen;
+  const listVisible = hasListTarget && !settingsRoute && !composeOpen && (!fullInbox || !showMain);
 
   const readerOwnsBand =
     !settingsRoute && !(composeOpen && composeAccountId) && !!readerAccount && !!selectedMessageId;
@@ -1604,11 +1625,7 @@ function MailHome() {
           {/* The frame's width round the cards (the right edge is the last
               card's own gap), so they float with every corner rounded. */}
           <div className="relative isolate flex min-w-0 flex-1 pb-8 pl-1">
-            <div
-              ref={setMailWorkspace}
-              data-mail-workspace=""
-              className="relative flex min-h-0 min-w-0 flex-1"
-            >
+            <div data-mail-workspace="" className="relative flex min-h-0 min-w-0 flex-1">
               {peeking ? (
                 <SidebarPeekCard width={sidebarWidth} onHover={sidebarPeek.hover}>
                   {sidebar}
@@ -1672,9 +1689,9 @@ function MailHome() {
                     scroll position, selection and next-message shortcuts stay. */}
                     <div
                       ref={listPaneRef}
-                      style={{ width: wideInbox ? undefined : listWidth }}
+                      style={{ width: fullInbox ? undefined : listWidth }}
                       className={cn(
-                        wideInbox ? `${PANE_LIST} min-w-0 flex-1` : `${PANE_LIST} shrink-0`,
+                        fullInbox ? `${PANE_LIST} min-w-0 flex-1` : `${PANE_LIST} shrink-0`,
                         !listVisible && "invisible absolute inset-0",
                       )}
                       inert={!listVisible}
@@ -1682,22 +1699,7 @@ function MailHome() {
                     >
                       <MessageList
                         headerLeading={sidebarOpen ? null : titlebarInset}
-                        headerTrailing={wideInbox ? titleTrailing : undefined}
-                        renderFloatingReader={
-                          floatingLayout && !composeOpen
-                            ? (navigation, title) => (
-                                <FloatingReader
-                                  container={mailWorkspace}
-                                  messageId={selectedMessageId ?? ""}
-                                  title={title}
-                                  navigation={navigation}
-                                  onClose={closeMessage}
-                                >
-                                  {renderReader(null, null)}
-                                </FloatingReader>
-                              )
-                            : undefined
-                        }
+                        headerTrailing={fullInbox ? titleTrailing : undefined}
                         accountId={(spansMailboxes ? firstRealAccountId : effectiveAccountId) ?? ""}
                         alias={aliasSpace?.id}
                         labelId={selectedLabelId}
@@ -1737,7 +1739,7 @@ function MailHome() {
                         }
                       />
                     </div>
-                    {wideInbox ? null : <PaneResizer onPointerDown={listStart} />}
+                    {fullInbox ? null : <PaneResizer onPointerDown={listStart} />}
                   </>
                 ) : null}
                 <div

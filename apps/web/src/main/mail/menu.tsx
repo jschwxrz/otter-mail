@@ -228,6 +228,18 @@ export function ContextMenuSeparator({ className }: { className?: string }) {
   return <ContextPrimitive.Separator className={cn("mx-2.5 my-1 h-px bg-border/70", className)} />;
 }
 
+export function ContextMenuLabel({
+  className,
+  ...props
+}: ComponentProps<typeof ContextPrimitive.Label>) {
+  return (
+    <ContextPrimitive.Label
+      className={cn("px-2.5 pt-1.5 pb-1 text-[13px] text-muted-foreground", className)}
+      {...props}
+    />
+  );
+}
+
 export function ContextMenuSub({
   label,
   icon,

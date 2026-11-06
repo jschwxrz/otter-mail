@@ -21,11 +21,14 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuCheckboxItem,
+  ContextMenuLabel,
   ContextMenuSeparator,
   ContextMenuSub,
 } from "./menu";
 import {
   ArchiveIcon,
+  CheckIcon,
+  ClockIcon,
   RotateCwIcon,
   ArchiveXIcon,
   FlagIcon,
@@ -39,7 +42,6 @@ import {
   Trash2Icon,
   XIcon,
   CircleChevronDownIcon,
-  ChevronUpIcon,
   ChevronDownIcon,
   PaperclipIcon,
 } from "lucide-react";
@@ -96,7 +98,6 @@ type CombinedMeta = { mailbox: string | null; accountName: string; accountColor:
 
 type MessageListProps = {
   headerTrailing?: ReactNode;
-  renderFloatingReader?: (navigation: ReactNode, title: string) => ReactNode;
   headerLeading?: ReactNode;
   accountId: string;
   alias?: string;
@@ -264,14 +265,17 @@ function MessageDayGroup({
           aria-expanded={!collapsed}
           aria-controls={bodyId}
           onClick={onToggle}
-          className="flex h-8 w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 text-left text-xs outline-none hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring"
+          className="group/day flex h-8 w-full cursor-pointer items-center gap-1.5 rounded-lg px-3 text-left text-xs outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring"
         >
           <ChevronDownIcon
             aria-hidden
-            className={cn("size-3.5 shrink-0 text-muted-foreground", collapsed && "-rotate-90")}
+            className={cn(
+              "size-3.5 shrink-0 text-muted-foreground group-hover/day:text-foreground",
+              collapsed && "-rotate-90",
+            )}
           />
           <span className="min-w-0 flex-1 truncate font-medium text-foreground">{label}</span>
-          <span className="shrink-0 tabular-nums text-muted-foreground">
+          <span className="shrink-0 tabular-nums text-muted-foreground group-hover/day:text-foreground">
             {group.messages.length}
             {unread > 0 ? ` · ${unread} unread` : null}
           </span>
@@ -295,6 +299,10 @@ type MessageRowProps = {
   message: MessageSummary;
   selected: boolean;
   checked: boolean;
+  selecting: boolean;
+  onToggleChecked: () => void;
+  /** Right-clicking a checked row acts on the whole selection. */
+  selectionMenu?: ReactNode;
   onRowClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   accountId: string;
   resolveLabel: ResolveLabel;
@@ -316,6 +324,9 @@ function MessageRow({
   message,
   selected,
   checked,
+  selecting,
+  onToggleChecked,
+  selectionMenu,
   onRowClick,
   accountId,
   resolveLabel,
@@ -454,7 +465,7 @@ function MessageRow({
     : { name: message.fromName, email: message.fromEmail };
 
   return (
-    <div className="relative">
+    <div className="group/row relative">
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <button
@@ -481,8 +492,7 @@ function MessageRow({
                 ? "bg-sidebar-row-active"
                 : checked
                   ? "bg-sidebar-row-hover"
-                  : "hover:bg-sidebar-row-hover",
-              checked ? "ring-1 ring-inset ring-primary/70" : "",
+                  : "group-hover/row:bg-sidebar-row-hover",
             ].join(" ")}
           >
             {/* Who it's from, at a glance (Outlook's column of faces); new
@@ -499,8 +509,30 @@ function MessageRow({
                 name={person.name}
                 email={person.email}
                 accountId={ownerAccountId}
-                className="message-list-face"
+                className={cn(
+                  "message-list-face",
+                  selecting || checked ? "invisible" : "group-hover/row:invisible",
+                )}
               />
+              <span
+                role="checkbox"
+                tabIndex={-1}
+                aria-checked={checked}
+                aria-label={checked ? "Deselect" : "Select"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleChecked();
+                }}
+                className={cn(
+                  "absolute inset-0 flex items-center justify-center rounded-lg border",
+                  checked
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-input bg-canvas text-transparent hover:border-muted-foreground",
+                  !selecting && !checked && "invisible group-hover/row:visible",
+                )}
+              >
+                <CheckIcon className="size-3.5" strokeWidth={3} />
+              </span>
               {/* Across mailboxes, whose it is: a badge on the face, apart
                   from the unread dot. */}
               {combinedMeta ? (
@@ -609,71 +641,147 @@ function MessageRow({
             <FlagIcon className="size-4 fill-current text-(--red)" />
           </button>
         ) : null}
-        <ContextMenuContent>
-          <ContextMenuItem
-            icon={unread ? "envelope.open" : "envelope.badge"}
-            onSelect={handleToggleRead}
-          >
-            {unread ? "Mark as read" : "Mark as unread"}
-          </ContextMenuItem>
-          <ContextMenuItem
-            icon={message.starred ? "flag.slash" : "flag"}
-            onSelect={() => handleStarToggle()}
-          >
-            {message.starred ? "Unflag" : "Flag"}
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem icon="cursorarrow" onSelect={onChatAgent}>
-            Open in agent chat
-          </ContextMenuItem>
-          <ExtensionContextMenuActions
-            target={{
-              accountId: message.accountId ?? accountId,
-              messageId: message.id,
-              subject: message.subject,
-            }}
-          />
-          <ContextMenuSeparator />
-          <ContextMenuSub label={labelChoices.title}>
-            {renderLabelChoices(labelChoices, CONTEXT_MENU_KIT)}
-          </ContextMenuSub>
-          {labelChoices.alsoFolders ? (
-            <ContextMenuSub label={folderChoices.title}>
-              {renderLabelChoices(folderChoices, CONTEXT_MENU_KIT)}
-            </ContextMenuSub>
-          ) : null}
-          <ContextMenuSeparator />
-          {trashed || junk ? null : (
+        {selecting ? null : (
+          <div className="message-list-hover-actions invisible absolute right-3 bottom-2 z-[2] flex items-center gap-0.5 rounded-lg border border-border/60 bg-canvas p-0.5 shadow-sm group-hover/row:visible">
+            {trashed || junk ? null : (
+              <HintTooltip
+                label={archiveSource ? "Archive" : "Move to inbox"}
+                shortcut="message.archive"
+              >
+                <IconBtn
+                  label={archiveSource ? "Archive" : "Move to inbox"}
+                  className="size-7"
+                  onClick={handleArchive}
+                >
+                  {archiveSource ? (
+                    <ArchiveIcon className="size-3.5" />
+                  ) : (
+                    <InboxIcon className="size-3.5" />
+                  )}
+                </IconBtn>
+              </HintTooltip>
+            )}
+            <HintTooltip label={unread ? "Mark as read" : "Mark as unread"}>
+              <IconBtn
+                label={unread ? "Mark as read" : "Mark as unread"}
+                className="size-7"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleRead();
+                }}
+              >
+                {unread ? <MailOpenIcon className="size-3.5" /> : <MailIcon className="size-3.5" />}
+              </IconBtn>
+            </HintTooltip>
+            <HintTooltip label={message.starred ? "Unflag" : "Flag"}>
+              <IconBtn
+                label={message.starred ? "Unflag" : "Flag"}
+                className="size-7"
+                onClick={handleStarToggle}
+              >
+                <FlagIcon
+                  className={cn("size-3.5", message.starred && "fill-current text-(--red)")}
+                />
+              </IconBtn>
+            </HintTooltip>
+            {inInbox && !trashed && !junk ? (
+              <HintTooltip label="Snooze">
+                <IconBtn
+                  label="Snooze"
+                  className="size-7"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSnoozeOpen(true);
+                  }}
+                >
+                  <ClockIcon className="size-3.5" />
+                </IconBtn>
+              </HintTooltip>
+            ) : null}
+            <HintTooltip label={trashed ? "Restore from trash" : "Move to trash"}>
+              <IconBtn
+                label={trashed ? "Restore from trash" : "Move to trash"}
+                className="size-7"
+                onClick={handleTrash}
+              >
+                {trashed ? (
+                  <RotateCcwIcon className="size-3.5" />
+                ) : (
+                  <Trash2Icon className="size-3.5" />
+                )}
+              </IconBtn>
+            </HintTooltip>
+          </div>
+        )}
+        {selectionMenu ? (
+          <ContextMenuContent>{selectionMenu}</ContextMenuContent>
+        ) : (
+          <ContextMenuContent>
             <ContextMenuItem
-              icon={archiveSource ? "archivebox" : "tray.and.arrow.down"}
-              onSelect={() => handleArchive()}
+              icon={unread ? "envelope.open" : "envelope.badge"}
+              onSelect={handleToggleRead}
             >
-              {archiveSource ? "Archive" : "Move to inbox"}
+              {unread ? "Mark as read" : "Mark as unread"}
             </ContextMenuItem>
-          )}
-          {inInbox && !trashed && !junk && (
-            <ContextMenuItem onSelect={() => setSnoozeOpen(true)}>Snooze…</ContextMenuItem>
-          )}
-          {trashed ? null : (
-            <ContextMenuItem icon={junk ? "checkmark.shield" : "xmark.bin"} onSelect={handleJunk}>
-              {junk ? "Not junk" : "Move to junk"}
+            <ContextMenuItem
+              icon={message.starred ? "flag.slash" : "flag"}
+              onSelect={() => handleStarToggle()}
+            >
+              {message.starred ? "Unflag" : "Flag"}
             </ContextMenuItem>
-          )}
-          {trashed ? (
-            <ContextMenuItem icon="trash.slash" onSelect={() => handleTrash()}>
-              Restore from trash
+            <ContextMenuSeparator />
+            <ContextMenuItem icon="cursorarrow" onSelect={onChatAgent}>
+              Open in agent chat
             </ContextMenuItem>
-          ) : (
-            <ContextMenuItem icon="trash" color="red" onSelect={() => handleTrash()}>
-              Move to trash
-            </ContextMenuItem>
-          )}
-          {trashed || junk ? (
-            <ContextMenuItem icon="trash.fill" color="red" onSelect={onDeleteForever}>
-              Delete forever…
-            </ContextMenuItem>
-          ) : null}
-        </ContextMenuContent>
+            <ExtensionContextMenuActions
+              target={{
+                accountId: message.accountId ?? accountId,
+                messageId: message.id,
+                subject: message.subject,
+              }}
+            />
+            <ContextMenuSeparator />
+            <ContextMenuSub label={labelChoices.title}>
+              {renderLabelChoices(labelChoices, CONTEXT_MENU_KIT)}
+            </ContextMenuSub>
+            {labelChoices.alsoFolders ? (
+              <ContextMenuSub label={folderChoices.title}>
+                {renderLabelChoices(folderChoices, CONTEXT_MENU_KIT)}
+              </ContextMenuSub>
+            ) : null}
+            <ContextMenuSeparator />
+            {trashed || junk ? null : (
+              <ContextMenuItem
+                icon={archiveSource ? "archivebox" : "tray.and.arrow.down"}
+                onSelect={() => handleArchive()}
+              >
+                {archiveSource ? "Archive" : "Move to inbox"}
+              </ContextMenuItem>
+            )}
+            {inInbox && !trashed && !junk && (
+              <ContextMenuItem onSelect={() => setSnoozeOpen(true)}>Snooze…</ContextMenuItem>
+            )}
+            {trashed ? null : (
+              <ContextMenuItem icon={junk ? "checkmark.shield" : "xmark.bin"} onSelect={handleJunk}>
+                {junk ? "Not junk" : "Move to junk"}
+              </ContextMenuItem>
+            )}
+            {trashed ? (
+              <ContextMenuItem icon="trash.slash" onSelect={() => handleTrash()}>
+                Restore from trash
+              </ContextMenuItem>
+            ) : (
+              <ContextMenuItem icon="trash" color="red" onSelect={() => handleTrash()}>
+                Move to trash
+              </ContextMenuItem>
+            )}
+            {trashed || junk ? (
+              <ContextMenuItem icon="trash.fill" color="red" onSelect={onDeleteForever}>
+                Delete forever…
+              </ContextMenuItem>
+            ) : null}
+          </ContextMenuContent>
+        )}
       </ContextMenu>
       {snoozeOpen && (
         <SnoozeDialog
@@ -782,7 +890,6 @@ function formatMailboxSummary(total: number, unread: number): string {
 export function MessageList({
   headerLeading,
   headerTrailing,
-  renderFloatingReader,
   accountId,
   alias,
   labelId,
@@ -1108,6 +1215,10 @@ export function MessageList({
       rangeSelect(message.id);
       return;
     }
+    if (checkedRef.current.size > 0) {
+      toggleChecked(message.id);
+      return;
+    }
     clearChecked();
     anchorRef.current = message.id;
     console.log("[MessageList:selectMessage]", { messageId: message.id });
@@ -1241,6 +1352,59 @@ export function MessageList({
         }),
     );
   };
+
+  const selectionMenu = (
+    <>
+      <ContextMenuLabel>{checked.size} selected</ContextMenuLabel>
+      <ContextMenuSeparator />
+      <ContextMenuItem icon="envelope.open" onSelect={bulkMarkRead}>
+        Mark as read
+      </ContextMenuItem>
+      <ContextMenuItem icon="envelope.badge" onSelect={bulkMarkUnread}>
+        Mark as unread
+      </ContextMenuItem>
+      <ContextMenuSeparator />
+      <ContextMenuItem icon="cursorarrow" onSelect={() => onOpenChat?.()}>
+        Open in agent chat
+      </ContextMenuItem>
+      <ContextMenuSeparator />
+      {allTrashed ? (
+        <ContextMenuItem icon="trash.slash" onSelect={bulkUntrash}>
+          Restore from trash
+        </ContextMenuItem>
+      ) : allJunk ? (
+        <>
+          <ContextMenuItem icon="checkmark.shield" onSelect={bulkNotJunk}>
+            Not junk
+          </ContextMenuItem>
+          <ContextMenuItem icon="trash" color="red" onSelect={bulkTrash}>
+            Move to trash
+          </ContextMenuItem>
+        </>
+      ) : (
+        <>
+          <ContextMenuItem icon="archivebox" onSelect={bulkArchive}>
+            Archive
+          </ContextMenuItem>
+          <ContextMenuItem icon="xmark.bin" onSelect={bulkJunk}>
+            Move to junk
+          </ContextMenuItem>
+          <ContextMenuItem icon="trash" color="red" onSelect={bulkTrash}>
+            Move to trash
+          </ContextMenuItem>
+        </>
+      )}
+      {allTrashed || allJunk ? (
+        <ContextMenuItem
+          icon="trash.fill"
+          color="red"
+          onSelect={() => setConfirmDeleteRows(checkedRows)}
+        >
+          Delete forever…
+        </ContextMenuItem>
+      ) : null}
+    </>
+  );
 
   const advanceFrom = (rowId: string) => {
     const idx = visibleMessages.findIndex((m) => m.id === rowId);
@@ -1638,38 +1802,6 @@ export function MessageList({
   };
 
   const firstSearchPage = globalSearching ? gmailSearch.data?.pages[0] : undefined;
-  const selectedIndex = visibleMessages.findIndex((message) => message.id === selectedMessageId);
-  const selectNeighbor = (step: -1 | 1) => {
-    const message = visibleMessages[selectedIndex + step];
-    if (message) selectForNavigation(message);
-  };
-  const floatingReader =
-    openMessageId && renderFloatingReader
-      ? renderFloatingReader(
-          <>
-            <HintTooltip label="Previous conversation" shortcut="list.previous">
-              <IconBtn
-                label="Previous conversation"
-                disabled={selectedIndex <= 0}
-                onClick={() => selectNeighbor(-1)}
-              >
-                <ChevronUpIcon className="size-4" />
-              </IconBtn>
-            </HintTooltip>
-            <HintTooltip label="Next conversation" shortcut="list.next">
-              <IconBtn
-                label="Next conversation"
-                disabled={selectedIndex >= visibleMessages.length - 1}
-                onClick={() => selectNeighbor(1)}
-              >
-                <ChevronDownIcon className="size-4" />
-              </IconBtn>
-            </HintTooltip>
-          </>,
-          selectedRow?.subject || "Conversation",
-        )
-      : null;
-
   const handleRowDragStart = (e: React.DragEvent, message: MessageSummary) => {
     const rows = checked.has(message.id) ? checkedRows : [message];
     console.log("[MessageList:dragStart]", { count: rows.length });
@@ -1698,6 +1830,9 @@ export function MessageList({
         message={message}
         selected={selectedMessageId === message.id && !focusedMessageId}
         checked={checked.has(message.id)}
+        selecting={checked.size > 0}
+        onToggleChecked={() => toggleChecked(message.id)}
+        selectionMenu={checked.has(message.id) ? selectionMenu : undefined}
         expanded={expanded.has(threadKey(message))}
         onToggleExpanded={() => setThreadExpanded(message, !expanded.has(threadKey(message)))}
         onDragStart={(e) => handleRowDragStart(e, message)}
@@ -1983,7 +2118,6 @@ export function MessageList({
         </div>
       ) : null}
 
-      {floatingReader}
       <Dialog
         open={confirmDeleteRows != null}
         onOpenChange={(o) => {
