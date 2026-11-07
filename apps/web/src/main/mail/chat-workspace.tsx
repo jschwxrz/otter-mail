@@ -7,6 +7,7 @@ import {
   type RefObject,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useShallow } from "zustand/react/shallow";
 import {
   FileIcon,
   FilePenLineIcon,
@@ -137,13 +138,19 @@ export function ChatWorkspace({
   const { selectedKind } = useChatProvider(undefined);
   const tabs = (convo?.tabs ?? []).filter((t) => features.browser || t.ref.kind !== "page");
   const chatAgent = useChatProvider(convo);
-  const browserSteps = useChats((s) => {
-    let steps = 0;
-    for (const turn of s.conversations.find((c) => c.id === chatId)?.turns ?? [])
-      for (const item of turn.items ?? [])
-        if (item.kind === "step" && item.step.title === "Browser") steps++;
-    return steps;
-  });
+  const [browserSteps, browserDone] = useChats(
+    useShallow((s) => {
+      let steps = 0;
+      let done = 0;
+      for (const turn of s.conversations.find((c) => c.id === chatId)?.turns ?? [])
+        for (const item of turn.items ?? [])
+          if (item.kind === "step" && item.step.title === "Browser") {
+            steps++;
+            if (item.output !== undefined) done++;
+          }
+      return [steps, done];
+    }),
+  );
   const run = useChats((s) => s.runs[chatId]?.requestId);
   const [liveClosed, setLiveClosed] = useState<string | null>(null);
   const liveSession =
@@ -265,7 +272,8 @@ export function ChatWorkspace({
   };
   useEffect(() => {
     panelRef.current = {
-      toggle: () => (tabs.length === 0 ? newPage() : setPanelHidden((hidden) => !hidden)),
+      toggle: () =>
+        tabs.length === 0 && !liveSession ? newPage() : setPanelHidden((hidden) => !hidden),
       newPage,
     };
     return () => {
@@ -424,7 +432,7 @@ export function ChatWorkspace({
                   provider={convo.provider}
                   sessionId={liveSession}
                   agentName={agentName}
-                  activity={browserSteps}
+                  activity={browserSteps + browserDone}
                 />
               ) : null}
               {shown && (shown.ref.kind === "thread" || shown.ref.kind === "draft") ? (

@@ -23,7 +23,8 @@ function usePageVisible(): boolean {
  * second) straight from the gateway, decoded off the main thread and handed to the canvas
  * without a copy. A frame that arrives while one decodes replaces the one waiting, so a slow
  * machine skips frames rather than falling behind; nothing streams while the page is hidden.
- * `activity` changes when the agent browses again: it may have moved to another tab.
+ * `activity` changes when the agent browses again, and when that step's result has named its tab:
+ * it may have moved to another one.
  */
 export function AgentBrowser({
   provider,
