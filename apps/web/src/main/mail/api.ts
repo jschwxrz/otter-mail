@@ -677,8 +677,8 @@ export const mailApi = {
   agentFork: (
     provider: ProviderKind,
     sessionId: string,
-    at: { requestId?: string; fromEnd: number },
-  ): Promise<string> => ipc("agent:fork", { provider, sessionId, ...at }),
+    before?: { requestId?: string; fromEnd: number },
+  ): Promise<string> => ipc("agent:fork", { provider, sessionId, before }),
 
   agentDeleteSession: (provider: ProviderKind, sessionId: string): Promise<{ ok: boolean }> =>
     ipc("agent:deleteSession", { provider, sessionId }),

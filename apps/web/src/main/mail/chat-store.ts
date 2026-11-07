@@ -789,16 +789,20 @@ export function deleteConversation(id: string, provider: ProviderKind): void {
   });
 }
 
-/** A new chat with what came before this message of yours, the message in its composer to edit and send. */
+/** A new chat with the conversation up to this reply. */
 export async function forkChat(convoId: string, turnId: string): Promise<string | undefined> {
   const convo = get().conversations.find((c) => c.id === convoId);
   const at = convo?.turns.findIndex((t) => t.id === turnId) ?? -1;
-  if (!convo?.sessionId || at < 1) return;
-  const turn = convo.turns[at];
-  const sessionId = await mailApi.agentFork(convo.provider, convo.sessionId, {
-    requestId: turn.id.startsWith("u-") ? turn.id.slice("u-".length) : undefined,
-    fromEnd: convo.turns.slice(at + 1).filter((t) => t.role === "user").length,
-  });
+  if (!convo?.sessionId || at < 0) return;
+  const later = convo.turns.slice(at + 1).filter((t) => t.role === "user");
+  const sessionId = await mailApi.agentFork(
+    convo.provider,
+    convo.sessionId,
+    later[0] && {
+      requestId: later[0].id.startsWith("u-") ? later[0].id.slice("u-".length) : undefined,
+      fromEnd: later.length - 1,
+    },
+  );
   console.log("[AgentChat:fork]", { provider: convo.provider, from: convo.sessionId, sessionId });
   const fork: Conversation = {
     ...newConversation(convo.provider),
@@ -806,13 +810,9 @@ export async function forkChat(convoId: string, turnId: string): Promise<string 
     sessionId,
     sessionOwned: true,
     device: convo.device,
-    turns: convo.turns.slice(0, at),
+    turns: convo.turns.slice(0, at + 1).map((t, i) => (i === at ? { ...t, forked: true } : t)),
   };
-  set((s) => ({
-    conversations: [fork, ...s.conversations],
-    activeId: fork.id,
-    drafts: { ...s.drafts, [fork.id]: turn.text },
-  }));
+  set((s) => ({ conversations: [fork, ...s.conversations], activeId: fork.id }));
   return fork.id;
 }
 

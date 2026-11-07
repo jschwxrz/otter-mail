@@ -380,10 +380,10 @@ export async function deleteSession(kind: ProviderKind, sessionId: string): Prom
   await provider(kind).deleteSession(await agentSettings(kind), sessionId);
 }
 
-export async function forkSession(kind: ProviderKind, sessionId: string, at: ForkPoint) {
+export async function forkSession(kind: ProviderKind, sessionId: string, before?: ForkPoint) {
   const found = provider(kind);
   if (!found.fork) throw new Error(`${found.displayName} chats can't be forked.`);
-  return found.fork(await agentSettings(kind), sessionId, at);
+  return found.fork(await agentSettings(kind), sessionId, before);
 }
 
 export async function readFile(kind: ProviderKind, sessionId: string, href: string) {

@@ -259,7 +259,7 @@ export function ChatTranscript({
   loadImage: (href: string) => Promise<string>;
   onOpenContext: (item: { title: string; target: ChatChange["target"] }) => void;
   onOpenChange: (change: ChatChange) => Promise<void>;
-  /** Forks the chat from this message of yours; absent when the agent can't. */
+  /** Forks the chat after this reply; absent when the agent can't. */
   onFork?: (turnId: string) => void;
 }) {
   const [expandedFolds, setExpandedFolds] = useState<Set<string>>(() => new Set());
@@ -276,7 +276,7 @@ export function ChatTranscript({
       else next.add(id);
       return next;
     });
-  return turns.map((turn, index) => {
+  return turns.map((turn) => {
     if (turn.role === "user") {
       return (
         <MessageScroller.Item key={turn.id} messageId={turn.id}>
@@ -301,20 +301,7 @@ export function ChatTranscript({
               ))}
               {turn.text}
             </div>
-            <div className="flex">
-              {onFork && index > 0 && !streaming ? (
-                <HintTooltip label="Fork from here">
-                  <IconBtn
-                    label="Fork from here"
-                    className="size-6 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                    onClick={() => onFork(turn.id)}
-                  >
-                    <GitForkIcon className="size-3.5" />
-                  </IconBtn>
-                </HintTooltip>
-              ) : null}
-              {turn.text ? <CopyMessageButton text={turn.text} /> : null}
-            </div>
+            {turn.text ? <CopyMessageButton text={turn.text} /> : null}
           </div>
         </MessageScroller.Item>
       );
@@ -355,8 +342,19 @@ export function ChatTranscript({
                 <ChatMarkdown text={answer} onOpenFile={onOpenFile} loadImage={loadImage} />
               </div>
               {!live ? (
-                <div className="mt-1">
+                <div className="mt-1 flex">
                   <CopyMessageButton text={answer} />
+                  {onFork && !streaming ? (
+                    <HintTooltip label="Fork conversation">
+                      <IconBtn
+                        label="Fork conversation"
+                        className="size-6 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                        onClick={() => onFork(turn.id)}
+                      >
+                        <GitForkIcon className="size-3.5" />
+                      </IconBtn>
+                    </HintTooltip>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -365,6 +363,16 @@ export function ChatTranscript({
           {turn.error ? <ErrorRow message={turn.error} providerName={providerName} /> : null}
           {!live && turn.changes?.length ? (
             <ChatChanges changes={turn.changes} onOpen={onOpenChange} />
+          ) : null}
+          {turn.forked ? (
+            <div className="flex items-center gap-3 py-4 text-xs text-muted-foreground">
+              <div className="h-px flex-1 bg-border" />
+              <span className="flex items-center gap-1.5 rounded-full border px-3 py-1">
+                <GitForkIcon className="size-3.5" />
+                Forked from conversation
+              </span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
           ) : null}
         </div>
       </MessageScroller.Item>

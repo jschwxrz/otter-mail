@@ -43,6 +43,8 @@ export interface ChatTurn {
   attachments?: ChatSentAttachment[];
   citations?: { text: string; comment?: string }[];
   error?: string;
+  /** The chat was forked from another after this turn. */
+  forked?: boolean;
   startedAt?: number;
   finishedAt?: number;
 }

@@ -1616,13 +1616,21 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
     );
   },
 
-  async fork(settings, sessionId, at) {
+  async fork(settings, sessionId, before) {
     const g = await gateway(settings);
+    if (!before) {
+      const copy = await g.client.request<{ key: string }>("sessions.create", {
+        agentId: sessionId.match(/^agent:([^:]+):/)?.[1],
+        parentSessionKey: sessionId,
+        fork: true,
+      });
+      return copy.key;
+    }
     const result = await g.client.request<{ messages?: Record<string, unknown>[] }>(
       "chat.history",
       { sessionKey: sessionId, limit: 500 },
     );
-    const entryId = forkEntry(result.messages ?? [], at);
+    const entryId = forkEntry(result.messages ?? [], before);
     if (!entryId) throw new Error("OpenClaw doesn't have this message any more.");
     const forked = await g.client.request<{ sessionKey: string }>("sessions.fork", {
       sessionKey: sessionId,
