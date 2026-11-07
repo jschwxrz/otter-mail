@@ -12,7 +12,7 @@ import {
   type Session,
   type WebContents,
 } from "electron";
-import { installChromeWebStore } from "electron-chrome-web-store";
+import { installChromeWebStore, updateExtensions } from "electron-chrome-web-store";
 import * as path from "node:path";
 
 import { broadcast } from "../ipc.js";
@@ -55,9 +55,34 @@ export function setupBrowser(): void {
   ses.extensions.on("extension-unloaded", () => broadcast("browser:extensionsChanged"));
   // Before any extension loads, so each worker and page gets its chrome.action.
   setupExtensions(path.join(__dirname, "extensions-preload.cjs"));
-  installChromeWebStore({ session: ses, beforeInstall: confirmInstall }).catch((error: unknown) =>
-    logger.error("browser", "Chrome Web Store setup failed", { error: String(error) }),
+  // The library's own updater leaves its update check's rejection unhandled.
+  installChromeWebStore({ session: ses, beforeInstall: confirmInstall, autoUpdate: false }).then(
+    () => {
+      keepExtensionsUpdated(ses);
+      app.on("browser-window-focus", () => keepExtensionsUpdated(ses));
+      setInterval(() => keepExtensionsUpdated(ses), 60 * 60_000);
+    },
+    (error: unknown) =>
+      logger.error("browser", "Chrome Web Store setup failed", { error: String(error) }),
   );
+}
+
+const EXTENSION_UPDATE_INTERVAL_MS = 3 * 60 * 60_000;
+let lastExtensionUpdate = 0;
+
+export function keepExtensionsUpdated(ses: Session): void {
+  if (Date.now() - lastExtensionUpdate < EXTENSION_UPDATE_INTERVAL_MS) return;
+  lastExtensionUpdate = Date.now();
+  updateExtensions(ses).catch((error: unknown) => {
+    // Undici's fetch rejects with this when the network does: offline, a connect timeout.
+    if (error instanceof TypeError && error.message === "fetch failed") {
+      logger.warn("browser", "Couldn't check for extension updates", {
+        error: String(error.cause ?? error),
+      });
+    } else {
+      logger.error("browser", "Extension update failed", error);
+    }
+  });
 }
 
 async function openOutside(page: WebContents, url: string): Promise<void> {
