@@ -142,36 +142,33 @@ export function AgentSidebar({
 
   const row = (c: Conversation, shelf: ChatShelf) => {
     const selected = c.id === chatId;
-    let trailing: ReactNode;
+    const fresh = (unseen.has(c.id) || waiting.has(c.id)) && !selected;
+    let meta: ReactNode;
     if (runs[c.id] && shelf === "active") {
       const since = c.turns.at(-1)?.startedAt ?? c.updatedAt;
-      trailing = (
-        <span className="flex shrink-0 items-center gap-1 text-xs text-info">
+      meta = (
+        <span className="flex items-center gap-1 text-info">
           <LoaderCircleIcon className="size-3 animate-spin" />
           Working {workingFor(since, now)}
         </span>
       );
     } else if (shelf === "snoozed") {
-      trailing = (
-        <span className="flex shrink-0 items-center gap-1 text-xs text-info">
+      meta = (
+        <span className="flex items-center gap-1 text-info">
           <AlarmClockIcon className="size-3" />
           {wakesIn(c.snoozedUntil ?? now, now)}
         </span>
       );
-    } else if ((unseen.has(c.id) || waiting.has(c.id)) && !selected) {
-      trailing = <span aria-label="New" className="size-1.5 shrink-0 rounded-full bg-primary" />;
     } else {
-      trailing = (
-        <span className="shrink-0 text-xs text-sidebar-muted-foreground/80">
-          {formatAgo(shelf === "active" ? chatReturnedAt(c, now) : c.updatedAt)}
-        </span>
-      );
+      meta = waiting.has(c.id)
+        ? "Needs you"
+        : formatAgo(shelf === "active" ? chatReturnedAt(c, now) : c.updatedAt);
     }
     return (
       <ChatRowMenu key={c.id} chat={c} shelf={shelf} now={now}>
         <div
           className={cn(
-            "group/row flex h-8 w-full min-w-0 items-center rounded-lg pe-1 text-sm has-focus-visible:ring-2 has-focus-visible:ring-focus-ring",
+            "group/row relative flex w-full min-w-0 items-center rounded-lg has-focus-visible:ring-2 has-focus-visible:ring-focus-ring",
             selected
               ? "bg-sidebar-row-selected text-sidebar-foreground"
               : "text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
@@ -181,20 +178,32 @@ export function AgentSidebar({
             type="button"
             onClick={() => onSelect(c.id)}
             aria-current={selected ? "page" : undefined}
-            className="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2.5 ps-(--sidebar-row-content-inset) text-left outline-none"
+            className="flex min-w-0 flex-1 cursor-pointer items-start gap-2.5 py-1.5 ps-(--sidebar-row-content-inset) pe-(--sidebar-row-content-inset) text-left outline-none"
           >
             <AgentAvatar
               kind={c.provider}
               agent={openClawAgentId(c.sessionId)}
-              className="size-3.5 shrink-0"
+              className="mt-[3px] size-3.5 shrink-0"
             />
-            <span className="min-w-0 flex-1 truncate">{c.title}</span>
-            {/* At rest the time (or state); on hover, the row's actions in its place. */}
-            <span className="flex shrink-0 pe-(--sidebar-row-content-inset) group-hover/row:hidden group-has-[[data-state=open]]/row:hidden">
-              {trailing}
+            <span className="flex min-w-0 flex-1 flex-col group-hover/row:[mask-image:linear-gradient(to_left,transparent_6.5rem,black_9rem)] group-has-[[data-state=open]]/row:[mask-image:linear-gradient(to_left,transparent_6.5rem,black_9rem)]">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span
+                  className={cn(
+                    "min-w-0 flex-1 truncate text-sm",
+                    (selected || fresh) && "text-sidebar-foreground",
+                  )}
+                >
+                  {c.title}
+                </span>
+                {fresh ? (
+                  <span aria-label="New" className="size-1.5 shrink-0 rounded-full bg-primary" />
+                ) : null}
+              </span>
+              <span className="truncate text-xs text-sidebar-muted-foreground/80">{meta}</span>
             </span>
           </button>
-          <div className="hidden shrink-0 group-hover/row:flex group-has-[[data-state=open]]/row:flex">
+          {/* On hover, the row's actions over its end; the text fades out beneath them. */}
+          <div className="absolute inset-y-0 end-1 hidden items-center group-hover/row:flex group-has-[[data-state=open]]/row:flex">
             <ShelveActions chat={c} settled={shelf === "settled"} />
           </div>
         </div>

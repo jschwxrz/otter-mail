@@ -41,8 +41,8 @@ import {
   watchChat,
   type ChatTab,
 } from "./chat-store";
-import { formatAgo } from "./chat-history";
 import { ChatView } from "./chat-view";
+import { DitherBackdrop } from "./dither-backdrop";
 import { FilePreview } from "./attachment-preview";
 import { MessageReader } from "./message-reader";
 import { PanelTab } from "./panel-tab";
@@ -246,11 +246,18 @@ export function ChatWorkspace({
   const pageTabs = allPages.filter((t) => t.chatId === chatId);
 
   const blank = !convo || isBlank(convo);
+  // Kept after the first send, so the backdrop can fade out under the chat.
+  const [backdropShown, setBackdropShown] = useState(blank);
+  const [backdropChat, setBackdropChat] = useState(chatId);
+  if (backdropChat !== chatId) {
+    setBackdropChat(chatId);
+    setBackdropShown(blank);
+  } else if (blank && !backdropShown) setBackdropShown(true);
   const chat = (
     <ChatView
       chatId={chatId}
       context={context}
-      home={blank ? <RecentChats onSelect={onSelectChat} /> : undefined}
+      centered={blank}
       inputRef={inputRef}
       onOpenChange={openChange}
       onOpenFile={(href) => open({ kind: "file", href }, href.split(/[\\/]/).pop() || href)}
@@ -262,24 +269,44 @@ export function ChatWorkspace({
       <div
         style={panelOpen ? { flexBasis: width } : undefined}
         className={cn(
-          "flex min-h-0 flex-col",
+          "relative flex min-h-0 flex-col",
           panelOpen ? "min-w-[300px] shrink" : "min-w-0 flex-1",
+          blank &&
+            "[--chat-composer-blur:var(--glass-blur)] [--chat-composer-surface:color-mix(in_srgb,var(--canvas)_62%,transparent)]",
         )}
       >
-        {/* data-toolbar: the window's own drag strip steps back, so it can't swallow the tabs' clicks. */}
+        {backdropShown ? (
+          <DitherBackdrop
+            key={chatId}
+            className={cn(
+              "transition-opacity duration-700 ease-out",
+              blank ? "opacity-100" : "opacity-0",
+            )}
+            onTransitionEnd={() => {
+              if (!blank) setBackdropShown(false);
+            }}
+          />
+        ) : null}
+        {/* data-toolbar: the window's own drag strip steps back, so it can't swallow the tabs' clicks.
+            A new chat has no title of its own: its bar floats over the backdrop. */}
         <div
           data-toolbar=""
-          className="drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-2 px-4"
+          className={cn(
+            "drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-2 px-4",
+            blank ? "absolute inset-x-0 top-0 z-10" : "relative",
+          )}
         >
           {titleLeading}
           {blank ? (
-            <AgentAvatar />
+            <span className="flex-1" />
           ) : (
-            <AgentAvatar kind={convo.provider} agent={openClawAgentId(convo.sessionId)} />
+            <>
+              <AgentAvatar kind={convo.provider} agent={openClawAgentId(convo.sessionId)} />
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                {convo.title}
+              </span>
+            </>
           )}
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-            {blank ? "New chat" : convo.title}
-          </span>
           {panelOpen ? null : titleTrailing}
         </div>
         {chat}
@@ -402,40 +429,4 @@ function FileTab({ chatId, href }: { chatId: string; href: string }) {
   if (!file.data) return null;
   const data = file.data;
   return <FilePreview file={{ ...data, load: async () => data.data }} />;
-}
-
-function RecentChats({ onSelect }: { onSelect: (chatId: string) => void }) {
-  const conversations = useChats((s) => s.conversations);
-  const unseen = useChats((s) => s.unseen);
-  const recent = conversations
-    .filter((c) => !isBlank(c))
-    .toSorted((a, b) => b.updatedAt - a.updatedAt)
-    .slice(0, 8);
-  if (recent.length === 0) return null;
-  return (
-    <ul aria-label="Recent chats" className="flex flex-col">
-      {recent.map((c) => (
-        <li key={c.id}>
-          <button
-            type="button"
-            onClick={() => onSelect(c.id)}
-            className="flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-lg px-2 text-left text-sm text-muted-foreground outline-none hover:bg-foreground/[0.05] hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
-          >
-            <AgentAvatar
-              kind={c.provider}
-              agent={openClawAgentId(c.sessionId)}
-              className="size-3.5"
-            />
-            <span className={cn("min-w-0 flex-1 truncate", unseen.has(c.id) && "text-foreground")}>
-              {c.title}
-            </span>
-            {unseen.has(c.id) ? (
-              <span aria-label="New" className="size-1.5 shrink-0 rounded-full bg-primary" />
-            ) : null}
-            <span className="shrink-0 text-xs">{formatAgo(c.updatedAt)}</span>
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
 }
