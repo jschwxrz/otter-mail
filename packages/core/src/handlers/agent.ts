@@ -235,6 +235,14 @@ export function registerAgentHandlers(): void {
     );
   });
 
+  handle("agent:retitle", async (params: unknown) => {
+    const p = params as Params;
+    const title = str(p?.title).trim();
+    const message = str(p?.message).trim();
+    if (!title && !message) throw new Error("A title or a message is required.");
+    return agent.retitleSession(providerOf(p), sessionIdOf(p), title ? { title } : { message });
+  });
+
   handle("agent:browserView", async (params: unknown) => {
     const p = params as Params;
     const size = (key: string) =>

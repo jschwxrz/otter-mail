@@ -70,7 +70,7 @@ function selectedOf(settings: ProviderSettings): ProviderKind {
 
 const STALE_AFTER_MS = 5 * 60_000;
 
-type Checked = Omit<ProviderSnapshot, "settings" | "forks" | "liveBrowser">;
+type Checked = Omit<ProviderSnapshot, "settings" | "forks" | "titles" | "liveBrowser">;
 const checked = new Map<ProviderKind, Checked>();
 const checking = new Map<ProviderKind, Promise<void>>();
 /** Bumped when a check's answer may be stale before it lands (the Otter account changed). */
@@ -110,6 +110,7 @@ export async function providersState(): Promise<ProvidersState> {
         status: settings.enabled ? snapshot.status : "disabled",
         model: chosen || fallback || null,
         forks: Boolean(agent.fork),
+        titles: Boolean(agent.retitle),
         liveBrowser: Boolean(agent.browserView),
         settings: { ...settings, ...(await agent.settingsView?.(settings)) },
       } satisfies ProviderSnapshot;
@@ -387,6 +388,16 @@ export async function forkSession(kind: ProviderKind, sessionId: string, before?
   const found = provider(kind);
   if (!found.fork) throw new Error(`${found.displayName} chats can't be forked.`);
   return found.fork(await agentSettings(kind), sessionId, before);
+}
+
+export async function retitleSession(
+  kind: ProviderKind,
+  sessionId: string,
+  name: { title: string } | { message: string },
+): Promise<string | null> {
+  const found = provider(kind);
+  if (!found.retitle) throw new Error(`${found.displayName} chats can't be retitled.`);
+  return found.retitle(await agentSettings(kind), sessionId, name);
 }
 
 export async function browserView(
