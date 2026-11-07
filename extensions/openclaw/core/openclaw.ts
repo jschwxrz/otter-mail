@@ -1106,6 +1106,31 @@ const sent = new Set<string>();
 /** Sessions whose run yielded: the run that starts next is its continuation, followed where it was sent. */
 const continuing = new Set<string>();
 
+/**
+ * The gateway titles only its own apps' chats (`dashboard:`, `ios-`, `node-`
+ * keys) with its model; ours ask the same model, and keep the title as the
+ * session's label so the gateway's screens show it too.
+ */
+async function nameSession(
+  g: Gateway,
+  agentId: string,
+  sessionKey: string,
+  message: string,
+  named: (title: string) => void,
+): Promise<void> {
+  try {
+    const { title } = await g.client.request<{ title?: string | null }>("sessions.title.prepare", {
+      agentId,
+      message: message.slice(0, 1000),
+    });
+    if (!title) return;
+    named(title);
+    await g.client.request("sessions.patch", { key: sessionKey, label: title });
+  } catch (error) {
+    logger.info("agent", "openclaw title failed", { error: String(error) });
+  }
+}
+
 function announce(
   sessionKey: string,
   runId: string,
@@ -1355,6 +1380,9 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
       const agentId = settings.model || (await listAgents(g)).defaultId;
       sessionKey = `agent:${agentId}:otter-mail:${crypto.randomUUID()}`;
       emit({ requestId, type: "session", sessionId: sessionKey });
+      void nameSession(g, agentId, sessionKey, input.input, (title) =>
+        emit({ requestId, type: "title", title }),
+      );
     }
 
     let attachments: unknown[];

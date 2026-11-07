@@ -1057,6 +1057,12 @@ function notifyDelivered(run: Run): void {
 
 function onChatEvent(raw: unknown): void {
   const event = raw as ChatEvent;
+  if (event?.type === "title") {
+    const turnId = `a-${event.requestId}`;
+    const convo = get().conversations.find((c) => c.turns.some((t) => t.id === turnId));
+    if (convo) patchConversation(convo.id, (c) => ({ ...c, title: clampTitle(event.title) }));
+    return;
+  }
   const s = event
     ? Object.values(get().runs).find((r) => r.requestId === event.requestId)
     : undefined;

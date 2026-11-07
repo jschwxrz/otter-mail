@@ -159,6 +159,7 @@ export type ChatQuestion = {
 
 export type ChatEvent =
   | { requestId: string; type: "session"; sessionId: string }
+  | { requestId: string; type: "title"; title: string }
   | { requestId: string; type: "delta"; id?: string; text: string }
   | { requestId: string; type: "text"; id: string; text: string }
   | { requestId: string; type: "tool"; id?: string; step: ToolStep }
