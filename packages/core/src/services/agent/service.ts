@@ -416,6 +416,24 @@ export async function browserInput(kind: ProviderKind, input: BrowserInput) {
   await found.browserInput(await agentSettings(kind), input);
 }
 
+export async function browserEvents(
+  kind: ProviderKind,
+  request: { targetId: string; profile?: string; since?: number; run?: string; waitMs: number },
+) {
+  const found = provider(kind);
+  if (!found.browserEvents) return null;
+  return found.browserEvents(await agentSettings(kind), request);
+}
+
+export async function browserUpload(
+  kind: ProviderKind,
+  upload: { targetId: string; profile?: string; files: { name: string; data: string }[] },
+) {
+  const found = provider(kind);
+  if (!found.browserUpload) throw new Error(`${found.displayName}'s browser can't take files.`);
+  await found.browserUpload(await agentSettings(kind), upload);
+}
+
 export async function readFile(kind: ProviderKind, sessionId: string, href: string) {
   const found = provider(kind);
   if (!found.readFile)

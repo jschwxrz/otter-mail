@@ -18,7 +18,8 @@ function modifiers(event: KeyboardEvent | MouseEvent): number {
 /**
  * Sends what you do on the live view to the agent's tab, in page CSS px. Moves and wheel
  * turns are merged into one batch an animation frame; presses, keys and pastes go at once.
- * Returns the cleanup.
+ * Returns `send`, for what doesn't come from the canvas (a pop-up's answer, going back), and
+ * `detach`.
  */
 export function controlBrowser(
   canvas: HTMLCanvasElement,
@@ -31,7 +32,7 @@ export function controlBrowser(
     send: (seq: number, events: InputEvent[]) => Promise<unknown>;
     onLost: (error: unknown) => void;
   },
-): () => void {
+): { send: (event: InputEvent) => void; detach: () => void } {
   let seq = 0;
   let scheduled = 0;
   const queue: InputEvent[] = [];
@@ -163,15 +164,18 @@ export function controlBrowser(
   canvas.addEventListener("paste", onPaste);
   canvas.addEventListener("contextmenu", onContextMenu);
   canvas.focus({ preventScroll: true });
-  return () => {
-    flush();
-    canvas.removeEventListener("pointerdown", onPointerDown);
-    canvas.removeEventListener("pointermove", onPointerMove);
-    canvas.removeEventListener("pointerup", onPointerUp);
-    canvas.removeEventListener("wheel", onWheel);
-    canvas.removeEventListener("keydown", onKeyDown);
-    canvas.removeEventListener("keyup", onKeyUp);
-    canvas.removeEventListener("paste", onPaste);
-    canvas.removeEventListener("contextmenu", onContextMenu);
+  return {
+    send: (event) => push(event, true),
+    detach: () => {
+      flush();
+      canvas.removeEventListener("pointerdown", onPointerDown);
+      canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("pointerup", onPointerUp);
+      canvas.removeEventListener("wheel", onWheel);
+      canvas.removeEventListener("keydown", onKeyDown);
+      canvas.removeEventListener("keyup", onKeyUp);
+      canvas.removeEventListener("paste", onPaste);
+      canvas.removeEventListener("contextmenu", onContextMenu);
+    },
   };
 }

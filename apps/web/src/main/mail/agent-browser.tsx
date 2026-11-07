@@ -1,19 +1,44 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
   CloudIcon,
   GlobeIcon,
   LoaderCircleIcon,
   MonitorOffIcon,
   MousePointer2Icon,
+  RotateCwIcon,
 } from "lucide-react";
 import { mailApi, type ProviderKind } from "./api";
 import { controlBrowser } from "./agent-browser-input";
+import {
+  AgentCursor,
+  DialogBanner,
+  type PageDialog,
+  type PageField,
+  type PagePointer,
+  type Placer,
+} from "./agent-browser-overlay";
 import { faviconFor } from "../browser/browser-view";
-import { hostOf } from "../browser/store";
-import { HintTooltip, cn } from "./ui";
+import { addressToUrl, hostOf } from "../browser/store";
+import { useLatest } from "../use-latest";
+import { HintTooltip, IconBtn, cn } from "./ui";
+import { toast } from "./toast";
 
 /** Held tabs are let go a while after the last heartbeat, so a closed app never keeps one. */
 const HEARTBEAT_MS = 10_000;
+/** How long one request for what happens on the tab waits for something to. */
+const EVENTS_WAIT_MS = 20_000;
+/** Files travel to the gateway in one message. */
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+const toBase64 = async (file: File) => {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
+};
 
 type ViewState =
   | { status: "connecting"; page?: string }
@@ -81,6 +106,14 @@ export function AgentBrowser({
   const [tab, setTab] = useState<{ targetId: string; profile?: string } | null>(null);
   const [controlling, setControlling] = useState(false);
   const [controlError, setControlError] = useState<string | null>(null);
+  const [pointer, setPointer] = useState<PagePointer | null>(null);
+  const [field, setField] = useState<PageField | null>(null);
+  const [dialog, setDialog] = useState<PageDialog | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
+  const controlRef = useRef<{
+    send: (event: { type: string; [key: string]: unknown }) => void;
+  } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<ViewState>({ status: "connecting" });
   const [connection, setConnection] = useState(0);
   const visible = usePageVisible();
@@ -140,6 +173,7 @@ export function AgentBrowser({
             if (stopped) return;
             if (!view?.url) {
               targetRef.current = null;
+              setTab(null);
               setState({ status: "closed" });
               return;
             }
@@ -242,7 +276,7 @@ export function AgentBrowser({
   useEffect(() => onPage(page), [page, onPage]);
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!controlling || !live || !tab || !canvas) return;
+    if (!controlling || !tab || !canvas) return;
     const input = (request: { take?: boolean; seq?: number; events?: unknown[] }) =>
       mailApi.agentBrowserInput(provider, { ...tab, ...request });
     const lost = (error: unknown) => {
@@ -252,18 +286,131 @@ export function AgentBrowser({
     let held = true;
     input({ take: true }).catch(lost);
     const heartbeat = setInterval(() => input({ take: true }).catch(lost), HEARTBEAT_MS);
-    const detach = controlBrowser(canvas, {
+    const control = controlBrowser(canvas, {
       frameSize: () => frameRef.current,
       send: (seq, events) => input({ seq, events }),
       onLost: (error) => held && lost(error),
     });
+    controlRef.current = control;
     return () => {
       held = false;
+      controlRef.current = null;
       clearInterval(heartbeat);
-      detach();
+      control.detach();
       void input({ take: false }).catch(() => {});
     };
-  }, [controlling, live, tab, provider]);
+  }, [controlling, tab, provider]);
+
+  // What happens on the tab: the agent's pointer and typing, pop-ups, file pickers, copies.
+  const controllingRef = useLatest(controlling);
+  useEffect(() => {
+    // From the moment the tab is known: a page held up by a pop-up sends no frames until it's answered.
+    if (!tab) return;
+    let stopped = false;
+    let since: number | undefined;
+    let run: string | undefined;
+    let failures = 0;
+    const handle = (event: { type: string } & Record<string, unknown>) => {
+      const at = Date.now();
+      if (event.type === "pointer")
+        setPointer((p) => ({
+          x: event.x as number,
+          y: event.y as number,
+          clicks: (p?.clicks ?? 0) + (event.phase === "click" ? 1 : 0),
+          at,
+        }));
+      else if (event.type === "typing")
+        setField({
+          x: event.x as number,
+          y: event.y as number,
+          width: event.width as number,
+          height: event.height as number,
+          at,
+        });
+      else if (event.type === "dialog")
+        setDialog({
+          dialogType: String(event.dialogType),
+          message: String(event.message),
+          defaultPrompt: String(event.defaultPrompt ?? ""),
+        });
+      else if (event.type === "dialogClosed") setDialog(null);
+      else if (!controllingRef.current) return;
+      else if (event.type === "clipboard")
+        void navigator.clipboard.writeText(String(event.text)).catch(() => {});
+      else if (event.type === "fileChooser" && fileRef.current) {
+        fileRef.current.multiple = event.multiple === true;
+        fileRef.current.click();
+      }
+    };
+    void (async () => {
+      for (;;) {
+        if (stopped) return;
+        try {
+          const result = await mailApi.agentBrowserEvents(provider, {
+            ...tab,
+            since,
+            run,
+            waitMs: since === undefined ? 0 : EVENTS_WAIT_MS,
+          });
+          if (stopped || !result) return;
+          // A first answer, or the plugin started over: take its state as it is.
+          if (since === undefined || result.run !== run) setDialog(result.dialog);
+          run = result.run;
+          for (const event of result.events) handle(event);
+          since = result.seq;
+          failures = 0;
+        } catch (error) {
+          // A gateway being updated, or without the plugin's events yet: ask again, less often.
+          if (stopped) return;
+          failures += 1;
+          const later = /update the Otter plugin/.test(String(error)) ? 60_000 : 15_000;
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.min(1000 * 2 ** failures, later)),
+          );
+        }
+      }
+    })();
+    return () => {
+      stopped = true;
+    };
+  }, [tab, provider, controllingRef]);
+
+  const choose = async (files: File[]) => {
+    if (!tab) return;
+    const size = files.reduce((sum, f) => sum + f.size, 0);
+    if (size > MAX_UPLOAD_BYTES) {
+      toast.error("Those files are too large to send to the agent's browser (10 MB at most).");
+      files = [];
+    }
+    try {
+      const encoded = await Promise.all(
+        files.map(async (file) => ({ name: file.name, data: await toBase64(file) })),
+      );
+      await mailApi.agentBrowserUpload(provider, { ...tab, files: encoded });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't send the files.");
+    }
+  };
+
+  // Closing the picker without a file cancels the page's.
+  const chooseRef = useLatest(choose);
+  useEffect(() => {
+    const input = fileRef.current;
+    const cancel = () => void chooseRef.current([]);
+    input?.addEventListener("cancel", cancel);
+    return () => input?.removeEventListener("cancel", cancel);
+  }, [chooseRef]);
+
+  const place: Placer = (x, y) => {
+    const canvas = canvasRef.current;
+    const size = frameRef.current;
+    if (!canvas || !size || !canvas.width || !canvas.height) return null;
+    const fit = Math.min(canvas.clientWidth / canvas.width, canvas.clientHeight / canvas.height);
+    const left = (canvas.clientWidth - canvas.width * fit) / 2;
+    const scale = (canvas.width * fit) / size.cssWidth;
+    return { left: left + x * scale, top: y * scale, scale };
+  };
+  const send = (event: { type: string; [key: string]: unknown }) => controlRef.current?.send(event);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -278,13 +425,73 @@ export function AgentBrowser({
             {live ? <span className="size-1.5 rounded-full bg-red-500" aria-label="Live" /> : null}
           </span>
         </HintTooltip>
-        <div
-          title={page}
-          className="mx-auto flex h-8 min-w-0 max-w-[56rem] flex-1 items-center justify-center rounded-full bg-foreground/[0.06] px-4 text-sm text-foreground"
-        >
-          <span className="truncate">{page ? hostOf(page) : `${agentName}'s browser`}</span>
-        </div>
-        {live && tab ? (
+        {controlling ? (
+          <div className="flex shrink-0 items-center rounded-full bg-foreground/[0.06] p-0.5">
+            <HintTooltip label="Back" side="bottom">
+              <IconBtn
+                label="Back"
+                className="rounded-full"
+                onClick={() => send({ type: "history", delta: -1 })}
+              >
+                <ArrowLeftIcon className="size-4" />
+              </IconBtn>
+            </HintTooltip>
+            <HintTooltip label="Forward" side="bottom">
+              <IconBtn
+                label="Forward"
+                className="rounded-full"
+                onClick={() => send({ type: "history", delta: 1 })}
+              >
+                <ArrowRightIcon className="size-4" />
+              </IconBtn>
+            </HintTooltip>
+            <span aria-hidden className="mx-0.5 h-4 w-px bg-border" />
+            <HintTooltip label="Reload" side="bottom">
+              <IconBtn
+                label="Reload"
+                className="rounded-full"
+                onClick={() => send({ type: "reload" })}
+              >
+                <RotateCwIcon className="size-4" />
+              </IconBtn>
+            </HintTooltip>
+          </div>
+        ) : null}
+        {controlling ? (
+          <input
+            aria-label="Address"
+            placeholder="Enter a URL"
+            spellCheck={false}
+            autoComplete="off"
+            value={address ?? (page ? hostOf(page) : "")}
+            onFocus={(e) => {
+              setAddress(page ?? "");
+              const input = e.currentTarget;
+              requestAnimationFrame(() => input.select());
+            }}
+            onBlur={() => setAddress(null)}
+            onChange={(e) => setAddress(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") e.currentTarget.blur();
+              if (e.key !== "Enter") return;
+              const url = addressToUrl(address ?? "");
+              if (url) send({ type: "navigate", url });
+              e.currentTarget.blur();
+            }}
+            className={cn(
+              "mx-auto h-8 min-w-0 max-w-[56rem] flex-1 rounded-full bg-foreground/[0.06] px-4 text-sm text-foreground outline-none hover:bg-foreground/[0.09] focus:bg-foreground/[0.09]",
+              address === null ? "text-center" : "text-left",
+            )}
+          />
+        ) : (
+          <div
+            title={page}
+            className="mx-auto flex h-8 min-w-0 max-w-[56rem] flex-1 items-center justify-center rounded-full bg-foreground/[0.06] px-4 text-sm text-foreground"
+          >
+            <span className="truncate">{page ? hostOf(page) : `${agentName}'s browser`}</span>
+          </div>
+        )}
+        {tab ? (
           <button
             type="button"
             onClick={() => {
@@ -317,6 +524,31 @@ export function AgentBrowser({
             live ? "size-full object-contain object-top" : "invisible size-full",
             controlling && "cursor-default outline-none ring-2 ring-focus-ring ring-inset",
           )}
+        />
+        {live && !controlling ? (
+          <AgentCursor pointer={pointer} field={field} place={place} />
+        ) : null}
+        {dialog ? (
+          <DialogBanner
+            key={dialog.message}
+            dialog={dialog}
+            agentName={agentName}
+            controlling={controlling}
+            onAnswer={(accept, promptText) => {
+              send({ type: "dialog", accept, ...(promptText === undefined ? {} : { promptText }) });
+              setDialog(null);
+            }}
+          />
+        ) : null}
+        <input
+          ref={fileRef}
+          type="file"
+          hidden
+          onChange={(e) => {
+            const files = [...(e.currentTarget.files ?? [])];
+            e.currentTarget.value = "";
+            void choose(files);
+          }}
         />
         {state.status === "live" ? null : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center text-sm text-muted-foreground">

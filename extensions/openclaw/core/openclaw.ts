@@ -22,6 +22,7 @@ import type {
   ApprovalDecision,
   ApprovalRequest,
   BrowserView,
+  BrowserEvents,
   ChatEvent,
   ChatQuestion,
   ChatProvider,
@@ -541,6 +542,14 @@ function sendKeyOf(row: Record<string, unknown>): string | undefined {
   }
   const key = meta?.idempotencyKey ?? row.idempotencyKey;
   return typeof key === "string" ? key.replace(/:user$/, "") : undefined;
+}
+
+function pluginOutdated(error: unknown): never {
+  throw /unknown method/i.test(String(error))
+    ? new Error(
+        "To take control, update the Otter plugin on the OpenClaw gateway: openclaw plugins update @otterware/openclaw-otter",
+      )
+    : error;
 }
 
 /** The tab the session's agent browsed in last, as its browser tool reported it. */
@@ -1875,15 +1884,27 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
     await g.client
       .request(
         take === undefined ? "otter.browser.input" : "otter.browser.control",
-        take === undefined ? { targetId, profile, seq, events } : { targetId, take },
+        take === undefined ? { targetId, profile, seq, events } : { targetId, profile, take },
       )
-      .catch((error: unknown) => {
-        throw /unknown method/i.test(String(error))
-          ? new Error(
-              "To take control, update the Otter plugin on the OpenClaw gateway: openclaw plugins update @otterware/openclaw-otter",
-            )
-          : error;
-      });
+      .catch(pluginOutdated);
+  },
+
+  async browserEvents(settings, { targetId, profile, since, run, waitMs }) {
+    const g = await gateway(settings);
+    return g.client
+      .request<BrowserEvents>(
+        "otter.browser.events",
+        { targetId, profile, since, run, waitMs },
+        { timeoutMs: waitMs + 15_000 },
+      )
+      .catch(pluginOutdated);
+  },
+
+  async browserUpload(settings, { targetId, profile, files }) {
+    const g = await gateway(settings);
+    await g.client
+      .request("otter.browser.upload", { targetId, profile, files }, { timeoutMs: 60_000 })
+      .catch(pluginOutdated);
   },
 
   async deleteSession(settings, sessionId) {
