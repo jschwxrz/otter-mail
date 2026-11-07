@@ -234,6 +234,8 @@ export const chats = sqliteTable(
     updatedAt: integer({ mode: "timestamp_ms" }).notNull(),
     snoozedUntil: integer(),
     settledAt: integer(),
+    pinnedAt: integer(),
+    returnedAt: integer(),
     deletedAt: integer({ mode: "timestamp_ms" }),
   },
   (t) => [primaryKey({ columns: [t.userId, t.id] })],

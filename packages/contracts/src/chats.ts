@@ -77,6 +77,9 @@ export interface Chat {
   /** Out of the list until then, unless the agent needs you or finishes sooner. */
   snoozedUntil?: number | null;
   settledAt?: number | null;
+  pinnedAt?: number | null;
+  /** When you last made it, wrote in it or brought it back: where it sits in the list. */
+  returnedAt?: number | null;
   tabs: ChatTab[];
   turns: ChatTurn[];
 }
