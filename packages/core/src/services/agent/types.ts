@@ -50,6 +50,8 @@ export type ProviderSnapshot = {
   sessions: boolean;
   /** Whether a chat can be forked from one of your messages (`ChatProvider.fork`). */
   forks: boolean;
+  /** Its chats can be renamed on the agent, and titled again by its model. */
+  titles: boolean;
   /** Whether a chat's browser can be watched live (`ChatProvider.browserView`). */
   liveBrowser: boolean;
   /** The agent's settings, plus what its `settingsView` adds (never its secrets). */
@@ -250,7 +252,10 @@ export interface ChatProvider<S extends AgentSettings = AgentSettings> {
   checkStatus(
     settings: S,
   ): Promise<
-    Omit<ProviderSnapshot, "checkedAt" | "enabled" | "settings" | "forks" | "liveBrowser">
+    Omit<
+      ProviderSnapshot,
+      "checkedAt" | "enabled" | "settings" | "forks" | "titles" | "liveBrowser"
+    >
   >;
   sendTurn(input: SendTurnInput, settings: S, emit: Emit): Promise<void>;
   /**
@@ -283,6 +288,15 @@ export interface ChatProvider<S extends AgentSettings = AgentSettings> {
   listSessions(settings: S, limit: number): Promise<ChatSession[]>;
   readSession(settings: S, sessionId: string): Promise<ChatSessionMessage[]>;
   readFile?(settings: S, sessionId: string, href: string): Promise<ChatFile>;
+  /**
+   * Names the session: `title` as given, or one its model writes from `message`
+   * (null when it has none).
+   */
+  retitle?(
+    settings: S,
+    sessionId: string,
+    name: { title: string } | { message: string },
+  ): Promise<string | null>;
   /** A new session with what came before this message, or all of it: its id. */
   fork?(settings: S, sessionId: string, before?: ForkPoint): Promise<string>;
   /** Null when the session hasn't browsed, or its browser has closed. */

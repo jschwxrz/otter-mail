@@ -742,6 +742,28 @@ export async function shelveChat(
   patchConversation(id, (c) => ({ ...c, ...change, updatedAt: Date.now() }));
 }
 
+/** `onAgent`: the agent keeps chats' names too (its snapshot's `titles`). */
+export async function renameChat(id: string, title: string, onAgent: boolean): Promise<void> {
+  const name = title.trim();
+  if (!get().conversations.find((c) => c.id === id)?.loaded) await loadChat(id);
+  const convo = get().conversations.find((c) => c.id === id);
+  if (!convo || !name || name === convo.title) return;
+  patchConversation(id, (c) => ({ ...c, title: name, updatedAt: Date.now() }));
+  if (onAgent && convo.sessionId)
+    void mailApi.agentRetitle(convo.provider, convo.sessionId, { title: name }).catch(() => {});
+}
+
+/** Asks the chat's agent to title it again from its first message. */
+export async function regenerateTitle(id: string): Promise<void> {
+  if (!get().conversations.find((c) => c.id === id)?.loaded) await loadChat(id);
+  const convo = get().conversations.find((c) => c.id === id);
+  const message = convo?.turns.find((t) => t.role === "user")?.text.trim();
+  if (!convo?.sessionId || !message) return;
+  const title = await mailApi.agentRetitle(convo.provider, convo.sessionId, { message });
+  if (title)
+    patchConversation(id, (c) => ({ ...c, title: clampTitle(title), updatedAt: Date.now() }));
+}
+
 export function newChat(provider: ProviderKind): string {
   const blank = get().conversations.find(isBlank);
   if (blank) {
@@ -1060,7 +1082,12 @@ function onChatEvent(raw: unknown): void {
   if (event?.type === "title") {
     const turnId = `a-${event.requestId}`;
     const convo = get().conversations.find((c) => c.turns.some((t) => t.id === turnId));
-    if (convo) patchConversation(convo.id, (c) => ({ ...c, title: clampTitle(event.title) }));
+    if (convo)
+      patchConversation(convo.id, (c) => ({
+        ...c,
+        title: clampTitle(event.title),
+        updatedAt: Date.now(),
+      }));
     return;
   }
   const s = event

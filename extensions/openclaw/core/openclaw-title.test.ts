@@ -115,3 +115,36 @@ describe("a new OpenClaw chat's title", () => {
     await end();
   });
 });
+
+describe("retitling an OpenClaw chat", () => {
+  it("keeps a name given by hand as the session's label", async () => {
+    fixture.request.mockResolvedValue({});
+    await expect(
+      openClawProvider.retitle!(settings, "agent:main:otter-mail:c-1", { title: "Inbox plan" }),
+    ).resolves.toBe("Inbox plan");
+    expect(fixture.request).toHaveBeenCalledWith("sessions.patch", {
+      key: "agent:main:otter-mail:c-1",
+      label: "Inbox plan",
+    });
+    expect(fixture.request).not.toHaveBeenCalledWith("sessions.title.prepare", expect.anything());
+  });
+
+  it("asks the session's agent for a new title from the message", async () => {
+    fixture.request.mockImplementation(async (method: string) =>
+      method === "sessions.title.prepare" ? { title: "Separate work inboxes" } : {},
+    );
+    await expect(
+      openClawProvider.retitle!(settings, "agent:rowan:otter-mail:c-1", {
+        message: "Should I split my work into separate inboxes?",
+      }),
+    ).resolves.toBe("Separate work inboxes");
+    expect(fixture.request).toHaveBeenCalledWith("sessions.title.prepare", {
+      agentId: "rowan",
+      message: "Should I split my work into separate inboxes?",
+    });
+    expect(fixture.request).toHaveBeenCalledWith("sessions.patch", {
+      key: "agent:rowan:otter-mail:c-1",
+      label: "Separate work inboxes",
+    });
+  });
+});

@@ -1108,24 +1108,36 @@ const continuing = new Set<string>();
 
 /**
  * The gateway titles only its own apps' chats (`dashboard:`, `ios-`, `node-`
- * keys) with its model; ours ask the same model, and keep the title as the
- * session's label so the gateway's screens show it too.
+ * keys) with its model; ours ask the same model.
  */
+async function writeTitle(g: Gateway, sessionKey: string, message: string) {
+  const { title } = await g.client.request<{ title?: string | null }>("sessions.title.prepare", {
+    agentId: sessionKey.split(":")[1],
+    message: message.slice(0, 1000),
+  });
+  return title || null;
+}
+
+/** The session's label, so the gateway's screens show the title too; labels are unique there. */
+async function keepTitle(g: Gateway, sessionKey: string, title: string): Promise<void> {
+  try {
+    await g.client.request("sessions.patch", { key: sessionKey, label: title });
+  } catch (error) {
+    logger.info("agent", "openclaw label failed", { error: String(error) });
+  }
+}
+
 async function nameSession(
   g: Gateway,
-  agentId: string,
   sessionKey: string,
   message: string,
   named: (title: string) => void,
 ): Promise<void> {
   try {
-    const { title } = await g.client.request<{ title?: string | null }>("sessions.title.prepare", {
-      agentId,
-      message: message.slice(0, 1000),
-    });
+    const title = await writeTitle(g, sessionKey, message);
     if (!title) return;
     named(title);
-    await g.client.request("sessions.patch", { key: sessionKey, label: title });
+    await keepTitle(g, sessionKey, title);
   } catch (error) {
     logger.info("agent", "openclaw title failed", { error: String(error) });
   }
@@ -1380,7 +1392,7 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
       const agentId = settings.model || (await listAgents(g)).defaultId;
       sessionKey = `agent:${agentId}:otter-mail:${crypto.randomUUID()}`;
       emit({ requestId, type: "session", sessionId: sessionKey });
-      void nameSession(g, agentId, sessionKey, input.input, (title) =>
+      void nameSession(g, sessionKey, input.input, (title) =>
         emit({ requestId, type: "title", title }),
       );
     }
@@ -1543,6 +1555,13 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
 
   async listSkills() {
     return [];
+  },
+
+  async retitle(settings, sessionId, name) {
+    const g = await gateway(settings);
+    const title = "title" in name ? name.title : await writeTitle(g, sessionId, name.message);
+    if (title) await keepTitle(g, sessionId, title);
+    return title;
   },
 
   async listSessions(settings, limit) {

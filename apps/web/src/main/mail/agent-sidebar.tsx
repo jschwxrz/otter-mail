@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AlarmClockIcon,
   ChevronDownIcon,
@@ -9,7 +9,15 @@ import {
 } from "lucide-react";
 import { Input } from "~/components/ui/input";
 import { AgentAvatar, openClawAgentId, useAgentProviders } from "./agent-providers";
-import { isBlank, shelveChat, useChats, type Conversation } from "./chat-store";
+import { readableError } from "./add-mailbox";
+import {
+  isBlank,
+  regenerateTitle,
+  renameChat,
+  shelveChat,
+  useChats,
+  type Conversation,
+} from "./chat-store";
 import { formatAgo } from "./chat-history";
 import {
   chatReturnedAt,
@@ -34,6 +42,7 @@ import {
 } from "./menu";
 import { ShelveActions } from "./chat-shelve-actions";
 import { Section, SidebarBody } from "./sidebar-ui";
+import { toast } from "./toast";
 import { HintTooltip, cn } from "./ui";
 
 const SETTLED_FIRST = 10;
@@ -41,6 +50,9 @@ const SETTLED_PAGE = 25;
 
 const HEADER_BUTTON =
   "flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-sidebar-muted-foreground outline-none hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring";
+
+const ROW_BODY =
+  "flex min-w-0 flex-1 items-start gap-2.5 py-1.5 ps-(--sidebar-row-content-inset) pe-(--sidebar-row-content-inset) text-left outline-none";
 
 const AGENT_FILTER_KEY = "gmail:chat-agent-filter";
 
@@ -84,6 +96,8 @@ export function AgentSidebar({
     }
   });
   const [query, setQuery] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState<ReadonlySet<string>>(new Set());
   const pickAgent = (key: string | null) => {
     setAgentFilter(key);
     try {
@@ -142,6 +156,7 @@ export function AgentSidebar({
 
   const row = (c: Conversation, shelf: ChatShelf) => {
     const selected = c.id === chatId;
+    const titles = Boolean(providers.find((p) => p.kind === c.provider)?.titles);
     const fresh = (unseen.has(c.id) || waiting.has(c.id)) && !selected;
     let meta: ReactNode;
     if (runs[c.id] && shelf === "active") {
@@ -164,46 +179,118 @@ export function AgentSidebar({
         ? "Needs you"
         : formatAgo(shelf === "active" ? chatReturnedAt(c, now) : c.updatedAt);
     }
+    const renaming = editing === c.id;
+    const busy = regenerating.has(c.id);
+    const startRename = () => setEditing(c.id);
+    const body = (title: ReactNode) => (
+      <>
+        <AgentAvatar
+          kind={c.provider}
+          agent={openClawAgentId(c.sessionId)}
+          className="mt-[3px] size-3.5 shrink-0"
+        />
+        <span
+          className={cn(
+            "flex min-w-0 flex-1 flex-col",
+            !renaming &&
+              "group-hover/row:[mask-image:linear-gradient(to_left,transparent_6.5rem,black_9rem)] group-has-[[data-state=open]]/row:[mask-image:linear-gradient(to_left,transparent_6.5rem,black_9rem)]",
+          )}
+        >
+          <span className="flex min-w-0 items-center gap-1.5">
+            {title}
+            {fresh ? (
+              <span aria-label="New" className="size-1.5 shrink-0 rounded-full bg-primary" />
+            ) : null}
+          </span>
+          <span className="truncate text-xs text-sidebar-muted-foreground/80">{meta}</span>
+        </span>
+      </>
+    );
     return (
-      <ChatRowMenu key={c.id} chat={c} shelf={shelf} now={now}>
+      <ChatRowMenu
+        key={c.id}
+        chat={c}
+        shelf={shelf}
+        now={now}
+        titles={titles}
+        regenerating={busy}
+        onRename={startRename}
+        onRegenerate={() => {
+          setRegenerating((ids) => new Set(ids).add(c.id));
+          void regenerateTitle(c.id)
+            .catch((err: unknown) =>
+              toast.error("Couldn't regenerate the title", { description: readableError(err) }),
+            )
+            .finally(() =>
+              setRegenerating((ids) => {
+                const next = new Set(ids);
+                next.delete(c.id);
+                return next;
+              }),
+            );
+        }}
+      >
         <div
           className={cn(
-            "group/row relative flex w-full min-w-0 items-center rounded-lg has-focus-visible:ring-2 has-focus-visible:ring-focus-ring",
+            "group/row relative flex w-full min-w-0 items-center rounded-lg",
+            !renaming && "has-focus-visible:ring-2 has-focus-visible:ring-focus-ring",
             selected
               ? "bg-sidebar-row-selected text-sidebar-foreground"
               : "text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
           )}
         >
-          <button
-            type="button"
-            onClick={() => onSelect(c.id)}
-            aria-current={selected ? "page" : undefined}
-            className="flex min-w-0 flex-1 cursor-pointer items-start gap-2.5 py-1.5 ps-(--sidebar-row-content-inset) pe-(--sidebar-row-content-inset) text-left outline-none"
-          >
-            <AgentAvatar
-              kind={c.provider}
-              agent={openClawAgentId(c.sessionId)}
-              className="mt-[3px] size-3.5 shrink-0"
-            />
-            <span className="flex min-w-0 flex-1 flex-col group-hover/row:[mask-image:linear-gradient(to_left,transparent_6.5rem,black_9rem)] group-has-[[data-state=open]]/row:[mask-image:linear-gradient(to_left,transparent_6.5rem,black_9rem)]">
-              <span className="flex min-w-0 items-center gap-1.5">
+          {renaming ? (
+            <div className={ROW_BODY}>
+              {body(
+                <TitleInput
+                  title={c.title}
+                  onDone={(title) => {
+                    setEditing(null);
+                    if (title === null) return;
+                    if (!title.trim()) toast.warning("A chat's title can't be empty");
+                    else void renameChat(c.id, title, titles);
+                  }}
+                />,
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onSelect(c.id)}
+              onDoubleClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                e.preventDefault();
+                startRename();
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "F2") return;
+                e.preventDefault();
+                startRename();
+              }}
+              aria-current={selected ? "page" : undefined}
+              aria-busy={busy || undefined}
+              className={cn(ROW_BODY, "cursor-pointer")}
+            >
+              {body(
                 <span
                   className={cn(
                     "min-w-0 flex-1 truncate text-sm",
                     (selected || fresh) && "text-sidebar-foreground",
+                    busy && "opacity-55",
                   )}
                 >
                   {c.title}
-                </span>
-                {fresh ? (
-                  <span aria-label="New" className="size-1.5 shrink-0 rounded-full bg-primary" />
-                ) : null}
-              </span>
-              <span className="truncate text-xs text-sidebar-muted-foreground/80">{meta}</span>
-            </span>
-          </button>
+                </span>,
+              )}
+            </button>
+          )}
           {/* On hover, the row's actions over its end; the text fades out beneath them. */}
-          <div className="absolute inset-y-0 end-1 hidden items-center group-hover/row:flex group-has-[[data-state=open]]/row:flex">
+          <div
+            className={cn(
+              "absolute inset-y-0 end-1 hidden items-center",
+              !renaming && "group-hover/row:flex group-has-[[data-state=open]]/row:flex",
+            )}
+          >
             <ShelveActions chat={c} settled={shelf === "settled"} />
           </div>
         </div>
@@ -349,15 +436,57 @@ export function AgentSidebar({
   );
 }
 
+/** Mounted only while renaming; Enter and Escape unmount it, and that blur mustn't save again. */
+function TitleInput({ title, onDone }: { title: string; onDone: (title: string | null) => void }) {
+  const [value, setValue] = useState(title);
+  const done = useRef(false);
+  const finish = (title: string | null) => {
+    if (done.current) return;
+    done.current = true;
+    onDone(title);
+  };
+  return (
+    <input
+      autoFocus
+      value={value}
+      dir="auto"
+      aria-label="Chat title"
+      onChange={(e) => setValue(e.target.value)}
+      onFocus={(e) => e.currentTarget.select()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.nativeEvent.isComposing) return;
+        if (e.key === "Enter") {
+          e.preventDefault();
+          finish(value);
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          finish(null);
+        }
+      }}
+      onBlur={() => finish(value)}
+      className="-my-px min-w-0 flex-1 rounded-sm border border-input bg-card px-1 text-sm text-card-foreground outline-none focus:border-foreground"
+    />
+  );
+}
+
 function ChatRowMenu({
   chat,
   shelf,
   now,
+  titles,
+  regenerating,
+  onRename,
+  onRegenerate,
   children,
 }: {
   chat: Conversation;
   shelf: ChatShelf;
   now: number;
+  titles: boolean;
+  regenerating: boolean;
+  onRename: () => void;
+  onRegenerate: () => void;
   children: ReactNode;
 }) {
   const bringBack = () => void shelveChat(chat.id, { snoozedUntil: null, settledAt: null });
@@ -394,6 +523,13 @@ function ChatRowMenu({
             </ContextMenuItem>
           </>
         )}
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={onRename}>Rename</ContextMenuItem>
+        {titles && chat.sessionId ? (
+          <ContextMenuItem disabled={regenerating} onSelect={onRegenerate}>
+            {regenerating ? "Regenerating…" : "Regenerate title"}
+          </ContextMenuItem>
+        ) : null}
       </ContextMenuContent>
     </ContextMenu>
   );
