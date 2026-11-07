@@ -262,11 +262,22 @@ export function createBrowserControl({
   // Event numbers start over when the plugin does (an update, a gateway restart): say which run.
   const run = randomUUID();
 
+  let sweeper;
   const tabOf = (targetId) => {
     let tab = tabs.get(targetId);
     if (!tab) {
-      tab = { targetId, lock: null, events: [], seq: 0, waiters: new Set(), seen: now() };
+      tab = {
+        targetId,
+        lock: null,
+        events: [],
+        seq: 0,
+        waiters: new Set(),
+        seen: now(),
+        chain: Promise.resolve(),
+      };
       tabs.set(targetId, tab);
+      sweeper ??= setInterval(() => sweep(), IDLE_MS);
+      sweeper.unref?.();
     }
     return tab;
   };
@@ -278,6 +289,7 @@ export function createBrowserControl({
   };
   const unlock = (tab) => {
     clearTimeout(tab.lock?.gap);
+    for (const batch of tab.lock?.waiting.values() ?? []) batch.done();
     tab.lock = null;
     tab.chooser = null;
     void tab.page
@@ -287,11 +299,18 @@ export function createBrowserControl({
       )
       .catch(() => {});
   };
-  const sweep = () => {
+  /** Lets go of tabs nobody has held or watched for a while, and their DevTools connections. */
+  const sweep = (all = false) => {
     for (const [targetId, tab] of tabs) {
-      if (holding(targetId) || now() - tab.seen < IDLE_MS) continue;
+      if (!all && (holding(targetId) || now() - tab.seen < IDLE_MS)) continue;
+      if (tab.lock) unlock(tab);
+      for (const wake of tab.waiters) wake();
       tabs.delete(targetId);
       void tab.page?.then((page) => page.close()).catch(() => {});
+    }
+    if (tabs.size === 0 && sweeper) {
+      clearInterval(sweeper);
+      sweeper = undefined;
     }
   };
   const tell = (tab, event) => {
@@ -375,33 +394,40 @@ export function createBrowserControl({
     const call = cdpInput(event);
     if (call) page.send(...call);
   };
-  /** Replays what's in order; returns the replays, which the request waits for (see `input`). */
+  /**
+   * Replays the batches now in order, one after another for the tab: a pop-up's answer or a
+   * history move waits on a reply, and what follows must not overtake it.
+   */
   const flush = (tab, page) => {
     const lock = tab.lock;
     const missing = lock.next;
-    const replays = [];
     while (lock.waiting.has(lock.next)) {
-      for (const event of lock.waiting.get(lock.next))
-        replays.push(replay(tab, page, event).catch(() => {}));
+      const batch = lock.waiting.get(lock.next);
       lock.waiting.delete(lock.next);
       lock.next += 1;
+      tab.chain = tab.chain
+        .then(async () => {
+          for (const event of batch.events) await replay(tab, page, event).catch(() => {});
+        })
+        .finally(batch.done);
     }
     // A batch is missing: let it arrive, then go on without it. Batches arriving behind it
     // don't push that back.
-    if (lock.gap && lock.next === missing && lock.waiting.size > 0) return replays;
+    if (lock.gap && lock.next === missing && lock.waiting.size > 0) return;
     clearTimeout(lock.gap);
     lock.gap = undefined;
-    if (lock.waiting.size === 0) return replays;
+    if (lock.waiting.size === 0) return;
     lock.gap = setTimeout(() => {
       lock.gap = undefined;
       if (tab.lock !== lock) return;
       lock.next = Math.min(...lock.waiting.keys());
       flush(tab, page);
     }, GAP_MS);
-    return replays;
   };
 
   return {
+    /** The plugin is being replaced: let go of everything. */
+    dispose: () => sweep(true),
     /** Whether the agent's browser tool may run this call now: reads always, actions unless held. */
     allows: (params) =>
       READ_ACTIONS.has(params?.action) || ![...tabs.keys()].some((id) => holding(id)),
@@ -431,10 +457,14 @@ export function createBrowserControl({
       tab.seen = now();
       if (!Number.isInteger(seq) || seq < tab.lock.next || !Array.isArray(events)) return;
       const lock = tab.lock;
-      lock.waiting.set(seq, events.slice(0, 200));
+      // The request stays open until its batch is replayed: answering a pop-up goes through
+      // OpenClaw, which drops the call once the request that made it returns.
+      const replayed = new Promise((done) =>
+        lock.waiting.set(seq, { events: events.slice(0, 200), done }),
+      );
       const page = await pageOf(tab, targetId, profile);
-      // Answering a pop-up goes through OpenClaw, which drops the call once this request returns.
-      if (tab.lock === lock) await Promise.all(flush(tab, page));
+      if (tab.lock === lock) flush(tab, page);
+      await replayed;
     },
     /**
      * What happened on the tab since `since`, waiting up to `waitMs` for something to. Without

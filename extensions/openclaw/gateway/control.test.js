@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { CONTROL_TTL_MS, cdpInput, createBrowserControl } from "./control.js";
 
-const fixture = async () => {
+const fixture = async ({ answerDialog } = {}) => {
   let time = 1000;
   const sent = [];
   const calls = [];
@@ -24,6 +24,7 @@ const fixture = async () => {
   const uploads = await mkdtemp(path.join(tmpdir(), "otter-uploads-"));
   const control = createBrowserControl({
     cdpUrlFor: async () => "http://127.0.0.1:18800/",
+    answerDialog,
     connect: async () => page,
     now: () => time,
     uploads,
@@ -47,9 +48,11 @@ describe("taking control of the agent's browser", () => {
     await expect(control.input("tab", undefined, 1, [text("a")])).rejects.toThrow(/Take control/);
     await control.take("tab");
     expect(calls).toContainEqual(["Page.setInterceptFileChooserDialog", { enabled: true }]);
-    await control.input("tab", undefined, 2, [text("b")]);
+    const later = control.input("tab", undefined, 2, [text("b")]);
+    await vi.waitFor(() => expect(calls.length).toBeGreaterThan(0));
     expect(sent).toEqual([]);
     await control.input("tab", undefined, 1, [text("a")]);
+    await later;
     expect(sent.map(([, p]) => p.text)).toEqual(["a", "b"]);
   });
 
@@ -70,8 +73,8 @@ describe("taking control of the agent's browser", () => {
     await control.take("tab");
     const replayed = [];
     for (let seq = 2; seq <= 6; seq++) {
-      await control.input("tab", undefined, seq, [text(String(seq))]);
-      vi.advanceTimersByTime(50);
+      void control.input("tab", undefined, seq, [text(String(seq))]);
+      await vi.advanceTimersByTimeAsync(50);
       replayed.push(sent.length);
     }
     // Batch 1 never came: replay starts 150 ms in, while the rest keep arriving.
@@ -79,7 +82,7 @@ describe("taking control of the agent's browser", () => {
     vi.useRealTimers();
   });
 
-  it("goes back a page, and answers the page's pop-up", async () => {
+  it("goes back a page, and answers the page's pop-up, in the order you did", async () => {
     const { control, sent } = await fixture();
     await control.take("tab");
     await control.input("tab", undefined, 1, [
@@ -87,12 +90,31 @@ describe("taking control of the agent's browser", () => {
       { type: "dialog", accept: true, promptText: "yes" },
       { type: "navigate", url: "javascript:alert(1)" },
     ]);
-    await vi.waitFor(() =>
-      expect(sent).toEqual([
-        ["Page.handleJavaScriptDialog", { accept: true, promptText: "yes" }],
-        ["Page.navigateToHistoryEntry", { entryId: 7 }],
-      ]),
-    );
+    // Going back waits on the page's history; the answer after it doesn't overtake it.
+    expect(sent).toEqual([
+      ["Page.navigateToHistoryEntry", { entryId: 7 }],
+      ["Page.handleJavaScriptDialog", { accept: true, promptText: "yes" }],
+    ]);
+  });
+
+  it("keeps the request open until its batch is replayed, even one released after a gap", async () => {
+    vi.useFakeTimers();
+    let answeredWhileOpen = null;
+    let settled = false;
+    const { control } = await fixture({
+      answerDialog: async () => {
+        answeredWhileOpen = !settled;
+      },
+    });
+    await control.take("tab");
+    // Batch 1 never comes: batch 2 (an answer) goes after the gap, its request still open.
+    const request = control
+      .input("tab", undefined, 2, [{ type: "dialog", accept: true }])
+      .then(() => (settled = true));
+    await vi.advanceTimersByTimeAsync(200);
+    await request;
+    expect(answeredWhileOpen).toBe(true);
+    vi.useRealTimers();
   });
 
   it("tells whoever watches where the pointer went and what popped up, waiting until it does", async () => {

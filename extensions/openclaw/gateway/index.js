@@ -239,6 +239,7 @@ export default defineChannelPluginEntry({
         return url.href;
       },
     });
+    api.lifecycle?.onDispose?.(() => control.dispose());
     const targetOf = (params) => {
       if (typeof params?.targetId !== "string" || !params.targetId)
         throw new Error("targetId is required");
