@@ -1,8 +1,34 @@
 import { openClawStep } from "@otter-mail/core/extension-kit";
 import { describe, expect, it } from "vite-plus/test";
-import { forkEntry, normalizeOpenClawUrl, parseOpenClawSetupCode } from "./openclaw.js";
+import {
+  browserTabOf,
+  forkEntry,
+  normalizeOpenClawUrl,
+  parseOpenClawSetupCode,
+} from "./openclaw.js";
 
 describe("OpenClaw", () => {
+  it("watches the tab the chat's agent browsed in last, on the gateway's own browser", () => {
+    const tab = (targetId: string, target = "host") => ({
+      role: "toolResult",
+      toolName: "browser",
+      details: {
+        browserTab: { targetId, profile: "openclaw", target, url: `https://${targetId}` },
+      },
+    });
+    expect(browserTabOf([tab("a"), { role: "assistant" }, tab("b")])).toEqual({
+      targetId: "b",
+      profile: "openclaw",
+      url: "https://b",
+    });
+    expect(browserTabOf([tab("a"), tab("b", "node")])?.targetId).toBe("a");
+    expect(browserTabOf([{ role: "user" }])).toBeUndefined();
+  });
+
+  it("names OpenClaw's tools the same over MCP", () => {
+    expect(openClawStep("mcp__openclaw__browser", { action: "open" }).title).toBe("Browser");
+  });
+
   it("forks at the message sent with a request id, else counted from the last", () => {
     const sent = (id: string, key?: string) => ({
       role: "user",

@@ -21,6 +21,7 @@ import {
 import type {
   ApprovalDecision,
   ApprovalRequest,
+  BrowserView,
   ChatEvent,
   ChatQuestion,
   ChatProvider,
@@ -478,6 +479,22 @@ function sendKeyOf(row: Record<string, unknown>): string | undefined {
   const meta = row.__openclaw as { idempotencyKey?: unknown } | undefined;
   const key = meta?.idempotencyKey ?? row.idempotencyKey;
   return typeof key === "string" ? key.replace(/:user$/, "") : undefined;
+}
+
+/** The tab the session's agent browsed in last, as its browser tool reported it. */
+export function browserTabOf(
+  rows: Record<string, unknown>[],
+): { targetId: string; profile?: string; url?: string } | undefined {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const tab = (rows[i].details as { browserTab?: Record<string, unknown> } | undefined)
+      ?.browserTab;
+    if (typeof tab?.targetId === "string" && tab.target !== "node")
+      return {
+        targetId: tab.targetId,
+        profile: typeof tab.profile === "string" ? tab.profile : undefined,
+        url: typeof tab.url === "string" ? tab.url : undefined,
+      };
+  }
 }
 
 /** The entry `sessions.fork` takes for one of your messages. */
@@ -1637,6 +1654,39 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
       entryId,
     });
     return forked.sessionKey;
+  },
+
+  async browserView(settings, sessionId, { width, height, except }) {
+    const g = await gateway(settings);
+    const { messages = [] } = await g.client.request<{ messages?: Record<string, unknown>[] }>(
+      "chat.history",
+      { sessionKey: sessionId, limit: 200 },
+    );
+    // Without a tab in its history (runtimes that keep no tool results): the browser's current one.
+    const tab = browserTabOf(messages);
+    if (tab && tab.targetId === except) return { targetId: tab.targetId, url: null };
+    const view = await g.client
+      .request<{ wsPath: string; targetId?: string; url?: string }>("browser.request", {
+        method: "POST",
+        path: "/screencast",
+        ...(tab?.profile ? { query: { profile: tab.profile } } : {}),
+        body: { targetId: tab?.targetId, maxWidth: width, maxHeight: height, quality: 70 },
+      })
+      .catch((error: unknown) => {
+        // Its tabs are cleaned up after a while, or the browser was stopped.
+        if (/not running|not found|no such|closed/i.test(String(error))) return null;
+        throw error;
+      });
+    if (!view) return null;
+    const base = `${settings.url.replace(/\/$/, "")}/`;
+    const targetId = view.targetId ?? tab?.targetId;
+    if (!targetId) return null;
+    if (!tab && targetId === except) return { targetId, url: null };
+    return {
+      targetId,
+      url: new URL(view.wsPath.replace(/^\//, ""), base).href,
+      page: view.url ?? tab?.url,
+    } satisfies BrowserView;
   },
 
   async deleteSession(settings, sessionId) {

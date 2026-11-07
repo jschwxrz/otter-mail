@@ -50,6 +50,8 @@ export type ProviderSnapshot = {
   sessions: boolean;
   /** Whether a chat can be forked from one of your messages (`ChatProvider.fork`). */
   forks: boolean;
+  /** Whether a chat's browser can be watched live (`ChatProvider.browserView`). */
+  liveBrowser: boolean;
   /** The agent's settings, plus what its `settingsView` adds (never its secrets). */
   settings: AgentSettingsView;
 };
@@ -206,6 +208,14 @@ export type AgentRun = {
 /** One of your messages in a session: the one sent with `requestId`, else the `fromEnd`th from the last (0). */
 export type ForkPoint = { requestId?: string; fromEnd: number };
 
+/**
+ * A live view of the tab a session's agent browses in: `url` is a WebSocket of JPEG frames
+ * (OpenClaw's screencast), null when that tab is still `except`.
+ */
+export type BrowserView = { targetId: string; url: string | null; page?: string };
+
+export type BrowserViewRequest = { width: number; height: number; except?: string };
+
 export interface ChatProvider<S extends AgentSettings = AgentSettings> {
   readonly kind: ProviderKind;
   readonly displayName: string;
@@ -220,7 +230,9 @@ export interface ChatProvider<S extends AgentSettings = AgentSettings> {
   settingsView?(settings: S): Promise<Record<string, unknown>>;
   checkStatus(
     settings: S,
-  ): Promise<Omit<ProviderSnapshot, "checkedAt" | "enabled" | "settings" | "forks">>;
+  ): Promise<
+    Omit<ProviderSnapshot, "checkedAt" | "enabled" | "settings" | "forks" | "liveBrowser">
+  >;
   sendTurn(input: SendTurnInput, settings: S, emit: Emit): Promise<void>;
   /**
    * Picks up a run sent earlier with this request id, which the panel lost
@@ -254,6 +266,12 @@ export interface ChatProvider<S extends AgentSettings = AgentSettings> {
   readFile?(settings: S, sessionId: string, href: string): Promise<ChatFile>;
   /** A new session with what came before this message, or all of it: its id. */
   fork?(settings: S, sessionId: string, before?: ForkPoint): Promise<string>;
+  /** Null when the session hasn't browsed, or its browser has closed. */
+  browserView?(
+    settings: S,
+    sessionId: string,
+    request: BrowserViewRequest,
+  ): Promise<BrowserView | null>;
   deleteSession(settings: S, sessionId: string): Promise<void>;
   shutdown(): void;
 }
