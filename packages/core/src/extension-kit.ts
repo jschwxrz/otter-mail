@@ -77,6 +77,7 @@ export type {
   ChatSession,
   ChatSessionMessage,
   Emit,
+  ForkPoint,
   ProviderModel,
   ProviderModelOption,
   ProviderSettings,

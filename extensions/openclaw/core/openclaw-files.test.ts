@@ -100,6 +100,32 @@ describe("OpenClaw image previews", () => {
     expect(file.data).toBe(btoa("pixels"));
   });
 
+  it("opens a PDF the gateway won't send through the Otter plugin", async () => {
+    fixture.request.mockImplementation(async (method: string) =>
+      method === "sessions.files.get"
+        ? { file: { name: "lease.pdf", previewKind: "unsupported", mimeType: "application/pdf" } }
+        : { file: { name: "lease.pdf", content: btoa("%PDF") } },
+    );
+    const file = await openClawProvider.readFile!(settings, "session", "artifacts/lease.pdf");
+    expect(fixture.request).toHaveBeenLastCalledWith("otter.files.get", {
+      sessionKey: "session",
+      path: "artifacts/lease.pdf",
+    });
+    expect(file).toMatchObject({
+      name: "lease.pdf",
+      mimeType: "application/pdf",
+      data: btoa("%PDF"),
+    });
+
+    fixture.request.mockImplementation(async (method: string) => {
+      if (method === "sessions.files.get") return { file: { name: "lease.pdf" } };
+      throw new Error("unknown method: otter.files.get");
+    });
+    await expect(
+      openClawProvider.readFile!(settings, "session", "artifacts/lease.pdf"),
+    ).rejects.toThrow("update the Otter plugin");
+  });
+
   it("reports denied or unavailable media without treating a remote path as a local file", async () => {
     fixture.request.mockResolvedValue({ assets: [{ error: "outside_session_boundary" }] });
     await expect(
