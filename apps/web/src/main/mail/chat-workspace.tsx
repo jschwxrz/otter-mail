@@ -12,6 +12,7 @@ import {
   FilePenLineIcon,
   GlobeIcon,
   MailIcon,
+  MonitorPlayIcon,
   PlusIcon,
   TriangleAlertIcon,
 } from "lucide-react";
@@ -41,6 +42,7 @@ import {
   watchChat,
   type ChatTab,
 } from "./chat-store";
+import { AgentBrowser } from "./agent-browser";
 import { ChatView } from "./chat-view";
 import { DitherBackdrop } from "./dither-backdrop";
 import { FilePreview } from "./attachment-preview";
@@ -54,6 +56,8 @@ import { HintTooltip, cn } from "./ui";
 export type ChatPanelControl = { toggle: () => void; newPage: () => void };
 
 const TAB_ICONS = { thread: MailIcon, draft: FilePenLineIcon, page: GlobeIcon, file: FileIcon };
+/** The agent's browser, live: a tab of this device's, not one the chat keeps. */
+const LIVE_TAB = "agent-browser";
 
 function useTabMessage(ref: ChatTabRef | undefined) {
   const mail = ref?.kind === "thread" || ref?.kind === "draft" ? ref : null;
@@ -132,7 +136,25 @@ export function ChatWorkspace({
   const activeTab = useChats((s) => s.activeTabs[chatId]);
   const { selectedKind } = useChatProvider(undefined);
   const tabs = (convo?.tabs ?? []).filter((t) => features.browser || t.ref.kind !== "page");
-  const shown = tabs.find((t) => t.id === activeTab) ?? tabs.at(-1);
+  const chatAgent = useChatProvider(convo);
+  const browserSteps = useChats((s) => {
+    let steps = 0;
+    for (const turn of s.conversations.find((c) => c.id === chatId)?.turns ?? [])
+      for (const item of turn.items ?? [])
+        if (item.kind === "step" && item.step.title === "Browser") steps++;
+    return steps;
+  });
+  const run = useChats((s) => s.runs[chatId]?.requestId);
+  const [liveClosed, setLiveClosed] = useState<string | null>(null);
+  const liveSession =
+    chatAgent.provider?.liveBrowser && convo?.sessionId && browserSteps > 0 && liveClosed !== chatId
+      ? convo.sessionId
+      : null;
+  const liveShown = liveSession !== null && (activeTab === LIVE_TAB || tabs.length === 0);
+  const agentName =
+    chatAgent.provider?.models.find((m) => m.slug === openClawAgentId(liveSession))?.name ??
+    chatAgent.name;
+  const shown = liveShown ? undefined : (tabs.find((t) => t.id === activeTab) ?? tabs.at(-1));
   const message = useTabMessage(shown?.ref);
   const mail = shown?.ref.kind === "thread" || shown?.ref.kind === "draft" ? shown.ref : null;
   const context = useMailChatContext({
@@ -177,6 +199,10 @@ export function ChatWorkspace({
   };
   useEffect(() => {
     closeTabRef.current = () => {
+      if (liveShown) {
+        setLiveClosed(chatId);
+        return true;
+      }
       if (!shown) return false;
       close(shown);
       return true;
@@ -219,7 +245,19 @@ export function ChatWorkspace({
   } = usePanelTabDrag((order) => reorderChatTabs(chatId, order));
 
   const [panelHidden, setPanelHidden] = useState(false);
-  const panelOpen = tabs.length > 0 && !panelHidden;
+  const panelOpen = (tabs.length > 0 || liveSession !== null) && !panelHidden;
+  // The agent starts browsing in a turn you're watching: show it, once a turn.
+  const seenSteps = useRef({ chatId, browserSteps, shownFor: "" });
+  useEffect(() => {
+    const seen = seenSteps.current;
+    seenSteps.current = { ...seen, chatId, browserSteps };
+    if (seen.chatId !== chatId || browserSteps <= seen.browserSteps) return;
+    if (!run || seen.shownFor === run) return;
+    seenSteps.current.shownFor = run;
+    setLiveClosed(null);
+    showChatTab(chatId, LIVE_TAB);
+    setPanelHidden(false);
+  }, [chatId, browserSteps, run]);
   const newPage = () => {
     if (!features.browser) return;
     openChatTab(chatId, { kind: "page", url: "" }, "New tab");
@@ -331,6 +369,17 @@ export function ChatWorkspace({
                 className="no-drag scroll-fade-x relative flex min-w-0 shrink items-center gap-1 overflow-x-auto [scrollbar-width:none]"
                 {...handlers}
               >
+                {liveSession ? (
+                  <PanelTab
+                    id={LIVE_TAB}
+                    title="Browser"
+                    tooltip={`${agentName}'s browser, live`}
+                    selected={liveShown}
+                    onSelect={() => showChatTab(chatId, LIVE_TAB)}
+                    onClose={() => setLiveClosed(chatId)}
+                    icon={<MonitorPlayIcon className="size-3.5" />}
+                  />
+                ) : null}
                 {tabs.map((tab) => {
                   const Icon = TAB_ICONS[tab.ref.kind];
                   const page =
@@ -369,6 +418,15 @@ export function ChatWorkspace({
               {titleTrailing}
             </div>
             <div className="relative flex min-h-0 flex-1 flex-col">
+              {liveShown && convo ? (
+                <AgentBrowser
+                  key={liveSession}
+                  provider={convo.provider}
+                  sessionId={liveSession}
+                  agentName={agentName}
+                  activity={browserSteps}
+                />
+              ) : null}
               {shown && (shown.ref.kind === "thread" || shown.ref.kind === "draft") ? (
                 message.error ? (
                   <TabProblem message={message.error.message} />

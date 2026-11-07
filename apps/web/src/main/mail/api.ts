@@ -105,6 +105,7 @@ export type ProviderSnapshot = {
   model: string | null;
   sessions: boolean;
   forks: boolean;
+  liveBrowser: boolean;
   /** The agent's settings, plus what it adds for its settings form (never its secrets). */
   settings: AgentSettingsView;
 };
@@ -679,6 +680,13 @@ export const mailApi = {
     sessionId: string,
     before?: { requestId?: string; fromEnd: number },
   ): Promise<string> => ipc("agent:fork", { provider, sessionId, before }),
+
+  agentBrowserView: (
+    provider: ProviderKind,
+    sessionId: string,
+    request: { width: number; height: number; except?: string },
+  ): Promise<{ targetId: string; url: string | null; page?: string } | null> =>
+    ipc("agent:browserView", { provider, sessionId, ...request }),
 
   agentDeleteSession: (provider: ProviderKind, sessionId: string): Promise<{ ok: boolean }> =>
     ipc("agent:deleteSession", { provider, sessionId }),

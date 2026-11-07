@@ -205,6 +205,9 @@ export function hermesStep(name: string, args: unknown): ToolStep {
 }
 
 export function openClawStep(name: string, args: unknown): ToolStep {
+  // Runtimes that call OpenClaw's tools over MCP (claude-cli) name them with its server's prefix.
+  if (name.startsWith("mcp__openclaw__"))
+    return openClawStep(name.slice("mcp__openclaw__".length), args);
   const wrapped = args as { id?: unknown; args?: unknown } | null;
   if (name === "tool_call" && typeof wrapped?.id === "string")
     return openClawStep(wrapped.id, wrapped.args);

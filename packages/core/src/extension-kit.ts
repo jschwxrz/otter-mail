@@ -70,6 +70,8 @@ export type {
   AgentRun,
   ApprovalDecision,
   ApprovalRequest,
+  BrowserView,
+  BrowserViewRequest,
   ChatAttachment,
   ChatEvent,
   ChatProvider,

@@ -235,6 +235,17 @@ export function registerAgentHandlers(): void {
     );
   });
 
+  handle("agent:browserView", async (params: unknown) => {
+    const p = params as Params;
+    const size = (key: string) =>
+      Math.round(Math.min(Math.max(Number(p?.[key]) || 1280, 320), 2000));
+    return agent.browserView(providerOf(p), sessionIdOf(p), {
+      width: size("width"),
+      height: size("height"),
+      except: str(p?.except) || undefined,
+    });
+  });
+
   handle("agent:deleteSession", async (params: unknown) => {
     const p = params as Params;
     await agent.deleteSession(providerOf(p), sessionIdOf(p));
