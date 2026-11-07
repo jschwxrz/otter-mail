@@ -252,8 +252,8 @@ export interface ChatProvider<S extends AgentSettings = AgentSettings> {
   listSessions(settings: S, limit: number): Promise<ChatSession[]>;
   readSession(settings: S, sessionId: string): Promise<ChatSessionMessage[]>;
   readFile?(settings: S, sessionId: string, href: string): Promise<ChatFile>;
-  /** A new session with what came before this message: its id. */
-  fork?(settings: S, sessionId: string, at: ForkPoint): Promise<string>;
+  /** A new session with what came before this message, or all of it: its id. */
+  fork?(settings: S, sessionId: string, before?: ForkPoint): Promise<string>;
   deleteSession(settings: S, sessionId: string): Promise<void>;
   shutdown(): void;
 }

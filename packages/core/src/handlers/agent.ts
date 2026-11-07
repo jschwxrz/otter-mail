@@ -223,11 +223,16 @@ export function registerAgentHandlers(): void {
 
   handle("agent:fork", async (params: unknown) => {
     const p = params as Params;
-    const fromEnd = Number(p?.fromEnd);
-    return agent.forkSession(providerOf(p), sessionIdOf(p), {
-      requestId: str(p?.requestId) || undefined,
-      fromEnd: Number.isInteger(fromEnd) && fromEnd >= 0 ? fromEnd : 0,
-    });
+    const before = p?.before as Params | undefined;
+    const fromEnd = Number(before?.fromEnd);
+    return agent.forkSession(
+      providerOf(p),
+      sessionIdOf(p),
+      before && {
+        requestId: str(before.requestId) || undefined,
+        fromEnd: Number.isInteger(fromEnd) && fromEnd >= 0 ? fromEnd : 0,
+      },
+    );
   });
 
   handle("agent:deleteSession", async (params: unknown) => {
