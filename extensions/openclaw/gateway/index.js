@@ -1,4 +1,3 @@
-import { AsyncResource } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import {
   createChannelPluginBase,
@@ -6,6 +5,7 @@ import {
   defineChannelPluginEntry,
 } from "openclaw/plugin-sdk/channel-core";
 import { toInboundMediaFacts } from "openclaw/plugin-sdk/channel-inbound";
+import { runInDetachedAsyncContext } from "openclaw/plugin-sdk/concurrency-runtime";
 import { defineStableChannelIngressIdentity } from "openclaw/plugin-sdk/channel-ingress-runtime";
 import { resolveAgentWorkspaceDir } from "openclaw/plugin-sdk/agent-runtime";
 import { dispatchGatewayMethod } from "openclaw/plugin-sdk/gateway-method-runtime";
@@ -25,12 +25,6 @@ import {
   sessionOf,
   tell,
 } from "./otter.js";
-
-/**
- * Where a message sent from Otter starts its run: outside the request that carried it,
- * so the run is the channel's owner's and not that connection's, and outlives it.
- */
-const receiving = new AsyncResource("otter-inbound");
 
 const owner = defineStableChannelIngressIdentity({
   key: "otter-sender",
@@ -169,7 +163,10 @@ export default defineChannelPluginEntry({
         const cfg = context?.getRuntimeConfig?.() ?? api.config;
         if (!isOwnerConfigured(cfg)) throw new Error("otter_not_owner");
         const message = messageOf(params);
-        receiving.runInAsyncScope(() =>
+        // The run starts outside the request that carried it (the gateway's context-free root,
+        // whatever request loaded this plugin), so it's the channel owner's, not that
+        // connection's, and outlives it.
+        runInDetachedAsyncContext(() =>
           runDetachedWebhookWork(() => receive(api, cfg, message)).catch((error) =>
             api.logger?.warn?.(`otter: a message from Otter failed: ${String(error)}`),
           ),
