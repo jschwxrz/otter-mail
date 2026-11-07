@@ -640,6 +640,8 @@ const chatBody = z.object({
   updatedAt: timestamp,
   snoozedUntil: timestamp.nullish(),
   settledAt: timestamp.nullish(),
+  pinnedAt: timestamp.nullish(),
+  returnedAt: timestamp.nullish(),
   tabs: z
     .array(
       z.object({

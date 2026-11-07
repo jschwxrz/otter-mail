@@ -1,6 +1,6 @@
-import type { Chat } from "@otter-mail/contracts/chats";
+import type { Chat, ChatTab } from "@otter-mail/contracts/chats";
 
-export type ChatShelf = "active" | "snoozed" | "settled";
+export type ChatShelf = "pinned" | "active" | "snoozed" | "settled";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -9,23 +9,31 @@ export const SETTLE_AFTER_MS = 7 * DAY_MS;
 /**
  * `working`: a turn runs in it here, so it doesn't settle for being idle.
  * `needsYou`: the agent asks for an approval or an answer, which outranks a
- * snooze or settling.
+ * snooze or settling. A pinned chat never settles on its own.
  */
 export function chatShelf(
-  chat: Pick<Chat, "updatedAt" | "snoozedUntil" | "settledAt">,
+  chat: Pick<Chat, "updatedAt" | "snoozedUntil" | "settledAt" | "pinnedAt">,
   { working, needsYou, now }: { working: boolean; needsYou: boolean; now: number },
 ): ChatShelf {
-  if (needsYou) return "active";
+  const pinned = chat.pinnedAt != null;
+  if (needsYou) return pinned ? "pinned" : "active";
   if (chat.snoozedUntil != null && chat.snoozedUntil > now) return "snoozed";
   if (chat.settledAt != null) return "settled";
+  if (pinned) return "pinned";
   if (!working && now - chat.updatedAt > SETTLE_AFTER_MS) return "settled";
   return "active";
 }
 
-/** When it last came back to you: a snooze that ran out brings it back to the top. */
-export function chatReturnedAt(chat: Pick<Chat, "updatedAt" | "snoozedUntil">, now: number) {
+/**
+ * Where it sits among the active chats: when you made it, wrote in it or
+ * brought it back, or its snooze ran out. Replies, renames and tabs don't move it.
+ */
+export function chatReturnedAt(
+  chat: Pick<Chat, "updatedAt" | "returnedAt" | "snoozedUntil">,
+  now: number,
+) {
   const woke = chat.snoozedUntil != null && chat.snoozedUntil <= now ? chat.snoozedUntil : 0;
-  return Math.max(chat.updatedAt, woke);
+  return Math.max(chat.returnedAt ?? chat.updatedAt, woke);
 }
 
 export type SnoozePreset = { id: string; label: string; when: string; until: number };
@@ -74,9 +82,27 @@ export function wakesIn(until: number, now: number): string {
   return `${Math.ceil(left / DAY_MS)}d`;
 }
 
-export function workingFor(since: number, now: number): string {
-  const secs = Math.max(0, Math.floor((now - since) / 1000));
-  if (secs < 60) return `${secs}s`;
-  if (secs < 3600) return `${Math.floor(secs / 60)}m`;
-  return `${Math.floor(secs / 3600)}h`;
+export function shortAgo(at: number, now: number): string {
+  const mins = Math.floor((now - at) / 60_000);
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return days < 7 ? `${days}d` : `${Math.floor(days / 7)}w`;
+}
+
+const TAB_NOUNS = [
+  ["draft", "draft"],
+  ["thread", "email"],
+  ["file", "file"],
+  ["page", "page"],
+] as const;
+
+/** What the chat used and made, from its tabs: "1 draft · 3 emails". */
+export function tabsSummary(tabs: ChatTab[]): string {
+  return TAB_NOUNS.flatMap(([kind, noun]) => {
+    const n = tabs.filter((t) => t.ref.kind === kind).length;
+    return n ? [`${n} ${noun}${n === 1 ? "" : "s"}`] : [];
+  }).join(" · ");
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { AlarmClockIcon, CheckIcon, UndoIcon } from "lucide-react";
-import { shelveChat, type Conversation } from "./chat-store";
+import { AlarmClockIcon, CheckIcon, PinIcon, PinOffIcon, UndoIcon } from "lucide-react";
+import { pinChat, shelveChat, type Conversation } from "./chat-store";
 import { snoozePresets } from "./chat-shelves";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./menu";
 import { cn } from "./ui";
@@ -20,6 +20,7 @@ export function ShelveActions({
   onDone?: () => void;
 }) {
   const action = cn(ACTION, compact && "h-5 px-1");
+  const pinned = chat.pinnedAt != null;
   const [openedAt, setOpenedAt] = useState(0);
   if (settled)
     return (
@@ -36,6 +37,15 @@ export function ShelveActions({
     );
   return (
     <div className="flex shrink-0 items-center gap-0.5">
+      <button
+        type="button"
+        aria-label={pinned ? "Unpin" : "Pin"}
+        title={pinned ? "Unpin" : "Pin"}
+        className={action}
+        onClick={() => void pinChat(chat.id, !pinned)}
+      >
+        {pinned ? <PinOffIcon className="size-3.5" /> : <PinIcon className="size-3.5" />}
+      </button>
       <DropdownMenu onOpenChange={(open) => open && setOpenedAt(Date.now())}>
         <DropdownMenuTrigger asChild>
           <button type="button" aria-label="Snooze" title="Snooze" className={action}>

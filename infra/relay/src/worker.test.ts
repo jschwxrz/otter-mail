@@ -1309,6 +1309,8 @@ describe("chats", () => {
     updatedAt: 2_000,
     snoozedUntil: 5_000,
     settledAt: null,
+    pinnedAt: 3_000,
+    returnedAt: 2_500,
     tabs: [
       {
         id: "thread:me@example.com:t1",

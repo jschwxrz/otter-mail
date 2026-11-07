@@ -91,6 +91,9 @@ const ACTIVE_TABS_KEY = "gmail:chat-active-tabs";
 const DOCKED_KEY = "gmail:chat-docked";
 const MAX_DOCKED = 5;
 const OPEN_REQUESTS_KEY = "gmail:chat-open-requests";
+const DRAFTS_KEY = "gmail:chat-drafts";
+/** New chats with a draft in them: they aren't saved anywhere else until their first message. */
+const NEW_DRAFTS_KEY = "gmail:chat-new-drafts";
 // Chats were kept here before they synced; they start over.
 localStorage.removeItem("gmail:hermes-chat:v2");
 localStorage.removeItem("gmail:panel-tabs");
@@ -121,6 +124,7 @@ function newConversation(provider: ProviderKind = "openrouter"): Conversation {
     device: null,
     createdAt: now,
     updatedAt: now,
+    returnedAt: now,
     tabs: [],
     turns: [],
     loaded: true,
@@ -128,6 +132,16 @@ function newConversation(provider: ProviderKind = "openrouter"): Conversation {
 }
 
 export const isBlank = (c: Conversation) => c.loaded && c.turns.length === 0;
+
+export const hasDraft = (drafts: Record<string, string>, id: string) => Boolean(drafts[id]?.trim());
+
+type NewDraft = Pick<Conversation, "id" | "provider" | "createdAt">;
+
+function restoreNewDrafts(drafts: Record<string, string>): Conversation[] {
+  return readJson<NewDraft[]>(NEW_DRAFTS_KEY, [])
+    .filter((d) => hasDraft(drafts, d.id))
+    .map((d) => ({ ...newConversation(d.provider), ...d, updatedAt: d.createdAt }));
+}
 
 export const isElsewhere = (c: Conversation, device: Device | null) =>
   LOCAL_CHAT_PROVIDERS.includes(c.provider) && c.device !== null && c.device.id !== device?.id;
@@ -237,7 +251,7 @@ function friendlyError(code: string, provider: ProviderKind): string {
 }
 
 export const useChats = create<ChatsState>(() => ({
-  conversations: [],
+  conversations: restoreNewDrafts(readJson<Record<string, string>>(DRAFTS_KEY, {})),
   ready: false,
   device: null,
   activeId: localStorage.getItem(ACTIVE_KEY) ?? "",
@@ -251,7 +265,7 @@ export const useChats = create<ChatsState>(() => ({
   queue: [],
   editingQueued: null,
   hydrating: null,
-  drafts: {},
+  drafts: readJson<Record<string, string>>(DRAFTS_KEY, {}),
   citations: {},
 }));
 
@@ -300,6 +314,7 @@ useChats.subscribe((state, prev) => {
   if (state.docked !== prev.docked) localStorage.setItem(DOCKED_KEY, JSON.stringify(state.docked));
   if (state.activeTabs !== prev.activeTabs)
     localStorage.setItem(ACTIVE_TABS_KEY, JSON.stringify(state.activeTabs));
+  if (state.drafts !== prev.drafts || state.conversations !== prev.conversations) saveDrafts();
   if (state.conversations === prev.conversations) return;
   const before = new Map(prev.conversations.map((c) => [c.id, c]));
   const open: Record<string, string> = {};
@@ -309,6 +324,38 @@ useChats.subscribe((state, prev) => {
     scheduleSave(c.id);
   }
   localStorage.setItem(OPEN_REQUESTS_KEY, JSON.stringify(open));
+});
+
+let draftTimer: ReturnType<typeof setTimeout> | null = null;
+
+function saveDrafts(): void {
+  draftTimer ??= setTimeout(writeDrafts, 300);
+}
+
+function writeDrafts(): void {
+  draftTimer = null;
+  const { conversations, drafts } = get();
+  const ids = new Set(conversations.map((c) => c.id));
+  const kept = Object.fromEntries(
+    Object.entries(drafts).filter(([id, text]) => text.trim() && ids.has(id)),
+  );
+  const fresh: NewDraft[] = conversations
+    .filter((c) => isBlank(c) && kept[c.id])
+    .map(({ id, provider, createdAt }) => ({ id, provider, createdAt }));
+  try {
+    localStorage.setItem(DRAFTS_KEY, JSON.stringify(kept));
+    localStorage.setItem(NEW_DRAFTS_KEY, JSON.stringify(fresh));
+  } catch {
+    // Without storage, drafts last until the app closes.
+  }
+}
+
+// A refresh or quit inside the debounce would lose the last keystrokes.
+window.addEventListener("pagehide", () => {
+  if (draftTimer) {
+    clearTimeout(draftTimer);
+    writeDrafts();
+  }
 });
 
 async function loadChats(): Promise<void> {
@@ -337,7 +384,8 @@ async function loadChats(): Promise<void> {
     conversations.sort((a, b) => b.updatedAt - a.updatedAt);
     let activeId = s.activeId;
     if (!conversations.some((c) => c.id === activeId)) {
-      const blank = conversations.find(isBlank) ?? newConversation();
+      const blank =
+        conversations.find((c) => isBlank(c) && !hasDraft(s.drafts, c.id)) ?? newConversation();
       if (!conversations.includes(blank)) conversations.unshift(blank);
       activeId = blank.id;
     }
@@ -407,6 +455,7 @@ function appendExchange(
   patchConversation(convoId, (c) => ({
     ...c,
     updatedAt: Date.now(),
+    returnedAt: Date.now(),
     snoozedUntil: null,
     settledAt: null,
     turns: [
@@ -734,12 +783,48 @@ export function watchChat(id: string | null): void {
   });
 }
 
+/** Snoozing or settling a pinned chat unpins it; bringing one back puts it at the top. */
 export async function shelveChat(
   id: string,
   change: Pick<Chat, "snoozedUntil" | "settledAt">,
 ): Promise<void> {
   if (!get().conversations.find((c) => c.id === id)?.loaded) await loadChat(id);
-  patchConversation(id, (c) => ({ ...c, ...change, updatedAt: Date.now() }));
+  const now = Date.now();
+  patchConversation(id, (c) => {
+    const away = c.settledAt != null || (c.snoozedUntil ?? 0) > now;
+    const back = away && change.snoozedUntil == null && change.settledAt == null;
+    return {
+      ...c,
+      ...change,
+      ...(change.snoozedUntil != null || change.settledAt != null ? { pinnedAt: null } : {}),
+      ...(back ? { returnedAt: now } : {}),
+      updatedAt: now,
+    };
+  });
+}
+
+export async function pinChat(id: string, pinned: boolean): Promise<void> {
+  if (!get().conversations.find((c) => c.id === id)?.loaded) await loadChat(id);
+  const now = Date.now();
+  patchConversation(id, (c) => ({
+    ...c,
+    pinnedAt: pinned ? now : null,
+    ...(pinned ? { snoozedUntil: null, settledAt: null } : { returnedAt: now }),
+    updatedAt: now,
+  }));
+}
+
+export function discardDraft(id: string): void {
+  const convo = get().conversations.find((c) => c.id === id);
+  set((s) => {
+    const drafts = { ...s.drafts };
+    delete drafts[id];
+    if (!convo || !isBlank(convo)) return { drafts };
+    const conversations = s.conversations.filter((c) => c.id !== id);
+    if (s.activeId !== id) return { drafts, conversations };
+    const next = newConversation(convo.provider);
+    return { drafts, conversations: [next, ...conversations], activeId: next.id };
+  });
 }
 
 /** `onAgent`: the agent keeps chats' names too (its snapshot's `titles`). */
@@ -765,7 +850,8 @@ export async function regenerateTitle(id: string): Promise<void> {
 }
 
 export function newChat(provider: ProviderKind): string {
-  const blank = get().conversations.find(isBlank);
+  const { conversations, drafts } = get();
+  const blank = conversations.find((c) => isBlank(c) && !hasDraft(drafts, c.id));
   if (blank) {
     if (blank.provider !== provider) patchConversation(blank.id, (c) => ({ ...c, provider }));
     showChat(blank.id);
@@ -862,7 +948,12 @@ export function openServerSession(
     updatedAt: session.lastActive,
   };
   set((s) => ({
-    conversations: [convo, ...s.conversations.filter((c) => !isBlank(c) || c.id === s.activeId)],
+    conversations: [
+      convo,
+      ...s.conversations.filter(
+        (c) => !isBlank(c) || c.id === s.activeId || hasDraft(s.drafts, c.id),
+      ),
+    ],
     activeId: convo.id,
     hydrating: convo.id,
   }));

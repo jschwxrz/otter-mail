@@ -1,30 +1,43 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AlarmClockIcon,
+  CheckIcon,
   ChevronDownIcon,
-  LoaderCircleIcon,
+  ChevronRightIcon,
+  CircleAlertIcon,
+  CircleDashedIcon,
+  CircleXIcon,
+  LaptopIcon,
+  PinIcon,
   PlusIcon,
   SearchIcon,
+  SquarePenIcon,
+  UndoIcon,
   XIcon,
+  type LucideIcon,
 } from "lucide-react";
 import { Input } from "~/components/ui/input";
 import { AgentAvatar, openClawAgentId, useAgentProviders } from "./agent-providers";
 import { readableError } from "./add-mailbox";
 import {
+  discardDraft,
+  hasDraft,
   isBlank,
+  isElsewhere,
+  pinChat,
   regenerateTitle,
   renameChat,
   shelveChat,
   useChats,
   type Conversation,
 } from "./chat-store";
-import { formatAgo } from "./chat-history";
 import {
   chatReturnedAt,
   chatShelf,
+  shortAgo,
   snoozePresets,
+  tabsSummary,
   wakesIn,
-  workingFor,
   type ChatShelf,
 } from "./chat-shelves";
 import {
@@ -40,8 +53,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./menu";
-import { ShelveActions } from "./chat-shelve-actions";
-import { Section, SidebarBody } from "./sidebar-ui";
+import { SidebarBody } from "./sidebar-ui";
 import { toast } from "./toast";
 import { HintTooltip, cn } from "./ui";
 
@@ -52,7 +64,14 @@ const HEADER_BUTTON =
   "flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-sidebar-muted-foreground outline-none hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring";
 
 const ROW_BODY =
-  "flex min-w-0 flex-1 items-start gap-2.5 py-1.5 ps-(--sidebar-row-content-inset) pe-(--sidebar-row-content-inset) text-left outline-none";
+  "flex min-w-0 flex-1 gap-2.5 py-1.5 ps-(--sidebar-row-content-inset) pe-(--sidebar-row-content-inset) text-left outline-none";
+
+/** The row's time or pin, which its settle button takes the place of on hover (Otter Code's). */
+const ROW_END_HIDES = "group-hover/row:invisible group-has-focus-visible/row:invisible";
+const ROW_ACTION_SHOWS = "group-hover/row:flex group-has-focus-visible/row:flex";
+
+const DRAFT_SURFACE = "bg-warning/4 hover:bg-warning/8";
+const DRAFT_PEN = "size-3 shrink-0 text-warning-foreground";
 
 const AGENT_FILTER_KEY = "gmail:chat-agent-filter";
 
@@ -84,8 +103,9 @@ export function AgentSidebar({
   const runs = useChats((s) => s.runs);
   const approvals = useChats((s) => s.approvals);
   const questions = useChats((s) => s.questions);
-  const anyWorking = Object.keys(runs).length > 0;
-  const now = useNow(anyWorking ? 1000 : 30_000);
+  const drafts = useChats((s) => s.drafts);
+  const device = useChats((s) => s.device);
+  const now = useNow(30_000);
   const [settledShown, setSettledShown] = useState(SETTLED_FIRST);
   const providers = useAgentProviders().data?.providers ?? [];
   const [agentFilter, setAgentFilter] = useState<string | null>(() => {
@@ -126,12 +146,18 @@ export function AgentSidebar({
   const filter = agentFilter && agents.has(agentFilter) ? agentFilter : null;
   const needle = query?.trim().toLowerCase() ?? "";
 
-  const waiting = new Set(
-    [...approvals, ...questions].flatMap(
-      ({ requestId }) => Object.values(runs).find((r) => r.requestId === requestId)?.convoId ?? [],
-    ),
-  );
+  const askedIn = (list: { requestId: string }[]) =>
+    new Set(
+      list.flatMap(
+        ({ requestId }) =>
+          Object.values(runs).find((r) => r.requestId === requestId)?.convoId ?? [],
+      ),
+    );
+  const approving = askedIn(approvals);
+  const asking = askedIn(questions);
+  const waiting = new Set([...approving, ...asking]);
   const shelves: Record<ChatShelf, Conversation[]> = {
+    pinned: [],
     active: [],
     snoozed: [],
     settled: [],
@@ -147,38 +173,111 @@ export function AgentSidebar({
       c,
     );
   }
+  shelves.pinned.sort((a, b) => (a.pinnedAt ?? 0) - (b.pinnedAt ?? 0));
   shelves.active.sort((a, b) => chatReturnedAt(b, now) - chatReturnedAt(a, now));
   shelves.snoozed.sort((a, b) => (a.snoozedUntil ?? 0) - (b.snoozedUntil ?? 0));
-  shelves.settled.sort((a, b) => b.updatedAt - a.updatedAt);
+  shelves.settled.sort((a, b) => (b.settledAt ?? b.updatedAt) - (a.settledAt ?? a.updatedAt));
   const settled = shelves.settled.filter((c, i) => i < settledShown || c.id === chatId);
   const hiddenSettled = shelves.settled.length - settled.length;
   const current = conversations.find((c) => c.id === chatId);
+
+  // A new chat you're writing joins the drafts once you leave it, not as you type (Otter Code's).
+  const [opened, setOpened] = useState({ chatId: "", hadDraft: false });
+  if (opened.chatId !== chatId) setOpened({ chatId, hadDraft: hasDraft(drafts, chatId) });
+  const newDrafts = needle
+    ? []
+    : conversations
+        .filter(
+          (c) =>
+            isBlank(c) &&
+            hasDraft(drafts, c.id) &&
+            (c.id !== chatId || opened.hadDraft) &&
+            (!filter || agentOf(c).key === filter),
+        )
+        .sort((a, b) => b.createdAt - a.createdAt);
+  const onNewChatPage = current !== undefined && isBlank(current) && !newDrafts.includes(current);
+
+  const status = (c: Conversation): ReactNode => {
+    if (approving.has(c.id))
+      return (
+        <Status
+          icon={CircleAlertIcon}
+          className="text-warning-foreground"
+          label="Needs your approval"
+        />
+      );
+    if (asking.has(c.id))
+      return (
+        <Status icon={CircleAlertIcon} className="text-warning-foreground" label="Has a question" />
+      );
+    if (runs[c.id]) return <Status icon={CircleDashedIcon} className="text-info" label="Working" />;
+    if (c.turns.at(-1)?.error)
+      return <Status icon={CircleXIcon} className="text-destructive-foreground" label="Failed" />;
+    if (isElsewhere(c, device)) return <Status icon={LaptopIcon} label={`On ${c.device!.name}`} />;
+    return tabsSummary(c.tabs) || agentName(c.provider, openClawAgentId(c.sessionId));
+  };
+
+  const draftRow = (c: Conversation) => {
+    const selected = c.id === chatId;
+    const preview = drafts[c.id]!.trim().split("\n", 1)[0];
+    const agent = openClawAgentId(c.sessionId);
+    return (
+      <div
+        key={c.id}
+        className={cn(
+          "group/row relative rounded-lg has-focus-visible:ring-2 has-focus-visible:ring-focus-ring",
+          selected ? "bg-sidebar-row-selected" : DRAFT_SURFACE,
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => onSelect(c.id)}
+          aria-current={selected ? "page" : undefined}
+          aria-label={`Unsent draft: ${preview}`}
+          className="flex w-full min-w-0 cursor-pointer flex-col gap-0.5 py-1.5 ps-(--sidebar-row-content-inset) pe-(--sidebar-row-content-inset) text-left outline-none"
+        >
+          <span className="flex h-5 min-w-0 items-center gap-1.5 pe-5">
+            <SquarePenIcon aria-hidden className={DRAFT_PEN} />
+            <AgentAvatar kind={c.provider} agent={agent} className="size-3.5 shrink-0" />
+            <span className="truncate text-xs font-medium text-sidebar-muted-foreground">
+              {agentName(c.provider, agent)}
+            </span>
+          </span>
+          <span className="truncate text-sm text-sidebar-foreground">{preview}</span>
+        </button>
+        <button
+          type="button"
+          aria-label="Discard draft"
+          title="Discard draft"
+          onClick={() => discardDraft(c.id)}
+          className="absolute end-1.5 top-1.5 hidden size-5 cursor-pointer items-center justify-center rounded-md text-sidebar-muted-foreground outline-none group-hover/row:flex hover:text-sidebar-foreground focus-visible:flex focus-visible:ring-2 focus-visible:ring-focus-ring"
+        >
+          <XIcon className="size-3" />
+        </button>
+      </div>
+    );
+  };
 
   const row = (c: Conversation, shelf: ChatShelf) => {
     const selected = c.id === chatId;
     const titles = Boolean(providers.find((p) => p.kind === c.provider)?.titles);
     const fresh = (unseen.has(c.id) || waiting.has(c.id)) && !selected;
-    let meta: ReactNode;
-    if (runs[c.id] && shelf === "active") {
-      const since = c.turns.at(-1)?.startedAt ?? c.updatedAt;
-      meta = (
-        <span className="flex items-center gap-1 text-info">
-          <LoaderCircleIcon className="size-3 animate-spin" />
-          Working {workingFor(since, now)}
-        </span>
-      );
-    } else if (shelf === "snoozed") {
-      meta = (
-        <span className="flex items-center gap-1 text-info">
-          <AlarmClockIcon className="size-3" />
+    const drafted = !selected && hasDraft(drafts, c.id);
+    const oneLine = shelf === "snoozed" || shelf === "settled";
+    let end: ReactNode;
+    if (shelf === "pinned") end = <PinIcon aria-label="Pinned" className="size-3" />;
+    else if (shelf === "snoozed")
+      end = (
+        <span className="flex items-center gap-1">
+          <AlarmClockIcon aria-label="Wakes in" className="size-3" />
           {wakesIn(c.snoozedUntil ?? now, now)}
         </span>
       );
-    } else {
-      meta = waiting.has(c.id)
-        ? "Needs you"
-        : formatAgo(shelf === "active" ? chatReturnedAt(c, now) : c.updatedAt);
-    }
+    else
+      end = shortAgo(
+        shelf === "settled" ? (c.settledAt ?? c.updatedAt) : chatReturnedAt(c, now),
+        now,
+      );
     const renaming = editing === c.id;
     const busy = regenerating.has(c.id);
     const startRename = () => setEditing(c.id);
@@ -187,22 +286,29 @@ export function AgentSidebar({
         <AgentAvatar
           kind={c.provider}
           agent={openClawAgentId(c.sessionId)}
-          className="mt-[3px] size-3.5 shrink-0"
+          className={cn("size-3.5 shrink-0", !oneLine && "mt-[3px]")}
         />
-        <span
-          className={cn(
-            "flex min-w-0 flex-1 flex-col",
-            !renaming &&
-              "group-hover/row:[mask-image:linear-gradient(to_left,transparent_6.5rem,black_9rem)] group-has-[[data-state=open]]/row:[mask-image:linear-gradient(to_left,transparent_6.5rem,black_9rem)]",
-          )}
-        >
+        <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex min-w-0 items-center gap-1.5">
+            {drafted ? <SquarePenIcon aria-label="Unsent draft" className={DRAFT_PEN} /> : null}
             {title}
             {fresh ? (
               <span aria-label="New" className="size-1.5 shrink-0 rounded-full bg-primary" />
             ) : null}
+            {renaming ? null : (
+              <span
+                className={cn(
+                  "ms-auto shrink-0 ps-1 text-[11px] tabular-nums text-sidebar-muted-foreground/70",
+                  ROW_END_HIDES,
+                )}
+              >
+                {end}
+              </span>
+            )}
           </span>
-          <span className="truncate text-xs text-sidebar-muted-foreground/80">{meta}</span>
+          {oneLine ? null : (
+            <span className="truncate text-xs text-sidebar-muted-foreground/80">{status(c)}</span>
+          )}
         </span>
       </>
     );
@@ -236,11 +342,13 @@ export function AgentSidebar({
             !renaming && "has-focus-visible:ring-2 has-focus-visible:ring-focus-ring",
             selected
               ? "bg-sidebar-row-selected text-sidebar-foreground"
-              : "text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
+              : drafted
+                ? cn(DRAFT_SURFACE, "text-sidebar-foreground")
+                : "text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
           )}
         >
           {renaming ? (
-            <div className={ROW_BODY}>
+            <div className={cn(ROW_BODY, oneLine && "items-center")}>
               {body(
                 <TitleInput
                   title={c.title}
@@ -269,13 +377,13 @@ export function AgentSidebar({
               }}
               aria-current={selected ? "page" : undefined}
               aria-busy={busy || undefined}
-              className={cn(ROW_BODY, "cursor-pointer")}
+              className={cn(ROW_BODY, oneLine && "items-center", "cursor-pointer")}
             >
               {body(
                 <span
                   className={cn(
-                    "min-w-0 flex-1 truncate text-sm",
-                    (selected || fresh) && "text-sidebar-foreground",
+                    "min-w-0 truncate text-sm",
+                    (selected || fresh || drafted) && "text-sidebar-foreground",
                     busy && "opacity-55",
                   )}
                 >
@@ -284,21 +392,39 @@ export function AgentSidebar({
               )}
             </button>
           )}
-          {/* On hover, the row's actions over its end; the text fades out beneath them. */}
-          <div
-            className={cn(
-              "absolute inset-y-0 end-1 hidden items-center",
-              !renaming && "group-hover/row:flex group-has-[[data-state=open]]/row:flex",
-            )}
-          >
-            <ShelveActions chat={c} settled={shelf === "settled"} />
-          </div>
+          {renaming ? null : (
+            <button
+              type="button"
+              aria-label={shelf === "settled" ? "Unsettle" : "Settle"}
+              title={shelf === "settled" ? "Unsettle" : "Settle"}
+              onClick={() =>
+                void shelveChat(
+                  c.id,
+                  shelf === "settled"
+                    ? { snoozedUntil: null, settledAt: null }
+                    : { snoozedUntil: null, settledAt: Date.now() },
+                )
+              }
+              className={cn(
+                "absolute end-1.5 hidden size-6 cursor-pointer items-center justify-center rounded-md text-sidebar-muted-foreground outline-none hover:bg-foreground/[0.08] hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring",
+                oneLine ? "inset-y-0 my-auto" : "top-1",
+                ROW_ACTION_SHOWS,
+              )}
+            >
+              {shelf === "settled" ? (
+                <UndoIcon className="size-3.5" />
+              ) : (
+                <CheckIcon className="size-3.5" />
+              )}
+            </button>
+          )}
         </div>
       </ChatRowMenu>
     );
   };
 
-  const empty = Object.values(shelves).every((list) => list.length === 0);
+  const empty = newDrafts.length === 0 && Object.values(shelves).every((list) => list.length === 0);
+  const divider = <div aria-hidden className="mx-2.5 my-1.5 h-px shrink-0 bg-sidebar-border/60" />;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 flex-col pt-(--sidebar-content-inset)">
@@ -358,11 +484,11 @@ export function AgentSidebar({
             <button
               type="button"
               aria-label="New chat"
-              aria-current={current && isBlank(current) ? "page" : undefined}
+              aria-current={onNewChatPage ? "page" : undefined}
               onClick={onNewChat}
               className={cn(
                 HEADER_BUTTON,
-                current && isBlank(current) && "bg-sidebar-row-selected text-sidebar-foreground",
+                onNewChatPage && "bg-sidebar-row-selected text-sidebar-foreground",
               )}
             >
               <PlusIcon className="size-4" />
@@ -406,16 +532,22 @@ export function AgentSidebar({
             .map(({ c, shelf }) => row(c, shelf))
         ) : (
           <>
+            {newDrafts.map(draftRow)}
+            {newDrafts.length > 0 && shelves.pinned.length + shelves.active.length > 0
+              ? divider
+              : null}
+            {shelves.pinned.map((c) => row(c, "pinned"))}
+            {shelves.pinned.length > 0 && shelves.active.length > 0 ? divider : null}
             {shelves.active.map((c) => row(c, "active"))}
             {/* The shelves sit at the bottom, under the chats you're on (Otter Code's). */}
-            <div className="mt-auto">
+            <div className="mt-auto pt-4">
               {shelves.snoozed.length > 0 ? (
-                <Section title="Snoozed" defaultOpen={false} count={shelves.snoozed.length}>
+                <Shelf title="Snoozed" count={shelves.snoozed.length}>
                   {shelves.snoozed.map((c) => row(c, "snoozed"))}
-                </Section>
+                </Shelf>
               ) : null}
               {shelves.settled.length > 0 ? (
-                <Section title="Settled" defaultOpen={false} count={shelves.settled.length}>
+                <Shelf title="Settled" count={shelves.settled.length}>
                   {settled.map((c) => row(c, "settled"))}
                   {hiddenSettled > 0 ? (
                     <button
@@ -426,12 +558,51 @@ export function AgentSidebar({
                       Show {Math.min(hiddenSettled, SETTLED_PAGE)} more
                     </button>
                   ) : null}
-                </Section>
+                </Shelf>
               ) : null}
             </div>
           </>
         )}
       </SidebarBody>
+    </div>
+  );
+}
+
+function Status({
+  icon: Icon,
+  label,
+  className,
+}: {
+  icon: LucideIcon;
+  label: string;
+  className?: string;
+}) {
+  return (
+    <span className={cn("flex min-w-0 items-center gap-1", className)}>
+      <Icon aria-hidden className="size-3 shrink-0" />
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
+
+function Shelf({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-(--sidebar-row-content-inset) text-left text-xs font-medium text-sidebar-muted-foreground outline-none hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
+      >
+        <span className="flex-1">{title}</span>
+        <span className="font-normal tabular-nums">{count}</span>
+        <ChevronRightIcon
+          aria-hidden
+          className={cn("size-3 shrink-0 transition-transform", open && "rotate-90")}
+        />
+      </button>
+      {open ? children : null}
     </div>
   );
 }
@@ -490,10 +661,14 @@ function ChatRowMenu({
   children: ReactNode;
 }) {
   const bringBack = () => void shelveChat(chat.id, { snoozedUntil: null, settledAt: null });
+  const pinned = chat.pinnedAt != null;
   return (
     <ContextMenu>
       <ContextMenuTrigger>{children}</ContextMenuTrigger>
       <ContextMenuContent>
+        <ContextMenuItem onSelect={() => void pinChat(chat.id, !pinned)}>
+          {pinned ? "Unpin" : "Pin"}
+        </ContextMenuItem>
         {shelf === "snoozed" ? (
           <ContextMenuItem onSelect={bringBack}>Wake up now</ContextMenuItem>
         ) : null}
