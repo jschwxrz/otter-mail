@@ -49,6 +49,21 @@ describe("taking control of the agent's browser", () => {
     vi.useRealTimers();
   });
 
+  it("skips a lost batch on time while later ones keep coming", async () => {
+    vi.useFakeTimers();
+    const { control, sent } = fixture();
+    control.take("tab");
+    const replayed = [];
+    for (let seq = 2; seq <= 6; seq++) {
+      await control.input("tab", undefined, seq, [text(String(seq))]);
+      vi.advanceTimersByTime(50);
+      replayed.push(sent.length);
+    }
+    // Batch 1 never came: replay starts 150 ms in, while the rest keep arriving.
+    expect(replayed).toEqual([0, 0, 3, 4, 5]);
+    vi.useRealTimers();
+  });
+
   it("sends keys and clicks as a person's", () => {
     expect(
       cdpInput({ type: "key", action: "down", key: "a", code: "KeyA", keyCode: 65, text: "a" }),

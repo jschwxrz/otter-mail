@@ -13,7 +13,6 @@ import {
   FilePenLineIcon,
   GlobeIcon,
   MailIcon,
-  MonitorPlayIcon,
   PlusIcon,
   TriangleAlertIcon,
 } from "lucide-react";
@@ -24,6 +23,7 @@ import {
   chatPageId,
   closeChatPage,
   ensureChatPage,
+  hostOf,
   routeLinks,
   useBrowser,
 } from "../browser/store";
@@ -43,7 +43,7 @@ import {
   watchChat,
   type ChatTab,
 } from "./chat-store";
-import { AgentBrowser } from "./agent-browser";
+import { AgentBrowser, AgentBrowserTabIcon } from "./agent-browser";
 import { ChatView } from "./chat-view";
 import { DitherBackdrop } from "./dither-backdrop";
 import { FilePreview } from "./attachment-preview";
@@ -153,6 +153,7 @@ export function ChatWorkspace({
   );
   const run = useChats((s) => s.runs[chatId]?.requestId);
   const [liveClosed, setLiveClosed] = useState<string | null>(null);
+  const [livePage, setLivePage] = useState<string | undefined>();
   const liveSession =
     chatAgent.provider?.liveBrowser && convo?.sessionId && browserSteps > 0 && liveClosed !== chatId
       ? convo.sessionId
@@ -380,12 +381,12 @@ export function ChatWorkspace({
                 {liveSession ? (
                   <PanelTab
                     id={LIVE_TAB}
-                    title="Browser"
-                    tooltip={`${agentName}'s browser, live`}
+                    title={livePage ? hostOf(livePage) : "Browser"}
+                    tooltip={`${agentName}'s browser, on the OpenClaw gateway${livePage ? `\n${livePage}` : ""}`}
                     selected={liveShown}
                     onSelect={() => showChatTab(chatId, LIVE_TAB)}
                     onClose={() => setLiveClosed(chatId)}
-                    icon={<MonitorPlayIcon className="size-3.5" />}
+                    icon={<AgentBrowserTabIcon page={livePage} />}
                   />
                 ) : null}
                 {tabs.map((tab) => {
@@ -433,6 +434,7 @@ export function ChatWorkspace({
                   sessionId={liveSession}
                   agentName={agentName}
                   activity={browserSteps + browserDone}
+                  onPage={setLivePage}
                 />
               ) : null}
               {shown && (shown.ref.kind === "thread" || shown.ref.kind === "draft") ? (

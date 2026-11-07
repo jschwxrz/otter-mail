@@ -118,7 +118,7 @@ export function createBrowserControl({ cdpUrlFor, connect = connectTarget, now =
     return tab.page;
   };
   const flush = (tab, page) => {
-    clearTimeout(tab.gap);
+    const missing = tab.next;
     while (tab.waiting.has(tab.next)) {
       for (const event of tab.waiting.get(tab.next)) {
         const call = cdpInput(event);
@@ -127,9 +127,14 @@ export function createBrowserControl({ cdpUrlFor, connect = connectTarget, now =
       tab.waiting.delete(tab.next);
       tab.next += 1;
     }
+    // A batch is missing: let it arrive, then go on without it. Batches arriving behind it
+    // don't push that back.
+    if (tab.gap && tab.next === missing && tab.waiting.size > 0) return;
+    clearTimeout(tab.gap);
+    tab.gap = undefined;
     if (tab.waiting.size === 0) return;
-    // A batch is missing: let it arrive, then go on without it.
     tab.gap = setTimeout(() => {
+      tab.gap = undefined;
       tab.next = Math.min(...tab.waiting.keys());
       flush(tab, page);
     }, GAP_MS);
