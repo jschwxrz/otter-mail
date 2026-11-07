@@ -70,6 +70,7 @@ export type {
   AgentRun,
   ApprovalDecision,
   ApprovalRequest,
+  BrowserEvents,
   BrowserInput,
   BrowserView,
   BrowserViewRequest,

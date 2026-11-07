@@ -235,6 +235,18 @@ export type BrowserInput = {
   events?: Record<string, unknown>[];
 };
 
+/**
+ * What happened on the agent's tab since `since` (absent: just where things are up to), waited
+ * for up to `waitMs`: where the pointer went, the field typed in, pop-ups, file pickers, copies.
+ */
+export type BrowserEvents = {
+  /** The plugin's run: its numbers start over with a new one. */
+  run: string;
+  seq: number;
+  dialog: { dialogType: string; message: string; defaultPrompt: string } | null;
+  events: Record<string, unknown>[];
+};
+
 export type BrowserViewRequest = { width: number; height: number; except?: string };
 
 export interface ChatProvider<S extends AgentSettings = AgentSettings> {
@@ -309,6 +321,21 @@ export interface ChatProvider<S extends AgentSettings = AgentSettings> {
     request: BrowserViewRequest,
   ): Promise<BrowserView | null>;
   browserInput?(settings: S, input: BrowserInput): Promise<void>;
+  browserEvents?(
+    settings: S,
+    request: {
+      targetId: string;
+      profile?: string;
+      since?: number;
+      run?: string;
+      waitMs: number;
+    },
+  ): Promise<BrowserEvents>;
+  /** The files you chose for the page's own file picker; none cancels it. */
+  browserUpload?(
+    settings: S,
+    upload: { targetId: string; profile?: string; files: { name: string; data: string }[] },
+  ): Promise<void>;
   deleteSession(settings: S, sessionId: string): Promise<void>;
   shutdown(): void;
 }

@@ -195,15 +195,43 @@ export default defineChannelPluginEntry({
 
     // Take control of the agent's browser from Otter: your input goes to the tab as a person's
     // would, and the agent's browser waits until you hand it back.
+    const browser = async (method, path, query, body) => {
+      const result = await dispatchGatewayMethod("browser.request", {
+        method,
+        path,
+        ...(query ? { query } : {}),
+        ...(body ? { body } : {}),
+      });
+      if (!result?.ok) throw new Error(result?.error?.message ?? "The browser didn't answer.");
+      return result.payload;
+    };
+    const pendingDialog = async (targetId, profile) => {
+      const query = { ...(profile ? { profile } : {}), targetId };
+      return (await browser("GET", "/dialogs", query))?.browserState?.dialogs?.pending?.[0];
+    };
     const control = createBrowserControl({
-      async cdpUrlFor(profile) {
-        const result = await dispatchGatewayMethod("browser.request", {
-          method: "GET",
-          path: "/profiles",
+      async openDialog(targetId, profile) {
+        const open = await pendingDialog(targetId, profile);
+        return open
+          ? {
+              dialogType: String(open.type),
+              message: String(open.message ?? ""),
+              defaultPrompt: String(open.defaultValue ?? ""),
+            }
+          : null;
+      },
+      async answerDialog(targetId, profile, { accept, promptText }) {
+        const pending = await pendingDialog(targetId, profile);
+        if (!pending) throw new Error("No pop-up is open.");
+        await browser("POST", "/hooks/dialog", profile ? { profile } : undefined, {
+          targetId,
+          dialogId: pending.id,
+          accept,
+          ...(typeof promptText === "string" ? { promptText } : {}),
         });
-        if (!result?.ok)
-          throw new Error(result?.error?.message ?? "Couldn't find the agent's browser.");
-        const profiles = result.payload?.profiles ?? [];
+      },
+      async cdpUrlFor(profile) {
+        const profiles = (await browser("GET", "/profiles"))?.profiles ?? [];
         const found = profiles.find((p) => (profile ? p.name === profile : p.isDefault));
         const url = typeof found?.cdpUrl === "string" ? URL.parse(found.cdpUrl) : null;
         if (!url || !["127.0.0.1", "localhost", "[::1]"].includes(url.hostname))
@@ -216,10 +244,12 @@ export default defineChannelPluginEntry({
         throw new Error("targetId is required");
       return params.targetId;
     };
+    const profileOf = (params) =>
+      typeof params?.profile === "string" ? params.profile : undefined;
     api.registerGatewayMethod(
       "otter.browser.control",
-      ({ params }) => {
-        if (params?.take === true) control.take(targetOf(params));
+      async ({ params }) => {
+        if (params?.take === true) await control.take(targetOf(params), profileOf(params));
         else control.release(targetOf(params));
         return { controlled: params?.take === true };
       },
@@ -228,18 +258,37 @@ export default defineChannelPluginEntry({
     api.registerGatewayMethod(
       "otter.browser.input",
       async ({ params }) => {
-        const profile = typeof params?.profile === "string" ? params.profile : undefined;
-        await control.input(targetOf(params), profile, params?.seq, params?.events);
+        await control.input(targetOf(params), profileOf(params), params?.seq, params?.events);
+        return {};
+      },
+      { scope: "operator.admin" },
+    );
+    api.registerGatewayMethod(
+      "otter.browser.events",
+      ({ params }) =>
+        control.events(
+          targetOf(params),
+          profileOf(params),
+          params?.since,
+          params?.waitMs,
+          params?.run,
+        ),
+      { scope: "operator.admin" },
+    );
+    api.registerGatewayMethod(
+      "otter.browser.upload",
+      async ({ params }) => {
+        await control.upload(targetOf(params), profileOf(params), params?.files);
         return {};
       },
       { scope: "operator.admin" },
     );
     api.on("before_tool_call", (event) =>
-      /(^|__)browser$/.test(event.toolName) && control.anyHeld()
+      /(^|__)browser$/.test(event.toolName) && !control.allows(event.params)
         ? {
             block: true,
             blockReason:
-              "The user has taken control of the browser. Wait until they hand it back, then try again.",
+              "The user has taken control of the browser. Reading pages still works; wait until they hand it back before acting on one.",
           }
         : undefined,
     );

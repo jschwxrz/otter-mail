@@ -268,6 +268,37 @@ export function registerAgentHandlers(): void {
     return { ok: true };
   });
 
+  handle("agent:browserEvents", async (params: unknown) => {
+    const p = params as Params;
+    const targetId = str(p?.targetId);
+    if (!targetId) throw new Error("A tab is required.");
+    return agent.browserEvents(providerOf(p), {
+      targetId,
+      profile: str(p?.profile) || undefined,
+      since: typeof p?.since === "number" ? p.since : undefined,
+      run: str(p?.run) || undefined,
+      waitMs: Math.min(Math.max(Number(p?.waitMs) || 0, 0), 25_000),
+    });
+  });
+
+  handle("agent:browserUpload", async (params: unknown) => {
+    const p = params as Params;
+    const targetId = str(p?.targetId);
+    if (!targetId) throw new Error("A tab is required.");
+    const files = (Array.isArray(p?.files) ? p.files : []).flatMap((file) => {
+      const f = file as Record<string, unknown> | null;
+      return typeof f?.name === "string" && typeof f.data === "string"
+        ? [{ name: f.name, data: f.data }]
+        : [];
+    });
+    await agent.browserUpload(providerOf(p), {
+      targetId,
+      profile: str(p?.profile) || undefined,
+      files,
+    });
+    return { ok: true };
+  });
+
   handle("agent:deleteSession", async (params: unknown) => {
     const p = params as Params;
     await agent.deleteSession(providerOf(p), sessionIdOf(p));

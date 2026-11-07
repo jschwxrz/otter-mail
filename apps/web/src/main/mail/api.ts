@@ -707,6 +707,21 @@ export const mailApi = {
     },
   ): Promise<{ ok: boolean }> => ipc("agent:browserInput", { provider, ...input }),
 
+  agentBrowserEvents: (
+    provider: ProviderKind,
+    request: { targetId: string; profile?: string; since?: number; run?: string; waitMs: number },
+  ): Promise<{
+    run: string;
+    seq: number;
+    dialog: { dialogType: string; message: string; defaultPrompt: string } | null;
+    events: ({ type: string; seq: number } & Record<string, unknown>)[];
+  } | null> => ipc("agent:browserEvents", { provider, ...request }),
+
+  agentBrowserUpload: (
+    provider: ProviderKind,
+    upload: { targetId: string; profile?: string; files: { name: string; data: string }[] },
+  ): Promise<{ ok: boolean }> => ipc("agent:browserUpload", { provider, ...upload }),
+
   agentDeleteSession: (provider: ProviderKind, sessionId: string): Promise<{ ok: boolean }> =>
     ipc("agent:deleteSession", { provider, sessionId }),
 
