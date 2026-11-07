@@ -4,10 +4,14 @@ import {
   chatOf,
   chatTarget,
   inboxKey,
+  isNewChat,
   isOwnerConfigured,
   messageOf,
+  newChatKey,
+  otterTargetsNote,
   pointerOf,
   sessionOf,
+  targetOf,
   tell,
 } from "./otter.js";
 
@@ -26,6 +30,32 @@ describe("the Otter channel plugin", () => {
       sessionKey: chat,
       at: 4,
     });
+  });
+
+  it('starts a chat with each delivery to "new", like a post to a channel rather than a thread', () => {
+    expect(targetOf("new")).toBe("new");
+    expect(targetOf("otter:new")).toBe("new");
+    expect(isNewChat("new")).toBe(true);
+    expect(targetOf("chat:agent:main:otter-mail:c-1")).toBe("chat:agent:main:otter-mail:c-1");
+    expect(targetOf("inbox")).toBe("inbox");
+    expect(targetOf(undefined)).toBe("inbox");
+    // The gateway routes the delivery to a new chat's session, and sends it with that key.
+    const chat = newChatKey("rowan", "n-1");
+    expect(chat).toBe("agent:rowan:otter-mail:n-1");
+    expect(pointerOf({ sessionKey: chat, to: "new", at: 6 })).toEqual({
+      kind: "message",
+      agentId: "rowan",
+      sessionKey: chat,
+      at: 6,
+    });
+  });
+
+  it("tells an agent in an Otter chat where it can deliver, this chat included", () => {
+    const note = otterTargetsNote("agent:main:otter-mail:c-1");
+    expect(note).toContain('"chat:agent:main:otter-mail:c-1": this chat');
+    expect(note).toContain('"new"');
+    expect(note).toContain('"inbox"');
+    expect(otterTargetsNote(undefined)).toContain('"chat:<session key>": this chat');
   });
 
   it("sends as the owner only once commands.ownerAllowFrom lists otter:owner", () => {

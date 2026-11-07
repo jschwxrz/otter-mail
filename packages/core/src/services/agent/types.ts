@@ -1,3 +1,4 @@
+import type { ChatDelivery } from "@otter-mail/contracts/chats";
 export type ProviderKind = string;
 
 export const DEFAULT_AGENT = "openrouter";
@@ -207,6 +208,8 @@ export type AgentRun = {
   chat?: { title: string };
   /** When what an agent delivered was written, so only what's new notifies. */
   deliveredAt?: number;
+  /** What it delivered: an automation's result, or a message it sent. */
+  delivery?: ChatDelivery;
 };
 
 /** One of your messages in a session: the one sent with `requestId`, else the `fromEnd`th from the last (0). */

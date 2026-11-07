@@ -355,14 +355,27 @@ export async function allowOpenClawFullAccess(
 
 type OwnerConfig = { listed: boolean; owners: unknown[]; hash: string };
 
+/**
+ * Whether Otter is the gateway's owner (`otter:owner` in `commands.ownerAllowFrom`), and its plugin
+ * may brief the agent on Otter's delivery targets (a prompt hook, which OpenClaw runs for a
+ * plugin it didn't bundle only once `hooks.allowConversationAccess` says so).
+ */
 async function ownerConfig(g: Gateway): Promise<OwnerConfig> {
   const { sourceConfig, hash } = await g.client.request<{
-    sourceConfig?: { commands?: { ownerAllowFrom?: unknown } };
+    sourceConfig?: {
+      commands?: { ownerAllowFrom?: unknown };
+      plugins?: { entries?: { otter?: { hooks?: { allowConversationAccess?: unknown } } } };
+    };
     hash: string;
   }>("config.get", {});
   const owners = sourceConfig?.commands?.ownerAllowFrom;
   const list = Array.isArray(owners) ? owners : [];
-  return { listed: list.some((entry) => String(entry).trim() === OTTER_OWNER), owners: list, hash };
+  const briefed = sourceConfig?.plugins?.entries?.otter?.hooks?.allowConversationAccess === true;
+  return {
+    listed: briefed && list.some((entry) => String(entry).trim() === OTTER_OWNER),
+    owners: list,
+    hash,
+  };
 }
 
 /**
@@ -384,17 +397,23 @@ export async function openClawOwner(): Promise<boolean | null> {
 
 const ownerListed = new WeakMap<Gateway, Promise<boolean>>();
 
-/** Lists the Otter plugin's sender in `commands.ownerAllowFrom`, beside any owners there are. */
+/** Lists the Otter plugin's sender in `commands.ownerAllowFrom` (beside any owners there are), and lets it brief the agent. */
 export async function allowOpenClawOwner(settings: OpenClawSettings): Promise<void> {
   const g = await gateway(settings);
   const { listed, owners, hash } = await ownerConfig(g);
   ownerListed.delete(g);
   if (listed) return;
+  const listedOwners = owners.some((entry) => String(entry).trim() === OTTER_OWNER)
+    ? owners
+    : [...owners, OTTER_OWNER];
   await g.client.request("config.patch", {
-    raw: JSON.stringify({ commands: { ownerAllowFrom: [...owners, OTTER_OWNER] } }),
+    raw: JSON.stringify({
+      commands: { ownerAllowFrom: listedOwners },
+      plugins: { entries: { otter: { hooks: { allowConversationAccess: true } } } },
+    }),
     baseHash: hash,
     replacePaths: ["commands.ownerAllowFrom"],
-    note: "Otter Mail: what you send from Otter is the owner's",
+    note: "Otter Mail: what you send from Otter is the owner's, and the agent knows Otter's chats",
   });
   logger.info("agent", "openclaw owner allowed");
 }
@@ -1219,7 +1238,11 @@ async function nameSession(
 function announce(
   sessionKey: string,
   runId: string,
-  { title, deliveredAt }: { title?: string; deliveredAt?: number } = {},
+  {
+    title,
+    deliveredAt,
+    delivery,
+  }: { title?: string; deliveredAt?: number; delivery?: AgentRun["delivery"] } = {},
 ): void {
   const watched = watching?.sessions.has(sessionKey);
   if (!watching || (!watched && !INBOX.test(sessionKey) && !pointed.has(sessionKey))) return;
@@ -1233,6 +1256,7 @@ function announce(
     requestId: `${AGENT_RUN}${runId}`,
     ...(!watched && { chat: { title: title ?? "OpenClaw" } }),
     ...(deliveredAt !== undefined && { deliveredAt }),
+    ...(delivery && { delivery }),
   });
 }
 
@@ -1349,14 +1373,23 @@ async function catchUpSessions(g: Gateway): Promise<void> {
       { sessionKey: key, limit: 200 },
     );
     const runs = agentRunsSince(messages ?? [], since, active);
-    if (watched === undefined && runs.length > 0) names ??= await agentNames(g);
-    const title =
-      watched !== undefined
-        ? undefined
-        : inbox
-          ? names?.get(inbox[1])
-          : sessionTitle(row) || names?.get(agentOf(key));
-    for (const id of runs) announce(key, id, { title, deliveredAt: deliveredAt(messages, id) });
+    if (runs.length > 0) names ??= await agentNames(g);
+    for (const id of runs) {
+      const at = deliveredAt(messages, id);
+      const delivery = await deliveryOf(g, messages ?? [], id, names?.get(agentOf(key)));
+      // A chat a delivery starts is named for the automation that sent it, and when.
+      const title =
+        watched !== undefined
+          ? undefined
+          : inbox
+            ? names?.get(inbox[1])
+            : (delivery?.kind === "automation" && delivery.name
+                ? `${delivery.name} · ${shortDate(at ?? Date.now())}`
+                : undefined) ||
+              sessionTitle(row) ||
+              names?.get(agentOf(key));
+      announce(key, id, { title, deliveredAt: at, delivery });
+    }
   }
   for (const key of caught) fresh.delete(key);
   for (const key of delivered) pointed.delete(key);
@@ -1369,6 +1402,73 @@ function sessionTitle(row: Record<string, unknown>): string | undefined {
   for (const field of ["displayName", "label", "derivedTitle"])
     if (typeof row[field] === "string" && row[field]) return row[field] as string;
   return undefined;
+}
+
+const shortDate = (at: number) =>
+  new Date(at).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+
+type Job = { name?: string; schedule?: string } | null;
+/** The gateway's automations, by id: a finished one-shot is gone, so null. */
+const jobs = new Map<string, Promise<Job>>();
+
+function jobOf(g: Gateway, id: string): Promise<Job> {
+  let job = jobs.get(id);
+  if (!job) {
+    job = g.client
+      .request<{ name?: unknown; schedule?: Record<string, unknown> }>("cron.get", { id })
+      .then((found) => ({
+        ...(typeof found.name === "string" && found.name ? { name: found.name } : {}),
+        ...(found.schedule ? { schedule: scheduleText(found.schedule) } : {}),
+      }))
+      .catch(() => null);
+    jobs.set(id, job);
+    // A job's name or schedule can change: read it again before long.
+    setTimeout(() => jobs.delete(id), JOB_CACHE_MS);
+  }
+  return job;
+}
+const JOB_CACHE_MS = 10 * 60 * 1000;
+
+/** An automation's schedule as the gateway keeps it, short. */
+export function scheduleText(schedule: Record<string, unknown>): string | undefined {
+  if (schedule.kind === "cron" && typeof schedule.expr === "string")
+    return typeof schedule.tz === "string" ? `${schedule.expr} (${schedule.tz})` : schedule.expr;
+  if (schedule.kind === "every" && typeof schedule.everyMs === "number") {
+    const minutes = Math.round(schedule.everyMs / 60_000);
+    return minutes >= 60 && minutes % 60 === 0
+      ? `Every ${minutes / 60}h`
+      : minutes >= 1
+        ? `Every ${minutes}m`
+        : `Every ${Math.round(schedule.everyMs / 1000)}s`;
+  }
+  if (schedule.kind === "at") return "Once";
+  return undefined;
+}
+
+/**
+ * What a delivery is: an automation's result (`automation-result`, with its job), or a message the
+ * agent sent (`delivery-mirror`: the message tool). Nothing for a run.
+ */
+async function deliveryOf(
+  g: Gateway,
+  rows: Record<string, unknown>[],
+  runId: string,
+  agent: string | undefined,
+): Promise<AgentRun["delivery"]> {
+  if (!runId.startsWith("delivery:")) return undefined;
+  const row = rows.find((m) => runOf(m) === runId);
+  if (row?.model !== "automation-result") {
+    // The message tool's copy of a reply a turn of this chat sent (`<run>:message-tool:…`): its answer.
+    const key = String(
+      (row?.__openclaw as { idempotencyKey?: unknown } | undefined)?.idempotencyKey,
+    );
+    const sender = /^(.+?):message-tool:/.exec(key)?.[1];
+    if (sender && rows.some((m) => runOf(m) === sender)) return undefined;
+    return { kind: "message", ...(agent && { from: agent }) };
+  }
+  const jobId = (row.openclawAutomation as { jobId?: unknown } | undefined)?.jobId;
+  const job = typeof jobId === "string" ? await jobOf(g, jobId) : null;
+  return { kind: "automation", ...job };
 }
 
 /** When a delivery (`delivery:<row id>`) was written; nothing for a run. */

@@ -15,14 +15,16 @@ import { runDetachedWebhookWork } from "openclaw/plugin-sdk/webhook-request-guar
 import { readWorkspaceFile } from "./files.js";
 import {
   accountOf,
-  chatOf,
   chatTarget,
+  isNewChat,
   isOwnerConfigured,
   messageOf,
-  OTTER_TARGET,
+  newChatKey,
+  otterTargetsNote,
   OWNER,
   pointerOf,
   sessionOf,
+  targetOf,
   tell,
 } from "./otter.js";
 
@@ -61,13 +63,15 @@ export const otterChannel = createChatChannelPlugin({
     messaging: {
       targetResolver: {
         looksLikeId: () => true,
-        hint: `"${OTTER_TARGET}", or "chat:<session key>" for one of Otter's chats`,
+        hint: '"chat:<session key>" for one of Otter\'s chats, "new" for a new chat, or "inbox"',
       },
-      // A delivery to a chat is kept in its session; any other, in the agent's Otter session.
+      // A delivery to a chat is kept in its session; to "new", in a chat it starts (the gateway
+      // routes each delivery once, and sends it to that session); any other, in the inbox.
       resolveOutboundSessionRoute: ({ agentId, target }) => {
-        const chat = chatOf(target);
-        const sessionKey = sessionOf(target, agentId);
-        const to = chat ? chatTarget(chat) : OTTER_TARGET;
+        const to = targetOf(target);
+        const sessionKey = isNewChat(to)
+          ? newChatKey(agentId, randomUUID())
+          : sessionOf(target, agentId);
         return {
           sessionKey,
           baseSessionKey: sessionKey,
@@ -82,10 +86,7 @@ export const otterChannel = createChatChannelPlugin({
   },
   outbound: {
     deliveryMode: "direct",
-    resolveTarget: (params) => {
-      const chat = chatOf(params?.to);
-      return { ok: true, to: chat ? chatTarget(chat) : OTTER_TARGET };
-    },
+    resolveTarget: (params) => ({ ok: true, to: targetOf(params?.to) }),
     sendText: (ctx) => deliver(ctx),
     sendPayload: (ctx) => deliver(ctx, ctx.payload),
   },
@@ -155,6 +156,14 @@ export default defineChannelPluginEntry({
   description: "Send what your agents want you to see to Otter.",
   plugin: otterChannel,
   registerFull(api) {
+    // What Otter's targets are, for a turn in an Otter chat: the Codex harness leaves channels'
+    // message-tool hints out of its instructions, but every harness runs this hook.
+    api.on("before_prompt_build", (_event, ctx) =>
+      ctx?.channel === "otter" || ctx?.messageProvider === "otter"
+        ? { appendSystemContext: otterTargetsNote(ctx.sessionKey) }
+        : undefined,
+    );
+
     // What you send in an Otter chat, as the gateway's owner: `chat.send`'s run, with the authority
     // a configured channel owner has (an automation another chat made, for one).
     api.registerGatewayMethod(

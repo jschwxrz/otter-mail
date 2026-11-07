@@ -7,6 +7,7 @@ import {
   type ChatContextMeta,
   type ChatTab,
   type ChatTabRef,
+  type ChatDelivery,
   type ChatTurn,
 } from "@otter-mail/contracts/chats";
 
@@ -1050,10 +1051,11 @@ type AgentRun = {
   requestId: string;
   chat?: { title: string };
   deliveredAt?: number;
+  delivery?: ChatDelivery;
 };
 
-/** What an agent delivered recently enough to notify about once it's read (by request id: its title). */
-const deliveries = new Map<string, string>();
+/** What an agent delivered recently enough to notify about once it's read (by request id). */
+const deliveries = new Map<string, { title: string; subtitle: string }>();
 const DELIVERY_NOTIFIES_MS = 10 * 60 * 1000;
 
 /** The chat for a session that has none: what an agent delivered to Otter. Every device makes the same one. */
@@ -1081,7 +1083,13 @@ async function followAgentRun(run: AgentRun): Promise<void> {
     (run.chat ? chatForSession(run, run.chat.title) : undefined);
   if (!convo) return;
   if (run.deliveredAt !== undefined && Date.now() - run.deliveredAt < DELIVERY_NOTIFIES_MS)
-    deliveries.set(run.requestId, convo.title);
+    deliveries.set(run.requestId, {
+      title: convo.title,
+      subtitle:
+        run.delivery?.kind === "automation"
+          ? (run.delivery.name ?? "Automation")
+          : "Sent you a message",
+    });
   const wait = () => {
     waitingRuns.set(convo.id, [...(waitingRuns.get(convo.id) ?? []), run]);
   };
@@ -1104,7 +1112,14 @@ async function followAgentRun(run: AgentRun): Promise<void> {
     ...c,
     turns: [
       ...c.turns,
-      { id: turnId, role: "assistant", text: "", items: [], startedAt: Date.now() },
+      {
+        id: turnId,
+        role: "assistant",
+        text: "",
+        items: [],
+        startedAt: run.deliveredAt ?? Date.now(),
+        ...(run.delivery && { delivered: run.delivery }),
+      },
     ],
     openRequest: run.requestId,
   }));
@@ -1149,8 +1164,8 @@ function notifyAsk(run: Run, id: string, title: string, body?: string): void {
 
 /** What an agent delivered, once read: notifies like an ask, only when no window has focus. */
 function notifyDelivered(run: Run): void {
-  const title = deliveries.get(run.requestId);
-  if (title === undefined) return;
+  const delivered = deliveries.get(run.requestId);
+  if (delivered === undefined) return;
   deliveries.delete(run.requestId);
   const convo = get().conversations.find((c) => c.id === run.convoId);
   const text = convo?.turns.find((t) => t.id === `a-${run.requestId}`)?.text.trim();
@@ -1160,8 +1175,8 @@ function notifyDelivered(run: Run): void {
     .agentNotifyAsk({
       provider: run.provider,
       key,
-      title,
-      subtitle: "Sent you a message",
+      title: delivered.title,
+      subtitle: delivered.subtitle,
       body: text.length > 200 ? `${text.slice(0, 200)}…` : text,
       focused: document.hasFocus(),
     })

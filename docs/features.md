@@ -503,15 +503,20 @@ named for the agent (Rowan), a turn per delivery, that you can reply in; a new o
 when no window is in front. The plugin sends the relay only a pointer (which agent, which
 session, an approval's or question's id), never the text, with a token made in Settings; the
 relay passes it to the account's open devices, which read the delivery from the gateway.
-A delivery can also go to one of Otter's chats (`--to chat:<session key>`): it's kept in that
-session and shows up in that chat, or starts a chat when no device has one for it. A chat
-open in the app also catches up when the gateway says its session changed, so a scheduled job's
-result written straight into it shows up without a pointer.
+Like Slack's threads and channel posts, a delivery either goes to one of Otter's chats
+(`--to chat:<session key>`, kept in that session) or starts a new chat each time (`--to new`,
+named for its automation and day: "Morning brief · Sat, Nov 8"); a chat no device has yet
+starts one. A chat open in the app also catches up when the gateway says its session changed,
+so a scheduled job's result written straight into it shows up without a pointer. What no
+message of yours started carries a one-line header: "Automation · Morning brief · 9:00 AM" (its
+schedule on hover, while the job exists; a finished one-shot is just "Automation"), or "Sent by
+Rowan" for what the agent sent with its message tool; its notification names the automation.
 
 With the plugin installed, what you send goes through it, as a message on the `otter` channel
 from its owner (`otter.chat.send`, which needs full access) instead of `chat.send`, once
 Settings › Agents › OpenClaw's "Manage every automation" adds `otter:owner` to the gateway's
-`commands.ownerAllowFrom`. OpenClaw lets a configured channel owner manage every automation
+`commands.ownerAllowFrom` (and `plugins.entries.otter.hooks.allowConversationAccess`, so the
+plugin can tell the agent, in an Otter chat, about these targets: this chat, `new`, the inbox). OpenClaw lets a configured channel owner manage every automation
 from any chat, as from its Control UI; a `chat.send` turn sees only the automations its own chat
 made. Automations made from a chat then deliver back to it over the channel. Without the
 plugin, or before that, sends stay `chat.send`.
