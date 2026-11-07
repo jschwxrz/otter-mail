@@ -273,8 +273,11 @@ export interface ChatProvider<S extends AgentSettings = AgentSettings> {
    * reported once, and those since a chat's `since` are caught up on.
    */
   watch?(settings: S, sessions: WatchedSession[], started: (run: AgentRun) => void): void;
-  /** The agent's gateway says it delivered something to Otter (relay.ts's `AgentPointer`): catch up now. */
-  delivered?(settings: S): void;
+  /**
+   * The agent's gateway says it delivered something to Otter (relay.ts's `AgentPointer`): catch
+   * up now, on `sessionKey` too when no chat has it yet.
+   */
+  delivered?(settings: S, sessionKey?: string): void;
   cancel(requestId: string): void;
   /** Adds a message to the running turn; false when it can't (then queue it). */
   steer(requestId: string, input: string): Promise<boolean>;

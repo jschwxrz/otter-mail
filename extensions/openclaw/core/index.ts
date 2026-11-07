@@ -14,6 +14,7 @@ import {
 import { manifest } from "../manifest.ts";
 import {
   allowOpenClawFullAccess,
+  allowOpenClawOwner,
   normalizeOpenClawUrl,
   openClawProvider,
   parseOpenClawSetupCode,
@@ -69,6 +70,11 @@ export default {
       await allowOpenClawFullAccess((await agentSettings("openclaw")) as OpenClawSettings, () => {
         void refreshProvider("openclaw");
       });
+      return providersState();
+    });
+    handle("agent:allowOpenClawOwner", async () => {
+      await allowOpenClawOwner((await agentSettings("openclaw")) as OpenClawSettings);
+      await refreshProvider("openclaw");
       return providersState();
     });
   },
