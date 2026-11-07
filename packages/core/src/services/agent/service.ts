@@ -288,11 +288,11 @@ export async function watchSessions(kind: ProviderKind, sessions: WatchedSession
 }
 
 /** An agent's gateway delivered something to Otter: the providers that watch catch up on it. */
-export async function agentDelivered(): Promise<void> {
+export async function agentDelivered(sessionKey?: string): Promise<void> {
   for (const found of registeredAgents().values()) {
     if (!found.delivered) continue;
     const settings = await agentSettings(found.kind);
-    if (settings.enabled) found.delivered(settings);
+    if (settings.enabled) found.delivered(settings, sessionKey);
   }
 }
 

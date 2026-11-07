@@ -117,7 +117,10 @@ async function onEvent(event: RelayEvent): Promise<void> {
     return;
   }
   if (event.type === "agent") {
-    await agentDelivered();
+    // A message's session may have no chat yet; an approval's or a question's is the one that asked.
+    await agentDelivered(
+      event.pointer.kind === "message" ? (event.pointer.sessionKey ?? undefined) : undefined,
+    );
     return;
   }
   if (event.type !== "mail") return;

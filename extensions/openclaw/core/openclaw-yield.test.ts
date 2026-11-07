@@ -695,6 +695,66 @@ describe("what an agent delivers to Otter", () => {
     );
   });
 
+  it("is caught up on in a watched chat when the gateway says it changed, with no pointer", async () => {
+    const now = Date.now();
+    let messages: unknown[] = [sent, row("req-1", [{ type: "text", text: "Scheduled." }])];
+    gateway((method) => {
+      if (method === "sessions.list") return { sessions: [{ key: "s", lastActivityAt: now }] };
+      if (method === "chat.history") return { messages };
+      return undefined;
+    });
+    const started: AgentRun[] = [];
+    openClawProvider.watch!(settings, [{ id: "s", since: now - 1 }], (run) => started.push(run));
+    await vi.waitFor(() =>
+      expect(fixture.request).toHaveBeenCalledWith("sessions.list", { limit: 200 }),
+    );
+    await tick();
+    expect(started).toEqual([]);
+
+    // A scheduled job's result, kept in the chat when it had no channel to go to.
+    messages = [...messages, delivered("d-changed", "ping from the 1-minute automation", now)];
+    event("sessions.changed", {});
+    await vi.waitFor(
+      () =>
+        expect(started).toEqual([
+          { sessionId: "s", requestId: "run:delivery:d-changed", deliveredAt: now },
+        ]),
+      { timeout: 3000 },
+    );
+  });
+
+  it("starts a chat for a session it was delivered to that no chat has yet", async () => {
+    const now = Date.now();
+    const key = "agent:main:otter-mail:new-thread";
+    gateway((method) => {
+      if (method === "sessions.list")
+        return { sessions: [{ key, displayName: "Lease reminders", lastActivityAt: now }] };
+      if (method === "agents.list") return { agents: [{ id: "main" }] };
+      if (method === "chat.history")
+        return { messages: [delivered("d-thread", "Renew the lease by Friday.", now)] };
+      return undefined;
+    });
+    const started: AgentRun[] = [];
+    openClawProvider.watch!(settings, [], (run) => started.push(run));
+    await vi.waitFor(() =>
+      expect(fixture.request).toHaveBeenCalledWith("sessions.list", { limit: 200 }),
+    );
+    await tick();
+    expect(started).toEqual([]);
+
+    openClawProvider.delivered!(settings, key);
+    await vi.waitFor(() =>
+      expect(started).toEqual([
+        {
+          sessionId: key,
+          requestId: "run:delivery:d-thread",
+          chat: { title: "Lease reminders" },
+          deliveredAt: now,
+        },
+      ]),
+    );
+  });
+
   it("is followed like a run: its text, then done", async () => {
     history = () => ({
       messages: [delivered("d-1", "Waiting on your approval.", 10)],

@@ -140,7 +140,14 @@ type Gateway = {
   url: string;
   client: GatewayProtocolClient<GatewayBrowserDeviceAuthPlan>;
   scopes: string[];
+  /** What the gateway says it answers, its plugins' methods included. */
+  methods: string[];
 };
+
+/** The Otter plugin's: a message sent as the channel's owner (`extensions/openclaw/gateway`). */
+const OTTER_SEND = "otter.chat.send";
+/** Who the Otter plugin sends as, which `commands.ownerAllowFrom` lists to make it the owner. */
+const OTTER_OWNER = "otter:owner";
 
 let fullAccess: boolean | null = null;
 let fullAccessRequest: string | null = null;
@@ -179,6 +186,7 @@ function open(url: string, { token, bootstrapToken }: Credentials): Promise<Gate
     let requestId = 0;
     let settled = false;
     let scopes: string[] = [];
+    let methods: string[] = [];
     const settle = (error: Error | null) => {
       if (settled) return;
       settled = true;
@@ -186,7 +194,7 @@ function open(url: string, { token, bootstrapToken }: Credentials): Promise<Gate
       if (error) {
         client.stop();
         reject(error);
-      } else resolve({ url, client, scopes });
+      } else resolve({ url, client, scopes, methods });
     };
     const timer = setTimeout(
       () => settle(new Error("The gateway didn't answer.")),
@@ -239,6 +247,7 @@ function open(url: string, { token, bootstrapToken }: Credentials): Promise<Gate
       onHello: (hello) => {
         pairingRequest = null;
         scopes = hello.auth?.scopes ?? [];
+        methods = (hello as { features?: { methods?: string[] } }).features?.methods ?? [];
         fullAccess = holdsAll(scopes);
         if (bootstrapToken) void clearOpenClawBootstrapToken();
         settle(null);
@@ -341,6 +350,52 @@ export async function allowOpenClawFullAccess(
       if (fullAccessRequest === requestId) fullAccessRequest = null;
       changed();
     });
+}
+
+type OwnerConfig = { listed: boolean; owners: unknown[]; hash: string };
+
+async function ownerConfig(g: Gateway): Promise<OwnerConfig> {
+  const { sourceConfig, hash } = await g.client.request<{
+    sourceConfig?: { commands?: { ownerAllowFrom?: unknown } };
+    hash: string;
+  }>("config.get", {});
+  const owners = sourceConfig?.commands?.ownerAllowFrom;
+  const list = Array.isArray(owners) ? owners : [];
+  return { listed: list.some((entry) => String(entry).trim() === OTTER_OWNER), owners: list, hash };
+}
+
+/**
+ * Whether what you send goes through the Otter plugin as the gateway's owner (a channel
+ * owner manages every automation, not only this chat's): null without the plugin, or
+ * without the full access its method needs.
+ */
+export async function openClawOwner(): Promise<boolean | null> {
+  const g = await current?.ready.catch(() => null);
+  if (!g?.methods.includes(OTTER_SEND) || !holdsAll(g.scopes)) return null;
+  let listed = ownerListed.get(g);
+  if (!listed) {
+    listed = ownerConfig(g).then((config) => config.listed);
+    ownerListed.set(g, listed);
+    listed.catch(() => ownerListed.delete(g));
+  }
+  return listed.catch(() => null);
+}
+
+const ownerListed = new WeakMap<Gateway, Promise<boolean>>();
+
+/** Lists the Otter plugin's sender in `commands.ownerAllowFrom`, beside any owners there are. */
+export async function allowOpenClawOwner(settings: OpenClawSettings): Promise<void> {
+  const g = await gateway(settings);
+  const { listed, owners, hash } = await ownerConfig(g);
+  ownerListed.delete(g);
+  if (listed) return;
+  await g.client.request("config.patch", {
+    raw: JSON.stringify({ commands: { ownerAllowFrom: [...owners, OTTER_OWNER] } }),
+    baseHash: hash,
+    replacePaths: ["commands.ownerAllowFrom"],
+    note: "Otter Mail: what you send from Otter is the owner's",
+  });
+  logger.info("agent", "openclaw owner allowed");
 }
 
 type Agent = {
@@ -476,7 +531,14 @@ const ownsRun = (turn: Turn, runId: unknown) =>
   runId === turn.runId || (typeof runId === "string" && turn.steers.has(runId));
 
 function sendKeyOf(row: Record<string, unknown>): string | undefined {
-  const meta = row.__openclaw as { idempotencyKey?: unknown } | undefined;
+  const meta = row.__openclaw as
+    | { idempotencyKey?: unknown; transport?: { channel?: unknown; messageId?: unknown } }
+    | undefined;
+  // Sent through the Otter channel, it's kept under the channel's own key; the send's is its message id.
+  if (row.role === "user" && meta?.transport?.channel === "otter") {
+    const id = meta.transport.messageId;
+    return typeof id === "string" ? id : undefined;
+  }
   const key = meta?.idempotencyKey ?? row.idempotencyKey;
   return typeof key === "string" ? key.replace(/:user$/, "") : undefined;
 }
@@ -569,6 +631,8 @@ const INBOX = /^agent:([^:]+):otter:inbox$/;
 /** How far back a device that has no chat for an agent's Otter session yet shows what it delivered. */
 const INBOX_BACKLOG_MS = 24 * 60 * 60 * 1000;
 const DELIVERY_WRITTEN_MS = 3000;
+/** How long a watched chat's changes settle before it's caught up on. */
+const CHANGE_SETTLE_MS = 1000;
 
 /** Whether the rows end with an accepted `sessions_yield`: the run's continuation hasn't come yet. */
 export function waitingOnYield(rows: Record<string, unknown>[]): boolean {
@@ -1149,7 +1213,7 @@ function announce(
   { title, deliveredAt }: { title?: string; deliveredAt?: number } = {},
 ): void {
   const watched = watching?.sessions.has(sessionKey);
-  if (!watching || (!watched && !INBOX.test(sessionKey))) return;
+  if (!watching || (!watched && !INBOX.test(sessionKey) && !pointed.has(sessionKey))) return;
   if (announced.has(runId) || sent.has(runId)) return;
   for (const turn of turns.values())
     if (turn.sessionKey === sessionKey && (!turn.ending || ownsRun(turn, runId))) return;
@@ -1166,6 +1230,13 @@ function announce(
 listeners.add(({ event, payload }) => {
   const p = (payload ?? {}) as Record<string, unknown>;
   if (typeof p.sessionKey !== "string" || !watching?.sessions.has(p.sessionKey)) return;
+  // Written into the chat by no run of it (a scheduled job's result, kept here when it had no
+  // channel to go to): only the session's change says so.
+  if (event === "sessions.changed") {
+    // A turn going in the chat follows it already.
+    for (const turn of turns.values()) if (turn.sessionKey === p.sessionKey && !turn.ending) return;
+    return catchUpSoon();
+  }
   const row = p.message as Record<string, unknown> | undefined;
   const key = event === "session.message" && row?.role === "user" ? sendKeyOf(row) : undefined;
   if (key) {
@@ -1222,9 +1293,33 @@ async function ensureWatching(delay = 0): Promise<void> {
  */
 const fresh = new Set<string>();
 
+/**
+ * Sessions the gateway delivered to that no chat here watches (a job that runs in a session of
+ * its own): caught up on like the agent's Otter session, so they start a chat.
+ */
+const pointed = new Set<string>();
+
+function catchUpNow(): void {
+  if (!watching) return;
+  if (watchedClient)
+    void current?.ready.then(catchUpSessions).catch(() => {
+      watchedClient = null;
+      scheduleWatch(RECONNECT_DELAYS_MS[0]);
+    });
+  else void ensureWatching();
+}
+
+let catchingUp: ReturnType<typeof setTimeout> | undefined;
+/** Once a burst of changes settles. */
+function catchUpSoon(): void {
+  clearTimeout(catchingUp);
+  catchingUp = setTimeout(catchUpNow, CHANGE_SETTLE_MS);
+}
+
 /** Runs the agent started while this device wasn't listening: going now, or written since the chat last ended. */
 async function catchUpSessions(g: Gateway): Promise<void> {
   const caught = new Set(fresh);
+  const delivered = new Set(pointed);
   const { sessions } = await g.client.request<{ sessions?: Record<string, unknown>[] }>(
     "sessions.list",
     { limit: 200 },
@@ -1234,7 +1329,7 @@ async function catchUpSessions(g: Gateway): Promise<void> {
     const key = String(row.key);
     const watched = watching?.sessions.get(key);
     const inbox = INBOX.exec(key);
-    if (watched === undefined && !inbox) continue;
+    if (watched === undefined && !inbox && !delivered.has(key)) continue;
     const since =
       watched === undefined ? Date.now() - INBOX_BACKLOG_MS : fresh.has(key) ? 0 : watched;
     const active = (row.activeRunIds as string[] | undefined) ?? [];
@@ -1245,11 +1340,26 @@ async function catchUpSessions(g: Gateway): Promise<void> {
       { sessionKey: key, limit: 200 },
     );
     const runs = agentRunsSince(messages ?? [], since, active);
-    if (watched === undefined && inbox && runs.length > 0) names ??= await agentNames(g);
-    const title = inbox ? names?.get(inbox[1]) : undefined;
+    if (watched === undefined && runs.length > 0) names ??= await agentNames(g);
+    const title =
+      watched !== undefined
+        ? undefined
+        : inbox
+          ? names?.get(inbox[1])
+          : sessionTitle(row) || names?.get(agentOf(key));
     for (const id of runs) announce(key, id, { title, deliveredAt: deliveredAt(messages, id) });
   }
   for (const key of caught) fresh.delete(key);
+  for (const key of delivered) pointed.delete(key);
+}
+
+const agentOf = (sessionKey: string) => sessionKey.split(":")[1] ?? "";
+
+/** What the gateway calls a session, for a chat it starts. */
+function sessionTitle(row: Record<string, unknown>): string | undefined {
+  for (const field of ["displayName", "label", "derivedTitle"])
+    if (typeof row[field] === "string" && row[field]) return row[field] as string;
+  return undefined;
 }
 
 /** When a delivery (`delivery:<row id>`) was written; nothing for a run. */
@@ -1309,6 +1419,26 @@ export function agentRunsSince(
   return [...written, ...unwritten];
 }
 
+/**
+ * Sends through the Otter channel when the gateway has it and lists it as an owner, so the run
+ * is a channel owner's (it manages every automation); else `chat.send`, whose run is the
+ * owner's only for what this chat made. The plugin refuses (`otter_not_owner`) before
+ * anything runs, so falling back never sends twice.
+ */
+async function sendAsOwner(
+  g: Gateway,
+  send: { sessionKey: string; message: string; idempotencyKey: string; attachments?: unknown[] },
+): Promise<{ runId?: string }> {
+  if (g.methods.includes(OTTER_SEND) && holdsAll(g.scopes)) {
+    try {
+      return await g.client.request<{ runId?: string }>(OTTER_SEND, send);
+    } catch (error) {
+      if (!/otter_not_owner/.test(String(error))) throw error;
+    }
+  }
+  return g.client.request<{ runId?: string }>("chat.send", send);
+}
+
 export const openClawProvider: ChatProvider<OpenClawSettings> = {
   kind: "openclaw",
   displayName: "OpenClaw",
@@ -1320,6 +1450,7 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
       hasToken: await hasOpenClawCredentials(),
       pairingRequest: openClawPairingRequest(),
       fullAccess: openClawFullAccess(),
+      owner: await openClawOwner(),
     };
   },
 
@@ -1416,13 +1547,14 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
     }
 
     const turn = newTurn(requestId, sessionKey, g, emit);
+    const send = {
+      sessionKey,
+      message: input.input,
+      idempotencyKey: requestId,
+      ...(attachments.length > 0 ? { attachments } : {}),
+    };
     await follow(turn, settings, async () => {
-      const sent = await g.client.request<{ runId?: string }>("chat.send", {
-        sessionKey,
-        message: input.input,
-        idempotencyKey: requestId,
-        ...(attachments.length > 0 ? { attachments } : {}),
-      });
+      const sent = await sendAsOwner(g, send);
       turn.runId = sent.runId ?? requestId;
       await watch(turn);
     });
@@ -1777,15 +1909,11 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
     else void ensureWatching();
   },
 
-  delivered() {
+  delivered(_settings, sessionKey) {
     const catchUp = () => {
-      if (!watching) return;
-      if (watchedClient)
-        void current?.ready.then(catchUpSessions).catch(() => {
-          watchedClient = null;
-          scheduleWatch(RECONNECT_DELAYS_MS[0]);
-        });
-      else void ensureWatching();
+      if (sessionKey?.startsWith("agent:") && !watching?.sessions.has(sessionKey))
+        pointed.add(sessionKey);
+      catchUpNow();
     };
     catchUp();
     // The gateway writes a delivery into the session only once the plugin has told the relay.
@@ -1795,6 +1923,8 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
   shutdown() {
     watching = null;
     fresh.clear();
+    pointed.clear();
+    clearTimeout(catchingUp);
     watchedClient = null;
     clearTimeout(rewatch);
     for (const [requestId, turn] of turns)

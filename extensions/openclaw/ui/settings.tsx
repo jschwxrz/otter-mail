@@ -48,10 +48,12 @@ export function OpenClawSettings({ provider, update }: AgentSettingsProps) {
     url: savedUrl,
     pairingRequest: openclawPairingRequest,
     fullAccess: openclawFullAccess,
+    owner: openclawOwner,
   } = provider.settings as ProviderSnapshot["settings"] & {
     url: string;
     pairingRequest: string | null;
     fullAccess: { allowed: boolean | null; request: string | null };
+    owner: boolean | null;
   };
   const [asking, setAsking] = useState(false);
   const connected = provider.status === "ready";
@@ -71,6 +73,19 @@ export function OpenClawSettings({ provider, update }: AgentSettingsProps) {
     } catch (error) {
       toast.error(
         `Could not ask the gateway: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      setAsking(false);
+    }
+  };
+
+  const allowOwner = async () => {
+    setAsking(true);
+    try {
+      setState(await openClawApi.agentAllowOpenClawOwner());
+    } catch (error) {
+      toast.error(
+        `Could not change the gateway's settings: ${error instanceof Error ? error.message : String(error)}`,
       );
     } finally {
       setAsking(false);
@@ -240,6 +255,17 @@ export function OpenClawSettings({ provider, update }: AgentSettingsProps) {
               <Command value={`openclaw devices approve ${openclawFullAccess.request}`} />
             ) : null}
           </SettingsRow>
+        ) : null}
+        {connected && openclawOwner === false ? (
+          <SettingsRow
+            title="Manage every automation"
+            description="A chat can only see and change the automations it made. Allowing this lists Otter as one of the gateway's owners (commands.ownerAllowFrom), as you would your own Telegram account, so any chat can manage them all."
+            control={
+              <Btn size="sm" disabled={asking} onClick={() => void allowOwner()}>
+                {asking ? "Allowing…" : "Allow"}
+              </Btn>
+            }
+          />
         ) : null}
       </SettingsSection>
       {connected ? <OpenClawDeliveries /> : null}
