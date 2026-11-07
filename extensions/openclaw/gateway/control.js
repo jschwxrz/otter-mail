@@ -407,7 +407,11 @@ export function createBrowserControl({
       lock.next += 1;
       tab.chain = tab.chain
         .then(async () => {
-          for (const event of batch.events) await replay(tab, page, event).catch(() => {});
+          // Handed back meanwhile: what's still queued is dropped, not sent over the agent.
+          for (const event of batch.events) {
+            if (tab.lock !== lock) return;
+            await replay(tab, page, event).catch(() => {});
+          }
         })
         .finally(batch.done);
     }

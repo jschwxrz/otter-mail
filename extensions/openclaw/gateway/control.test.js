@@ -97,6 +97,21 @@ describe("taking control of the agent's browser", () => {
     ]);
   });
 
+  it("drops what's still queued once you hand the tab back", async () => {
+    let answer;
+    const { control, sent } = await fixture({
+      answerDialog: () => new Promise((resolve) => (answer = resolve)),
+    });
+    await control.take("tab");
+    const first = control.input("tab", undefined, 1, [{ type: "dialog", accept: true }]);
+    const second = control.input("tab", undefined, 2, [text("late")]);
+    await vi.waitFor(() => expect(answer).toBeDefined());
+    control.release("tab");
+    answer();
+    await Promise.all([first, second]);
+    expect(sent).toEqual([]);
+  });
+
   it("keeps the request open until its batch is replayed, even one released after a gap", async () => {
     vi.useFakeTimers();
     let answeredWhileOpen = null;
