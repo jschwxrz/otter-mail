@@ -1,12 +1,47 @@
 import { useEffect, useRef, useState } from "react";
-import { GlobeIcon, LoaderCircleIcon, MonitorOffIcon } from "lucide-react";
+import {
+  CloudIcon,
+  GlobeIcon,
+  LoaderCircleIcon,
+  MonitorOffIcon,
+  MousePointer2Icon,
+} from "lucide-react";
 import { mailApi, type ProviderKind } from "./api";
+import { controlBrowser } from "./agent-browser-input";
+import { faviconFor } from "../browser/browser-view";
+import { hostOf } from "../browser/store";
+import { HintTooltip, cn } from "./ui";
+
+/** Held tabs are let go a while after the last heartbeat, so a closed app never keeps one. */
+const HEARTBEAT_MS = 10_000;
 
 type ViewState =
   | { status: "connecting"; page?: string }
   | { status: "live"; page?: string }
   | { status: "closed" }
   | { status: "failed"; message: string };
+
+/** The site's icon, as a browser tab shows it, marked as the agent's remote browser. */
+export function AgentBrowserTabIcon({ page }: { page?: string }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  const icon = page ? faviconFor(page) : null;
+  return (
+    <span className="relative flex size-3.5 shrink-0">
+      {icon && failed !== icon ? (
+        <img
+          src={icon}
+          alt=""
+          draggable={false}
+          className="size-3.5 rounded-[3px]"
+          onError={() => setFailed(icon)}
+        />
+      ) : (
+        <GlobeIcon className="size-3.5" />
+      )}
+      <CloudIcon className="absolute -right-1.5 -bottom-1 size-2.5 rounded-full bg-canvas p-px text-muted-foreground" />
+    </span>
+  );
+}
 
 function usePageVisible(): boolean {
   const [visible, setVisible] = useState(() => document.visibilityState === "visible");
@@ -24,21 +59,28 @@ function usePageVisible(): boolean {
  * without a copy. A frame that arrives while one decodes replaces the one waiting, so a slow
  * machine skips frames rather than falling behind; nothing streams while the page is hidden.
  * `activity` changes when the agent browses again, and when that step's result has named its tab:
- * it may have moved to another one.
+ * it may have moved to another one. Taking control sends your mouse and keys to the tab (the
+ * Otter plugin on the gateway replays them), and the agent's browser waits until you hand it back.
  */
 export function AgentBrowser({
   provider,
   sessionId,
   agentName,
   activity,
+  onPage,
 }: {
   provider: ProviderKind;
   sessionId: string;
   agentName: string;
   activity: number;
+  onPage: (url: string | undefined) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const targetRef = useRef<string | null>(null);
+  const frameRef = useRef<{ cssWidth: number; cssHeight: number } | null>(null);
+  const [tab, setTab] = useState<{ targetId: string; profile?: string } | null>(null);
+  const [controlling, setControlling] = useState(false);
+  const [controlError, setControlError] = useState<string | null>(null);
   const [state, setState] = useState<ViewState>({ status: "connecting" });
   const [connection, setConnection] = useState(0);
   const visible = usePageVisible();
@@ -54,6 +96,7 @@ export function AgentBrowser({
     let decoding = false;
     let waiting: Blob | null = null;
     let shown = false;
+    const decoder = new TextDecoder();
 
     const draw = (frame: Blob) => {
       if (decoding) {
@@ -101,6 +144,11 @@ export function AgentBrowser({
               return;
             }
             targetRef.current = view.targetId;
+            setTab((t) =>
+              t?.targetId === view.targetId
+                ? t
+                : { targetId: view.targetId, profile: view.profile },
+            );
             shown = false;
             setState({ status: "connecting", page: view.page });
             const opened = new WebSocket(view.url);
@@ -117,6 +165,12 @@ export function AgentBrowser({
               }
               const buffer = data as ArrayBuffer;
               const header = new DataView(buffer).getUint32(0);
+              const meta = JSON.parse(decoder.decode(new Uint8Array(buffer, 4, header))) as {
+                cssWidth?: number;
+                cssHeight?: number;
+              };
+              if (meta.cssWidth && meta.cssHeight)
+                frameRef.current = { cssWidth: meta.cssWidth, cssHeight: meta.cssHeight };
               draw(new Blob([new Uint8Array(buffer, 4 + header)], { type: "image/jpeg" }));
             });
             opened.addEventListener("close", ({ code }) => {
@@ -183,24 +237,86 @@ export function AgentBrowser({
     };
   }, [activity, provider, sessionId]);
 
+  const live = state.status === "live";
+  const page = "page" in state ? state.page : undefined;
+  useEffect(() => onPage(page), [page, onPage]);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!controlling || !live || !tab || !canvas) return;
+    const input = (request: { take?: boolean; seq?: number; events?: unknown[] }) =>
+      mailApi.agentBrowserInput(provider, { ...tab, ...request });
+    const lost = (error: unknown) => {
+      setControlling(false);
+      setControlError(error instanceof Error ? error.message : "Lost control of the tab.");
+    };
+    let held = true;
+    input({ take: true }).catch(lost);
+    const heartbeat = setInterval(() => input({ take: true }).catch(lost), HEARTBEAT_MS);
+    const detach = controlBrowser(canvas, {
+      frameSize: () => frameRef.current,
+      send: (seq, events) => input({ seq, events }),
+      onLost: (error) => held && lost(error),
+    });
+    return () => {
+      held = false;
+      clearInterval(heartbeat);
+      detach();
+      void input({ take: false }).catch(() => {});
+    };
+  }, [controlling, live, tab, provider]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b px-3 text-xs text-muted-foreground">
-        {state.status === "live" ? (
-          <span className="size-1.5 shrink-0 rounded-full bg-red-500" aria-label="Live" />
-        ) : (
-          <GlobeIcon className="size-3.5 shrink-0" />
-        )}
-        <span className="min-w-0 flex-1 truncate">
-          {"page" in state && state.page ? state.page : `${agentName}'s browser`}
-        </span>
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 px-3">
+        <HintTooltip
+          label={`${agentName}'s browser, running on the OpenClaw gateway`}
+          side="bottom"
+        >
+          <span className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-foreground/[0.06] px-3 text-xs font-medium text-foreground">
+            <CloudIcon className="size-3.5 text-muted-foreground" />
+            {agentName}
+            {live ? <span className="size-1.5 rounded-full bg-red-500" aria-label="Live" /> : null}
+          </span>
+        </HintTooltip>
+        <div
+          title={page}
+          className="mx-auto flex h-8 min-w-0 max-w-[56rem] flex-1 items-center justify-center rounded-full bg-foreground/[0.06] px-4 text-sm text-foreground"
+        >
+          <span className="truncate">{page ? hostOf(page) : `${agentName}'s browser`}</span>
+        </div>
+        {live && tab ? (
+          <button
+            type="button"
+            onClick={() => {
+              setControlError(null);
+              setControlling((on) => !on);
+            }}
+            className={cn(
+              "flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
+              controlling
+                ? "bg-foreground text-background hover:bg-foreground/85"
+                : "bg-foreground/[0.06] text-foreground hover:bg-foreground/[0.09]",
+            )}
+          >
+            <MousePointer2Icon className="size-3.5" />
+            {controlling ? "Release control" : "Take control"}
+          </button>
+        ) : null}
       </div>
+      {controlError && !controlling ? (
+        <p className="shrink-0 border-b border-border/70 px-3 py-1.5 text-xs text-destructive">
+          {controlError}
+        </p>
+      ) : null}
       <div className="relative min-h-0 flex-1 bg-muted/40">
         <canvas
           ref={canvasRef}
-          className={
-            state.status === "live" ? "size-full object-contain object-top" : "invisible size-full"
-          }
+          tabIndex={controlling ? 0 : -1}
+          aria-label={controlling ? `${agentName}'s browser, under your control` : undefined}
+          className={cn(
+            live ? "size-full object-contain object-top" : "invisible size-full",
+            controlling && "cursor-default outline-none ring-2 ring-focus-ring ring-inset",
+          )}
         />
         {state.status === "live" ? null : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center text-sm text-muted-foreground">

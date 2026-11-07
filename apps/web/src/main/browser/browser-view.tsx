@@ -69,7 +69,7 @@ const SUGGESTED = [
   { name: "Chrome Web Store", url: CHROME_WEB_STORE_URL },
 ];
 
-function faviconFor(url: string): string {
+export function faviconFor(url: string): string {
   return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostOf(url))}&sz=64`;
 }
 

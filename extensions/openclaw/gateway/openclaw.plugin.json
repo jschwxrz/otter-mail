@@ -3,6 +3,7 @@
   "name": "Otter",
   "description": "Send what your agents want you to see to Otter.",
   "activation": { "onStartup": true },
+  "contracts": { "gatewayMethodDispatch": ["authenticated-request"] },
   "channels": ["otter"],
   "configSchema": { "type": "object", "additionalProperties": false, "properties": {} },
   "channelConfigs": {

@@ -1714,7 +1714,25 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
       targetId,
       url: new URL(view.wsPath.replace(/^\//, ""), base).href,
       page: view.url ?? tab?.url,
+      profile: tab?.profile,
     } satisfies BrowserView;
+  },
+
+  // Through the Otter plugin on the gateway (otter.browser.*), which replays it in Chromium.
+  async browserInput(settings, { targetId, profile, take, seq, events }) {
+    const g = await gateway(settings);
+    await g.client
+      .request(
+        take === undefined ? "otter.browser.input" : "otter.browser.control",
+        take === undefined ? { targetId, profile, seq, events } : { targetId, take },
+      )
+      .catch((error: unknown) => {
+        throw /unknown method/i.test(String(error))
+          ? new Error(
+              "To take control, update the Otter plugin on the OpenClaw gateway: openclaw plugins update @otterware/openclaw-otter",
+            )
+          : error;
+      });
   },
 
   async deleteSession(settings, sessionId) {
