@@ -686,8 +686,19 @@ export const mailApi = {
     provider: ProviderKind,
     sessionId: string,
     request: { width: number; height: number; except?: string },
-  ): Promise<{ targetId: string; url: string | null; page?: string } | null> =>
+  ): Promise<{ targetId: string; url: string | null; page?: string; profile?: string } | null> =>
     ipc("agent:browserView", { provider, sessionId, ...request }),
+
+  agentBrowserInput: (
+    provider: ProviderKind,
+    input: {
+      targetId: string;
+      profile?: string;
+      take?: boolean;
+      seq?: number;
+      events?: unknown[];
+    },
+  ): Promise<{ ok: boolean }> => ipc("agent:browserInput", { provider, ...input }),
 
   agentDeleteSession: (provider: ProviderKind, sessionId: string): Promise<{ ok: boolean }> =>
     ipc("agent:deleteSession", { provider, sessionId }),

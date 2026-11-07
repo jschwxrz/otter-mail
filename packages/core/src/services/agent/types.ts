@@ -214,7 +214,24 @@ export type ForkPoint = { requestId?: string; fromEnd: number };
  * A live view of the tab a session's agent browses in: `url` is a WebSocket of JPEG frames
  * (OpenClaw's screencast), null when that tab is still `except`.
  */
-export type BrowserView = { targetId: string; url: string | null; page?: string };
+export type BrowserView = {
+  targetId: string;
+  url: string | null;
+  page?: string;
+  profile?: string;
+};
+
+/**
+ * Your input to the agent's tab, once you've taken control (`take`; false hands it back):
+ * mouse, wheel and key events in page CSS px, numbered in the order they were sent.
+ */
+export type BrowserInput = {
+  targetId: string;
+  profile?: string;
+  take?: boolean;
+  seq?: number;
+  events?: Record<string, unknown>[];
+};
 
 export type BrowserViewRequest = { width: number; height: number; except?: string };
 
@@ -274,6 +291,7 @@ export interface ChatProvider<S extends AgentSettings = AgentSettings> {
     sessionId: string,
     request: BrowserViewRequest,
   ): Promise<BrowserView | null>;
+  browserInput?(settings: S, input: BrowserInput): Promise<void>;
   deleteSession(settings: S, sessionId: string): Promise<void>;
   shutdown(): void;
 }

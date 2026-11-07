@@ -32,6 +32,7 @@ import {
   type ChatEvent,
   type ChatProvider,
   type ChatSession,
+  type BrowserInput,
   type BrowserViewRequest,
   type ChatSessionMessage,
   type ForkPoint,
@@ -396,6 +397,12 @@ export async function browserView(
   const found = provider(kind);
   if (!found.browserView) return null;
   return found.browserView(await agentSettings(kind), sessionId, request);
+}
+
+export async function browserInput(kind: ProviderKind, input: BrowserInput) {
+  const found = provider(kind);
+  if (!found.browserInput) throw new Error(`${found.displayName}'s browser can't be controlled.`);
+  await found.browserInput(await agentSettings(kind), input);
 }
 
 export async function readFile(kind: ProviderKind, sessionId: string, href: string) {

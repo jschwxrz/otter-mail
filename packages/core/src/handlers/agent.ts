@@ -246,6 +246,20 @@ export function registerAgentHandlers(): void {
     });
   });
 
+  handle("agent:browserInput", async (params: unknown) => {
+    const p = params as Params;
+    const targetId = str(p?.targetId);
+    if (!targetId) throw new Error("A tab is required.");
+    await agent.browserInput(providerOf(p), {
+      targetId,
+      profile: str(p?.profile) || undefined,
+      take: typeof p?.take === "boolean" ? p.take : undefined,
+      seq: typeof p?.seq === "number" ? p.seq : undefined,
+      events: Array.isArray(p?.events) ? (p.events as Record<string, unknown>[]) : undefined,
+    });
+    return { ok: true };
+  });
+
   handle("agent:deleteSession", async (params: unknown) => {
     const p = params as Params;
     await agent.deleteSession(providerOf(p), sessionIdOf(p));
