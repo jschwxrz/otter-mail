@@ -148,14 +148,23 @@ describe("what you send from Otter", () => {
 });
 
 describe("listing Otter as the gateway's owner", () => {
-  it("adds it beside the owners there are, and says when it's listed", async () => {
+  it("adds it beside the owners there are, lets its plugin brief the agent, and says when both are so", async () => {
     connect(["otter.chat.send"]);
     let owners: string[] = ["telegram:111"];
+    let briefed: boolean | undefined;
     answer((method, params) => {
       if (method === "config.get")
-        return { sourceConfig: { commands: { ownerAllowFrom: owners } }, hash: "h-1" };
+        return {
+          sourceConfig: {
+            commands: { ownerAllowFrom: owners },
+            plugins: { entries: { otter: { hooks: { allowConversationAccess: briefed } } } },
+          },
+          hash: "h-1",
+        };
       if (method === "config.patch") {
-        owners = JSON.parse((params as { raw: string }).raw).commands.ownerAllowFrom;
+        const patch = JSON.parse((params as { raw: string }).raw);
+        owners = patch.commands.ownerAllowFrom;
+        briefed = patch.plugins.entries.otter.hooks.allowConversationAccess;
         return { ok: true };
       }
       return undefined;
@@ -169,7 +178,36 @@ describe("listing Otter as the gateway's owner", () => {
       expect.objectContaining({ baseHash: "h-1", replacePaths: ["commands.ownerAllowFrom"] }),
     );
     expect(owners).toEqual(["telegram:111", "otter:owner"]);
+    expect(briefed).toBe(true);
     expect(await openClawOwner()).toBe(true);
+  });
+
+  it("asks again when Otter is an owner but its plugin may not brief the agent yet", async () => {
+    connect(["otter.chat.send"]);
+    let owners: string[] = ["otter:owner"];
+    let briefed: boolean | undefined;
+    answer((method, params) => {
+      if (method === "config.get")
+        return {
+          sourceConfig: {
+            commands: { ownerAllowFrom: owners },
+            plugins: { entries: { otter: { hooks: { allowConversationAccess: briefed } } } },
+          },
+          hash: "h-2",
+        };
+      if (method === "config.patch") {
+        const patch = JSON.parse((params as { raw: string }).raw);
+        owners = patch.commands.ownerAllowFrom;
+        briefed = patch.plugins.entries.otter.hooks.allowConversationAccess;
+        return { ok: true };
+      }
+      return undefined;
+    });
+    await openClawProvider.checkStatus(settings);
+    expect(await openClawOwner()).toBe(false);
+    await allowOpenClawOwner(settings);
+    expect(owners).toEqual(["otter:owner"]);
+    expect(briefed).toBe(true);
   });
 
   it("isn't asked about without the plugin", async () => {

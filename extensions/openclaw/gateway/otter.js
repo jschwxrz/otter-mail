@@ -12,6 +12,36 @@ export const OWNER_ENTRY = `otter:${OWNER}`;
 /** A chat in Otter is a target of its own: what's sent to it is kept in its session. */
 export const chatTarget = (sessionKey) => `chat:${sessionKey}`;
 
+/** Like posting to a Slack channel rather than in a thread: each delivery starts a chat of its own. */
+export const NEW_CHAT_TARGET = "new";
+
+export const isNewChat = (to) =>
+  typeof to === "string" && to.trim().replace(/^otter:/, "") === NEW_CHAT_TARGET;
+
+/** A target as the channel keeps it: one of Otter's chats, a new one each time, or the inbox. */
+export function targetOf(to) {
+  const chat = chatOf(to);
+  if (chat) return chatTarget(chat);
+  return isNewChat(to) ? NEW_CHAT_TARGET : OTTER_TARGET;
+}
+
+/** A session for a new chat, an Otter chat like one you start. */
+export const newChatKey = (agentId, id) => `agent:${agentId}:otter-mail:${id}`;
+
+/**
+ * What an agent in an Otter chat is told about sending to Otter (the message tool, an automation's
+ * delivery), with this chat's own target.
+ */
+export function otterTargetsNote(sessionKey) {
+  const here = agentOf(sessionKey) ? chatTarget(sessionKey) : "chat:<session key>";
+  return [
+    "Otter delivery targets (channel `otter`), like a thread or a new post in Slack:",
+    `- "${here}": this chat. Any Otter chat is "chat:<its session key>".`,
+    '- "new": a new Otter chat for each delivery (an automation that should post a fresh chat every run, such as a morning brief).',
+    '- "inbox": the agent\'s single Otter inbox chat.',
+  ].join("\n");
+}
+
 export const agentOf = (sessionKey) =>
   typeof sessionKey === "string" && sessionKey.startsWith("agent:")
     ? sessionKey.split(":")[1]
@@ -41,7 +71,8 @@ export function pointerOf({ sessionKey, to, payload, at = Date.now() }) {
   const approval = data.execApproval;
   const question = data.askUser;
   const session = approval?.sessionKey ?? sessionKey;
-  const chat = chatOf(to);
+  // A new chat's session is the one its delivery was routed to.
+  const chat = chatOf(to) ?? (isNewChat(to) && agentOf(sessionKey) ? sessionKey : undefined);
   const agentId = approval?.agentId ?? agentOf(chat ?? session) ?? "main";
   return {
     kind: approval ? "approval" : question ? "question" : "message",

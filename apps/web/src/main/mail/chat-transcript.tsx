@@ -5,6 +5,7 @@ import {
   ChevronRightIcon,
   CircleAlertIcon,
   CheckIcon,
+  ClockIcon,
   CopyIcon,
   FilePenLineIcon,
   GitForkIcon,
@@ -126,6 +127,33 @@ function ContextRecap({
         </span>
       )}
     </div>
+  );
+}
+
+/** A turn no message of yours started: an automation's result, or a message the agent sent. */
+function DeliveryRow({ turn }: { turn: ChatTurn }) {
+  const delivered = turn.delivered;
+  if (!delivered) return null;
+  const at = turn.startedAt
+    ? new Date(turn.startedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    : null;
+  const automation = delivered.kind === "automation";
+  const label = automation
+    ? ["Automation", delivered.name, at].filter(Boolean).join(" · ")
+    : [delivered.from ? `Sent by ${delivered.from}` : "Sent to you", at]
+        .filter(Boolean)
+        .join(" · ");
+  const Icon = automation ? ClockIcon : SendIcon;
+  const row = (
+    <div className="flex min-w-0 items-center gap-1.5 px-1 pt-2 text-xs text-muted-foreground">
+      <Icon className="size-3.5 shrink-0" />
+      <span className="min-w-0 truncate">{label}</span>
+    </div>
+  );
+  return automation && delivered.schedule ? (
+    <HintTooltip label={delivered.schedule}>{row}</HintTooltip>
+  ) : (
+    row
   );
 }
 
@@ -325,6 +353,7 @@ export function ChatTranscript({
     return (
       <MessageScroller.Item key={turn.id} messageId={turn.id}>
         <div className="flex flex-col">
+          <DeliveryRow turn={turn} />
           {live ? <WorkingRow startedAt={turn.startedAt} /> : null}
           {folded ? (
             <WorkFoldRow

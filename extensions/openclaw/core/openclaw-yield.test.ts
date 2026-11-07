@@ -36,7 +36,7 @@ vi.mock("@openclaw/gateway-client/browser", () => ({
     request = fixture.request;
   },
 }));
-const { openClawProvider, agentRunsSince, turnRows, waitingOnYield } =
+const { openClawProvider, agentRunsSince, scheduleText, turnRows, waitingOnYield } =
   await import("./openclaw.js");
 const settings = { url: "wss://gateway.test" } as OpenClawSettings;
 afterEach(() => {
@@ -672,6 +672,7 @@ describe("what an agent delivers to Otter", () => {
           requestId: "run:delivery:d-new",
           chat: { title: "Rowan" },
           deliveredAt: now,
+          delivery: { kind: "automation" },
         },
       ]),
     );
@@ -691,6 +692,7 @@ describe("what an agent delivers to Otter", () => {
         sessionId: "agent:main:otter:inbox",
         requestId: "run:delivery:d-next",
         deliveredAt: now + 1,
+        delivery: { kind: "automation" },
       }),
     );
   });
@@ -717,21 +719,37 @@ describe("what an agent delivers to Otter", () => {
     await vi.waitFor(
       () =>
         expect(started).toEqual([
-          { sessionId: "s", requestId: "run:delivery:d-changed", deliveredAt: now },
+          {
+            sessionId: "s",
+            requestId: "run:delivery:d-changed",
+            deliveredAt: now,
+            delivery: { kind: "automation" },
+          },
         ]),
       { timeout: 3000 },
     );
   });
 
-  it("starts a chat for a session it was delivered to that no chat has yet", async () => {
+  it("starts a chat for a session it was delivered to that no chat has yet, named for its automation", async () => {
     const now = Date.now();
     const key = "agent:main:otter-mail:new-thread";
-    gateway((method) => {
-      if (method === "sessions.list")
-        return { sessions: [{ key, displayName: "Lease reminders", lastActivityAt: now }] };
+    gateway((method, params) => {
+      if (method === "sessions.list") return { sessions: [{ key, lastActivityAt: now }] };
       if (method === "agents.list") return { agents: [{ id: "main" }] };
+      if (method === "cron.get" && (params as { id: string }).id === "job-lease")
+        return {
+          name: "Lease reminders",
+          schedule: { kind: "cron", expr: "0 9 * * 1", tz: "Europe/Berlin" },
+        };
       if (method === "chat.history")
-        return { messages: [delivered("d-thread", "Renew the lease by Friday.", now)] };
+        return {
+          messages: [
+            {
+              ...delivered("d-thread", "Renew the lease by Friday.", now),
+              openclawAutomation: { kind: "cron", jobId: "job-lease" },
+            },
+          ],
+        };
       return undefined;
     });
     const started: AgentRun[] = [];
@@ -748,11 +766,82 @@ describe("what an agent delivers to Otter", () => {
         {
           sessionId: key,
           requestId: "run:delivery:d-thread",
-          chat: { title: "Lease reminders" },
+          chat: {
+            title: `Lease reminders · ${new Date(now).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}`,
+          },
           deliveredAt: now,
+          delivery: {
+            kind: "automation",
+            name: "Lease reminders",
+            schedule: "0 9 * * 1 (Europe/Berlin)",
+          },
         },
       ]),
     );
+  });
+
+  it("says it's a message the agent sent when the message tool delivered it", async () => {
+    const now = Date.now();
+    gateway((method) => {
+      if (method === "sessions.list") return { sessions: [{ key: "s", lastActivityAt: now }] };
+      if (method === "agents.list")
+        return { agents: [{ id: "main", identity: { name: "Rowan" } }] };
+      if (method === "chat.history")
+        return { messages: [delivered("d-sent", "Your parcel arrived.", now, "delivery-mirror")] };
+      return undefined;
+    });
+    const started: AgentRun[] = [];
+    openClawProvider.watch!(settings, [{ id: "s", since: now - 1 }], (run) => started.push(run));
+    await vi.waitFor(() =>
+      expect(started).toEqual([
+        {
+          sessionId: "s",
+          requestId: "run:delivery:d-sent",
+          deliveredAt: now,
+          delivery: { kind: "message" },
+        },
+      ]),
+    );
+  });
+
+  it("isn't a delivery when the agent answered a message in this chat with the message tool", async () => {
+    const now = Date.now();
+    const reply = {
+      ...delivered("d-reply", "Scheduled it.", now, "delivery-mirror"),
+      __openclaw: {
+        id: "d-reply",
+        recordTimestampMs: now,
+        idempotencyKey: "req-9:message-tool:abc",
+      },
+    };
+    gateway((method) => {
+      if (method === "sessions.list") return { sessions: [{ key: "s", lastActivityAt: now }] };
+      if (method === "chat.history")
+        return {
+          messages: [
+            { role: "user", content: "Schedule it", __openclaw: { idempotencyKey: "req-9:user" } },
+            row("req-9", [{ type: "toolCall", id: "m-1", name: "message", arguments: {} }]),
+            reply,
+          ],
+        };
+      return undefined;
+    });
+    const started: AgentRun[] = [];
+    openClawProvider.watch!(settings, [{ id: "s", since: now - 1 }], (run) => started.push(run));
+    await vi.waitFor(() =>
+      expect(started).toEqual([
+        { sessionId: "s", requestId: "run:delivery:d-reply", deliveredAt: now },
+      ]),
+    );
+  });
+
+  it("describes an automation's schedule briefly", () => {
+    expect(scheduleText({ kind: "cron", expr: "0 10,14,18 * * *", tz: "Europe/Berlin" })).toBe(
+      "0 10,14,18 * * * (Europe/Berlin)",
+    );
+    expect(scheduleText({ kind: "every", everyMs: 30 * 60_000 })).toBe("Every 30m");
+    expect(scheduleText({ kind: "every", everyMs: 6 * 3_600_000 })).toBe("Every 6h");
+    expect(scheduleText({ kind: "at", at: "2026-11-08T10:00:00Z" })).toBe("Once");
   });
 
   it("is followed like a run: its text, then done", async () => {

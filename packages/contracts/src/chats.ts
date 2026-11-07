@@ -31,6 +31,14 @@ export interface ChatSentAttachment {
   thumb?: string;
 }
 
+/**
+ * A turn no message of yours started: an automation's result (its job's name and schedule while
+ * the job exists), or a message the agent sent you itself.
+ */
+export type ChatDelivery =
+  | { kind: "automation"; name?: string; schedule?: string }
+  | { kind: "message"; from?: string };
+
 export interface ChatTurn {
   id: string;
   role: "user" | "assistant";
@@ -45,6 +53,7 @@ export interface ChatTurn {
   error?: string;
   /** The chat was forked from another after this turn. */
   forked?: boolean;
+  delivered?: ChatDelivery;
   startedAt?: number;
   finishedAt?: number;
 }
