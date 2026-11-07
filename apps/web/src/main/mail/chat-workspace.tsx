@@ -261,6 +261,7 @@ export function ChatWorkspace({
       inputRef={inputRef}
       onOpenChange={openChange}
       onOpenFile={(href) => open({ kind: "file", href }, href.split(/[\\/]/).pop() || href)}
+      onShowChat={onSelectChat}
     />
   );
 

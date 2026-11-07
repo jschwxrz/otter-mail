@@ -19,7 +19,7 @@ import {
 } from "./chat-cite";
 import { AttachmentPreview, attachmentPreview, type PreviewFile } from "./attachment-preview";
 import { DropOverlay, useChatAttachments, useFileDrop } from "./chat-attachments";
-import { isElsewhere, loadChat, setCitations, useChats } from "./chat-store";
+import { forkChat, isElsewhere, loadChat, setCitations, useChats } from "./chat-store";
 import { ChatTranscript } from "./chat-transcript";
 import { ChatComposer } from "./chat-composer";
 import { isProviderUsable } from "./agent-providers";
@@ -47,6 +47,7 @@ export function ChatView({
   inputRef,
   onOpenChange,
   onOpenFile,
+  onShowChat,
   compact = false,
   centered = false,
 }: {
@@ -56,6 +57,8 @@ export function ChatView({
   inputRef: RefObject<HTMLTextAreaElement | null>;
   onOpenChange: (change: ChatChange) => Promise<void>;
   onOpenFile?: (href: string) => void;
+  /** Shows another chat (a fork) where the shown one is the route's. */
+  onShowChat?: (chatId: string) => void;
   compact?: boolean;
   /** A new chat over the backdrop: the composer waits mid-column, and glides down on send. */
   centered?: boolean;
@@ -218,6 +221,18 @@ export function ChatView({
                   loadImage={loadChatImage}
                   onOpenContext={openContextItem}
                   onOpenChange={onOpenChange}
+                  onFork={
+                    chat.provider?.forks && convo?.sessionId
+                      ? (turnId) =>
+                          forkChat(chatId, turnId).then(
+                            (forked) => forked && onShowChat?.(forked),
+                            (error: unknown) =>
+                              toast.error("Couldn't fork this chat", {
+                                description: error instanceof Error ? error.message : String(error),
+                              }),
+                          )
+                      : undefined
+                  }
                 />
               </MessageScroller.Content>
             </ScrollArea>

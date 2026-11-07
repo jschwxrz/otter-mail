@@ -48,6 +48,8 @@ export type ProviderSnapshot = {
   models: ProviderModel[];
   model: string | null;
   sessions: boolean;
+  /** Whether a chat can be forked from one of your messages (`ChatProvider.fork`). */
+  forks: boolean;
   /** The agent's settings, plus what its `settingsView` adds (never its secrets). */
   settings: AgentSettingsView;
 };
@@ -201,6 +203,9 @@ export type AgentRun = {
   deliveredAt?: number;
 };
 
+/** One of your messages in a session: the one sent with `requestId`, else the `fromEnd`th from the last (0). */
+export type ForkPoint = { requestId?: string; fromEnd: number };
+
 export interface ChatProvider<S extends AgentSettings = AgentSettings> {
   readonly kind: ProviderKind;
   readonly displayName: string;
@@ -213,7 +218,9 @@ export interface ChatProvider<S extends AgentSettings = AgentSettings> {
   readonly localOnly?: boolean;
   /** What the settings form needs beyond the settings: whether a key is saved, a pairing request. */
   settingsView?(settings: S): Promise<Record<string, unknown>>;
-  checkStatus(settings: S): Promise<Omit<ProviderSnapshot, "checkedAt" | "enabled" | "settings">>;
+  checkStatus(
+    settings: S,
+  ): Promise<Omit<ProviderSnapshot, "checkedAt" | "enabled" | "settings" | "forks">>;
   sendTurn(input: SendTurnInput, settings: S, emit: Emit): Promise<void>;
   /**
    * Picks up a run sent earlier with this request id, which the panel lost
@@ -245,6 +252,8 @@ export interface ChatProvider<S extends AgentSettings = AgentSettings> {
   listSessions(settings: S, limit: number): Promise<ChatSession[]>;
   readSession(settings: S, sessionId: string): Promise<ChatSessionMessage[]>;
   readFile?(settings: S, sessionId: string, href: string): Promise<ChatFile>;
+  /** A new session with what came before this message: its id. */
+  fork?(settings: S, sessionId: string, at: ForkPoint): Promise<string>;
   deleteSession(settings: S, sessionId: string): Promise<void>;
   shutdown(): void;
 }

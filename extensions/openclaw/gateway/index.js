@@ -4,6 +4,9 @@ import {
   createChatChannelPlugin,
   defineChannelPluginEntry,
 } from "openclaw/plugin-sdk/channel-core";
+import { resolveAgentWorkspaceDir } from "openclaw/plugin-sdk/agent-runtime";
+import { resolveAgentIdFromSessionKey } from "openclaw/plugin-sdk/routing";
+import { readWorkspaceFile } from "./files.js";
 import { accountOf, inboxKey, OTTER_TARGET, pointerOf, tell } from "./otter.js";
 
 async function deliver(ctx, payload) {
@@ -59,4 +62,19 @@ export default defineChannelPluginEntry({
   name: "Otter",
   description: "Send what your agents want you to see to Otter.",
   plugin: otterChannel,
+  registerFull(api) {
+    // Otter's preview of a file an agent linked: PDFs and other files sessions.files.get won't send.
+    api.registerGatewayMethod(
+      "otter.files.get",
+      async ({ params, context }) => {
+        const { sessionKey, path } = params ?? {};
+        if (typeof sessionKey !== "string" || typeof path !== "string" || !path)
+          throw new Error("sessionKey and path are required");
+        const cfg = context?.getRuntimeConfig?.() ?? api.config;
+        const workspace = resolveAgentWorkspaceDir(cfg, resolveAgentIdFromSessionKey(sessionKey));
+        return { file: await readWorkspaceFile(workspace, path) };
+      },
+      { scope: "operator.read" },
+    );
+  },
 });

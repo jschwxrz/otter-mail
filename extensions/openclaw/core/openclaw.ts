@@ -28,6 +28,7 @@ import type {
   ChatSession,
   ChatSessionMessage,
   Emit,
+  ForkPoint,
 } from "@otter-mail/core/extension-kit";
 import { OPENCLAW_DEFAULTS, type OpenClawSettings } from "./settings.js";
 import {
@@ -477,6 +478,16 @@ function sendKeyOf(row: Record<string, unknown>): string | undefined {
   const meta = row.__openclaw as { idempotencyKey?: unknown } | undefined;
   const key = meta?.idempotencyKey ?? row.idempotencyKey;
   return typeof key === "string" ? key.replace(/:user$/, "") : undefined;
+}
+
+/** The entry `sessions.fork` takes for one of your messages. */
+export function forkEntry(rows: Record<string, unknown>[], at: ForkPoint): string | undefined {
+  const sent = rows.filter((m) => m.role === "user");
+  const row =
+    (at.requestId && sent.findLast((m) => sendKeyOf(m) === at.requestId)) ||
+    sent[sent.length - 1 - at.fromEnd];
+  const id = (row?.__openclaw as { id?: unknown } | undefined)?.id;
+  return typeof id === "string" ? id : undefined;
 }
 
 /** Tools the chat doesn't show as steps: a yield is the turn waiting, not something it did. */
@@ -1575,6 +1586,24 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
       .catch((error: unknown) => {
         throw /not found|outside/i.test(String(error)) ? new Error(unreadable) : error;
       });
+    // It shares only images and text, up to 256 KB: the Otter plugin sends the rest (a PDF).
+    if (result.file && result.file.content === undefined) {
+      const whole = await g.client
+        .request<{ file: { name: string; content: string } }>("otter.files.get", {
+          sessionKey: sessionId,
+          path,
+        })
+        .catch((error: unknown) => {
+          throw /unknown method/i.test(String(error))
+            ? new Error(
+                "To open this file, update the Otter plugin on the OpenClaw gateway: openclaw plugins update @otterware/openclaw-otter",
+              )
+            : /not found|outside/i.test(String(error))
+              ? new Error(unreadable)
+              : error;
+        });
+      return chatFile(whole.file.name, fromBase64(whole.file.content), result.file.mimeType);
+    }
     if (result.file?.content === undefined) throw new Error(unreadable);
     const bytes =
       result.file.contentEncoding === "base64"
@@ -1585,6 +1614,21 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
       bytes,
       result.file.mimeType,
     );
+  },
+
+  async fork(settings, sessionId, at) {
+    const g = await gateway(settings);
+    const result = await g.client.request<{ messages?: Record<string, unknown>[] }>(
+      "chat.history",
+      { sessionKey: sessionId, limit: 500 },
+    );
+    const entryId = forkEntry(result.messages ?? [], at);
+    if (!entryId) throw new Error("OpenClaw doesn't have this message any more.");
+    const forked = await g.client.request<{ sessionKey: string }>("sessions.fork", {
+      sessionKey: sessionId,
+      entryId,
+    });
+    return forked.sessionKey;
   },
 
   async deleteSession(settings, sessionId) {

@@ -1,8 +1,27 @@
 import { openClawStep } from "@otter-mail/core/extension-kit";
 import { describe, expect, it } from "vite-plus/test";
-import { normalizeOpenClawUrl, parseOpenClawSetupCode } from "./openclaw.js";
+import { forkEntry, normalizeOpenClawUrl, parseOpenClawSetupCode } from "./openclaw.js";
 
 describe("OpenClaw", () => {
+  it("forks at the message sent with a request id, else counted from the last", () => {
+    const sent = (id: string, key?: string) => ({
+      role: "user",
+      content: id,
+      __openclaw: { id, ...(key ? { idempotencyKey: `${key}:user` } : {}) },
+    });
+    const rows = [
+      sent("e1"),
+      { role: "assistant", content: "hi" },
+      sent("e2", "req-2"),
+      { role: "assistant", content: "ok" },
+      sent("e3", "req-3"),
+    ];
+    expect(forkEntry(rows, { requestId: "req-2", fromEnd: 0 })).toBe("e2");
+    expect(forkEntry(rows, { requestId: "req-gone", fromEnd: 2 })).toBe("e1");
+    expect(forkEntry(rows, { fromEnd: 0 })).toBe("e3");
+    expect(forkEntry(rows, { fromEnd: 5 })).toBeUndefined();
+  });
+
   it("reaches the gateway over its WebSocket, whatever address is pasted", () => {
     expect(normalizeOpenClawUrl("chris-agent-01.tail1234.ts.net")).toBe(
       "wss://chris-agent-01.tail1234.ts.net",

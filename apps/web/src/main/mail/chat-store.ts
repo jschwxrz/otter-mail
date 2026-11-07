@@ -789,6 +789,33 @@ export function deleteConversation(id: string, provider: ProviderKind): void {
   });
 }
 
+/** A new chat with what came before this message of yours, the message in its composer to edit and send. */
+export async function forkChat(convoId: string, turnId: string): Promise<string | undefined> {
+  const convo = get().conversations.find((c) => c.id === convoId);
+  const at = convo?.turns.findIndex((t) => t.id === turnId) ?? -1;
+  if (!convo?.sessionId || at < 1) return;
+  const turn = convo.turns[at];
+  const sessionId = await mailApi.agentFork(convo.provider, convo.sessionId, {
+    requestId: turn.id.startsWith("u-") ? turn.id.slice("u-".length) : undefined,
+    fromEnd: convo.turns.slice(at + 1).filter((t) => t.role === "user").length,
+  });
+  console.log("[AgentChat:fork]", { provider: convo.provider, from: convo.sessionId, sessionId });
+  const fork: Conversation = {
+    ...newConversation(convo.provider),
+    title: convo.title,
+    sessionId,
+    sessionOwned: true,
+    device: convo.device,
+    turns: convo.turns.slice(0, at),
+  };
+  set((s) => ({
+    conversations: [fork, ...s.conversations],
+    activeId: fork.id,
+    drafts: { ...s.drafts, [fork.id]: turn.text },
+  }));
+  return fork.id;
+}
+
 export function openServerSession(
   session: ChatSession,
   provider: ProviderKind,

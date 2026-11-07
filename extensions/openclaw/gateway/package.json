@@ -1,6 +1,6 @@
 {
   "name": "@otterware/openclaw-otter",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Otter as an OpenClaw channel: what your agents send you waits in Otter, and Otter tells your devices.",
   "license": "MIT",
   "repository": {
@@ -10,6 +10,7 @@
   },
   "files": [
     "index.js",
+    "files.js",
     "otter.js",
     "openclaw.plugin.json"
   ],

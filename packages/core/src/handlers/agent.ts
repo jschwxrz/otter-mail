@@ -221,6 +221,15 @@ export function registerAgentHandlers(): void {
     return runAsTask(str(p?.taskId), () => agent.readFile(providerOf(p), str(p?.sessionId), href));
   });
 
+  handle("agent:fork", async (params: unknown) => {
+    const p = params as Params;
+    const fromEnd = Number(p?.fromEnd);
+    return agent.forkSession(providerOf(p), sessionIdOf(p), {
+      requestId: str(p?.requestId) || undefined,
+      fromEnd: Number.isInteger(fromEnd) && fromEnd >= 0 ? fromEnd : 0,
+    });
+  });
+
   handle("agent:deleteSession", async (params: unknown) => {
     const p = params as Params;
     await agent.deleteSession(providerOf(p), sessionIdOf(p));

@@ -7,6 +7,7 @@ import {
   CheckIcon,
   CopyIcon,
   FilePenLineIcon,
+  GitForkIcon,
   LayersIcon,
   MailIcon,
   SendIcon,
@@ -248,6 +249,7 @@ export function ChatTranscript({
   loadImage,
   onOpenContext,
   onOpenChange,
+  onFork,
 }: {
   turns: ChatTurn[];
   streaming: boolean;
@@ -257,6 +259,8 @@ export function ChatTranscript({
   loadImage: (href: string) => Promise<string>;
   onOpenContext: (item: { title: string; target: ChatChange["target"] }) => void;
   onOpenChange: (change: ChatChange) => Promise<void>;
+  /** Forks the chat from this message of yours; absent when the agent can't. */
+  onFork?: (turnId: string) => void;
 }) {
   const [expandedFolds, setExpandedFolds] = useState<Set<string>>(() => new Set());
   const { scrollToEnd } = useMessageScroller();
@@ -272,7 +276,7 @@ export function ChatTranscript({
       else next.add(id);
       return next;
     });
-  return turns.map((turn) => {
+  return turns.map((turn, index) => {
     if (turn.role === "user") {
       return (
         <MessageScroller.Item key={turn.id} messageId={turn.id}>
@@ -297,7 +301,20 @@ export function ChatTranscript({
               ))}
               {turn.text}
             </div>
-            {turn.text ? <CopyMessageButton text={turn.text} /> : null}
+            <div className="flex">
+              {onFork && index > 0 && !streaming ? (
+                <HintTooltip label="Fork from here">
+                  <IconBtn
+                    label="Fork from here"
+                    className="size-6 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                    onClick={() => onFork(turn.id)}
+                  >
+                    <GitForkIcon className="size-3.5" />
+                  </IconBtn>
+                </HintTooltip>
+              ) : null}
+              {turn.text ? <CopyMessageButton text={turn.text} /> : null}
+            </div>
           </div>
         </MessageScroller.Item>
       );

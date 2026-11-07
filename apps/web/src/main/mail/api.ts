@@ -104,6 +104,7 @@ export type ProviderSnapshot = {
   models: ProviderModel[];
   model: string | null;
   sessions: boolean;
+  forks: boolean;
   /** The agent's settings, plus what it adds for its settings form (never its secrets). */
   settings: AgentSettingsView;
 };
@@ -672,6 +673,12 @@ export const mailApi = {
     data: string;
     size: number;
   }> => task("agent:readFile", { provider, sessionId, href }),
+
+  agentFork: (
+    provider: ProviderKind,
+    sessionId: string,
+    at: { requestId?: string; fromEnd: number },
+  ): Promise<string> => ipc("agent:fork", { provider, sessionId, ...at }),
 
   agentDeleteSession: (provider: ProviderKind, sessionId: string): Promise<{ ok: boolean }> =>
     ipc("agent:deleteSession", { provider, sessionId }),

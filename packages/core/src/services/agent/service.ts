@@ -33,6 +33,7 @@ import {
   type ChatProvider,
   type ChatSession,
   type ChatSessionMessage,
+  type ForkPoint,
   type ProviderKind,
   type ProviderSettings,
   type ProviderSnapshot,
@@ -67,7 +68,7 @@ function selectedOf(settings: ProviderSettings): ProviderKind {
 
 const STALE_AFTER_MS = 5 * 60_000;
 
-type Checked = Omit<ProviderSnapshot, "settings">;
+type Checked = Omit<ProviderSnapshot, "settings" | "forks">;
 const checked = new Map<ProviderKind, Checked>();
 const checking = new Map<ProviderKind, Promise<void>>();
 /** Bumped when a check's answer may be stale before it lands (the Otter account changed). */
@@ -106,6 +107,7 @@ export async function providersState(): Promise<ProvidersState> {
         enabled: settings.enabled,
         status: settings.enabled ? snapshot.status : "disabled",
         model: chosen || fallback || null,
+        forks: Boolean(agent.fork),
         settings: { ...settings, ...(await agent.settingsView?.(settings)) },
       } satisfies ProviderSnapshot;
     }),
@@ -376,6 +378,12 @@ export async function readSession(
 
 export async function deleteSession(kind: ProviderKind, sessionId: string): Promise<void> {
   await provider(kind).deleteSession(await agentSettings(kind), sessionId);
+}
+
+export async function forkSession(kind: ProviderKind, sessionId: string, at: ForkPoint) {
+  const found = provider(kind);
+  if (!found.fork) throw new Error(`${found.displayName} chats can't be forked.`);
+  return found.fork(await agentSettings(kind), sessionId, at);
 }
 
 export async function readFile(kind: ProviderKind, sessionId: string, href: string) {
