@@ -65,7 +65,8 @@ export function buildHandoffText(
   context: AgentContext,
   provider: ProviderKind,
 ): string {
-  const lines: string[] = [question.trim(), "", "— context from Otter —"];
+  // A marker, not a name: chats sync to older apps (and the iPhone's Otter Mail), which strip it.
+  const lines: string[] = [question.trim(), "", "— context from Otter Mail —"];
   for (const c of context.conversations) {
     if (c.quote) {
       lines.push(

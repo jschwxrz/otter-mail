@@ -118,7 +118,7 @@ function createClient() {
       ...(deviceName
         ? {
             headers: {
-              "User-Agent": `Otter/${appVersion} (${encodeURIComponent(deviceName)})`,
+              "User-Agent": `Otter Mail/${appVersion} (${encodeURIComponent(deviceName)})`,
             },
           }
         : {}),
@@ -198,7 +198,7 @@ export async function signOut(): Promise<void> {
 
 function deviceName(userAgent: string | null | undefined): string {
   const ua = userAgent ?? "";
-  const mac = /^Otter(?: Mail)?\/\S+ \((.+)\)$/.exec(ua)?.[1];
+  const mac = /^Otter Mail\/\S+ \((.+)\)$/.exec(ua)?.[1];
   if (mac) {
     try {
       return decodeURIComponent(mac);

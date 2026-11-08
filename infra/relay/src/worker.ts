@@ -204,7 +204,7 @@ app.get("/", (c) => c.text("Otter relay\n"));
 
 app.get("/v1/notifications/callback", async (c) => {
   const { state, code, error } = c.req.query();
-  if (!state) return c.text("Start notification setup in Otter.", 400);
+  if (!state) return c.text("Start notification setup in the app.", 400);
   return notificationConnections.callbackResponse(c.env, state, error ? undefined : code);
 });
 

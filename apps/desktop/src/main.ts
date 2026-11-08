@@ -316,7 +316,6 @@ app.on("will-quit", () => {
 
 void app.whenReady().then(async () => {
   nameApp();
-  if (hostOS.renameOldInstall()) return app.exit(0);
   logger.info("main", "App ready", {
     version: app.getVersion(),
     packaged: app.isPackaged,

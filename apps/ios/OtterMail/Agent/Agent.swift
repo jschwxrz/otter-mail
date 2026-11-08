@@ -562,7 +562,7 @@ final class Agent {
             switch message.role {
             case "user":
                 // Show the question, not the context block sent with it.
-                let text = message.text.components(separatedBy: MailContext.marker).first?.components(separatedBy: MailContext.otterMarker).first ?? message.text
+                let text = message.text.components(separatedBy: MailContext.marker).first ?? message.text
                 turns.append(Turn(role: .user, text: text.trimmingCharacters(in: .whitespacesAndNewlines)))
             case "assistant":
                 if let last = turns.last, last.role == .agent {
@@ -871,8 +871,6 @@ struct MailContext: Hashable {
     var messageIDs: [String]
 
     static let marker = "\n\n— context from Otter Mail —"
-    /// What the Mac and web apps write, since they're called Otter.
-    static let otterMarker = "\n\n— context from Otter —"
 
     init(_ thread: MailThread) {
         account = thread.mailbox

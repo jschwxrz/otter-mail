@@ -331,7 +331,7 @@ export async function complete(env: Env, state: string, code?: string): Promise<
     .bind(id, Date.now())
     .first<Authorization>();
   if (!request || request.user_id !== verified.payload.sub)
-    throw new HTTPException(400, { message: "Authorization expired. Start again in Otter." });
+    throw new HTTPException(400, { message: "Authorization expired. Start again in the app." });
   if (!code) return request;
   const revoked = await env.DB.prepare(
     "SELECT 1 FROM push_revocations WHERE user_id=? AND (session_id=? OR (session_id='' AND revoked_at>=?))",
@@ -363,7 +363,7 @@ export async function complete(env: Env, state: string, code?: string): Promise<
   const address =
     request.provider === "gmail" ? body.emailAddress : (body.mail ?? body.userPrincipalName);
   if (address?.toLowerCase() !== request.email)
-    throw new HTTPException(403, { message: "Authorize the mailbox selected in Otter." });
+    throw new HTTPException(403, { message: "Authorize the mailbox you selected in the app." });
   // Recheck after the network requests: removal or session revocation must win an in-flight exchange.
   if (
     await env.DB.prepare(
@@ -557,7 +557,7 @@ export async function callbackResponse(env: Env, state: string, code?: string): 
     algorithms: ["HS256"],
   }).catch(() => null);
   if (!verified)
-    return new Response("Notification setup expired. Start again in Otter.", { status: 400 });
+    return new Response("Notification setup expired. Start again in the app.", { status: 400 });
   let success = false;
   try {
     await complete(env, state, code);
@@ -569,17 +569,19 @@ export async function callbackResponse(env: Env, state: string, code?: string): 
     });
   }
   const returnTo = verified.payload.returnTo;
+  // The iPhone app is still Otter Mail.
+  const appName = returnTo === "native" ? "Otter Mail" : "Otter";
   const nonce = crypto.randomUUID();
   const status = success ? "success" : "error";
   const message = success
-    ? "Background notifications connected. You can return to Otter."
-    : "Background notifications were not connected. Return to Otter and try again.";
+    ? `Background notifications connected. You can return to ${appName}.`
+    : `Background notifications were not connected. Return to ${appName} and try again.`;
   const script =
     returnTo === "native"
       ? `location.href='ottermail-notifications://complete?result=${status}'`
       : `if(window.opener){window.opener.postMessage({type:'otter:notification-connected',result:'${status}'},${JSON.stringify(env.APP_ORIGIN)});window.close()}${returnTo === "web" ? `else{location.replace(${JSON.stringify(env.APP_ORIGIN + "/settings/accounts")})}` : ""}`;
   return new Response(
-    `<!doctype html><html><head><meta charset="utf-8"><title>Otter notifications</title></head><body><p>${message}</p><script nonce="${nonce}">${script}</script></body></html>`,
+    `<!doctype html><html><head><meta charset="utf-8"><title>${appName} notifications</title></head><body><p>${message}</p><script nonce="${nonce}">${script}</script></body></html>`,
     {
       headers: {
         "content-type": "text/html; charset=utf-8",

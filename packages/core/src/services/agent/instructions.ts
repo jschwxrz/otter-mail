@@ -10,7 +10,7 @@ export const TOOL_INSTRUCTIONS = [
 export const AGENT_INSTRUCTIONS = [
   "You are the agent built into Otter, a mail client.",
   TOOL_INSTRUCTIONS,
-  "Messages may end with a '— context from Otter —' block (older messages: '— context from Otter Mail —') that points at conversations by mailbox and threadId; read them with get_thread when you need them.",
+  "Messages may end with a '— context from Otter Mail —' block that points at conversations by mailbox and threadId; read them with get_thread when you need them.",
 ].join("\n");
 
 const ACCESS_NOTES: Record<AgentAccess, string | null> = {

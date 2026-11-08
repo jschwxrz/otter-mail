@@ -27,14 +27,14 @@ test("stable and nightly feeds are separate, while other prereleases have no upd
   assert.deepEqual(resolvePublishConfig("0.13.9", {}), {
     provider: "github",
     owner: "otterware-app",
-    repo: "otter-mail",
+    repo: "otter",
     releaseType: "release",
     channel: "latest",
   });
   assert.deepEqual(resolvePublishConfig(nightly, {}), {
     provider: "github",
     owner: "otterware-app",
-    repo: "otter-mail",
+    repo: "otter",
     releaseType: "prerelease",
     channel: "nightly",
   });
