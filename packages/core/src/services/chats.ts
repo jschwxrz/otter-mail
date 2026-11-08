@@ -13,10 +13,12 @@ import {
   LOCAL_CHAT_PROVIDERS,
   chatForSync,
   type Chat,
+  type ChatMessageMatch,
   type ChatSummary,
   type ChatTurn,
   type ListChatsResponse,
 } from "@otter/contracts/chats";
+import { matchMessage, messageSnippet, messageTokens } from "@otter/shared/chat-search";
 
 import { broadcast } from "../ipc.js";
 import { readJson, writeJson } from "../json-file.js";
@@ -83,6 +85,42 @@ export async function listChats(): Promise<{
 
 export async function getChat(id: string): Promise<Chat | null> {
   return (await load()).chats.find((c) => c.id === id) ?? null;
+}
+
+const SEARCH_LIMIT = 50;
+
+/** What a message says: a reply's text is in its items, between its steps. */
+const messageText = (turn: ChatTurn) =>
+  [turn.text, ...(turn.items ?? []).map((item) => (item.kind === "text" ? item.text : ""))]
+    .filter(Boolean)
+    .join("\n\n");
+
+/** Chats with a message holding every word of `query`, best first, each with its best message. */
+export async function searchChats(query: string): Promise<ChatMessageMatch[]> {
+  const tokens = messageTokens(query);
+  if (tokens.length === 0) return [];
+  const found: (ChatMessageMatch & { quality: number })[] = [];
+  for (const chat of (await load()).chats) {
+    let best: { quality: number; offset: number; turn: ChatTurn; text: string } | null = null;
+    for (const turn of chat.turns.toReversed()) {
+      const text = messageText(turn);
+      const match = matchMessage(text, tokens);
+      if (match && match.quality > (best?.quality ?? 0)) best = { ...match, turn, text };
+    }
+    if (best) {
+      found.push({
+        id: chat.id,
+        turnId: best.turn.id,
+        role: best.turn.role,
+        snippet: messageSnippet(best.text, best.offset),
+        quality: best.quality,
+      });
+    }
+  }
+  return found
+    .sort((a, b) => b.quality - a.quality)
+    .slice(0, SEARCH_LIMIT)
+    .map(({ quality: _quality, ...match }) => match);
 }
 
 /**

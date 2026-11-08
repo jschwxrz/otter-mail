@@ -93,6 +93,14 @@ export interface Chat {
   turns: ChatTurn[];
 }
 
+/** A chat listed for one of its messages: `chats:search`. */
+export interface ChatMessageMatch {
+  id: string;
+  turnId: string;
+  role: ChatTurn["role"];
+  snippet: string;
+}
+
 export type ChatSummary = Omit<Chat, "turns"> & { deletedAt: number | null };
 
 export function chatTabId(ref: ChatTabRef): string {

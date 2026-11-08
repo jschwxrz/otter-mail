@@ -1,13 +1,14 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   AlarmClockIcon,
   CheckIcon,
-  ChevronDownIcon,
   ChevronRightIcon,
   CircleAlertIcon,
   CircleDashedIcon,
   CircleXIcon,
   LaptopIcon,
+  ListFilterIcon,
   PinIcon,
   PlusIcon,
   SearchIcon,
@@ -16,7 +17,14 @@ import {
   XIcon,
   type LucideIcon,
 } from "lucide-react";
-import { Input } from "~/components/ui/input";
+import type { ChatMessageMatch } from "@otter/contracts/chats";
+import {
+  findTokenRanges,
+  messageTokens,
+  rankChatTitles,
+  splitSearchText,
+  type SearchRange,
+} from "@otter/shared/chat-search";
 import { AgentAvatar, openClawAgentId, useAgentProviders } from "./agent-providers";
 import { readableError } from "./add-mailbox";
 import {
@@ -27,6 +35,8 @@ import {
   pinChat,
   regenerateTitle,
   renameChat,
+  searchChatMessages,
+  showFoundMessage,
   shelveChat,
   useChats,
   type Conversation,
@@ -77,6 +87,9 @@ const DRAFT_PEN = "size-3 shrink-0 text-warning-foreground";
 
 const AGENT_FILTER_KEY = "gmail:chat-agent-filter";
 
+const resultId = (index: number) => `agent-search-result-${index}`;
+const scrollIntoView = (el: HTMLElement | null) => el?.scrollIntoView({ block: "nearest" });
+
 function agentOf(c: Conversation): { key: string; kind: string; agent: string | null } {
   const agent = openClawAgentId(c.sessionId);
   return { key: agent ? `${c.provider}:${agent}` : c.provider, kind: c.provider, agent };
@@ -108,7 +121,9 @@ export function AgentSidebar({
       return null;
     }
   });
-  const [query, setQuery] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState<ReadonlySet<string>>(new Set());
   const pickAgent = (key: string | null) => {
@@ -137,7 +152,13 @@ export function AgentSidebar({
     );
   };
   const filter = agentFilter && agents.has(agentFilter) ? agentFilter : null;
-  const needle = query?.trim().toLowerCase() ?? "";
+  const searching = query.trim().length > 0;
+  const messageQuery = messageTokens(query).length > 0 ? query.trim() : "";
+  const messageSearch = useQuery({
+    queryKey: ["chat-search", messageQuery],
+    enabled: messageQuery !== "",
+    queryFn: () => searchChatMessages(messageQuery),
+  });
 
   const askedIn = (list: { requestId: string }[]) =>
     new Set(
@@ -149,12 +170,7 @@ export function AgentSidebar({
   const approving = askedIn(approvals);
   const asking = askedIn(questions);
   const waiting = new Set([...approving, ...asking]);
-  const shown = conversations.filter(
-    (c) =>
-      !isBlank(c) &&
-      (!filter || agentOf(c).key === filter) &&
-      (!needle || c.title.toLowerCase().includes(needle)),
-  );
+  const shown = conversations.filter((c) => !isBlank(c) && (!filter || agentOf(c).key === filter));
   const shelves = shelveChats(shown, {
     working: new Set(Object.keys(runs)),
     needsYou: waiting,
@@ -167,18 +183,62 @@ export function AgentSidebar({
   // A new chat you're writing joins the drafts once you leave it, not as you type (Otter Code's).
   const [opened, setOpened] = useState({ chatId: "", hadDraft: false });
   if (opened.chatId !== chatId) setOpened({ chatId, hadDraft: hasDraft(drafts, chatId) });
-  const newDrafts = needle
-    ? []
-    : conversations
-        .filter(
-          (c) =>
-            isBlank(c) &&
-            hasDraft(drafts, c.id) &&
-            (c.id !== chatId || opened.hadDraft) &&
-            (!filter || agentOf(c).key === filter),
-        )
-        .sort((a, b) => b.createdAt - a.createdAt);
+  const newDrafts = conversations
+    .filter(
+      (c) =>
+        isBlank(c) &&
+        hasDraft(drafts, c.id) &&
+        (c.id !== chatId || opened.hadDraft) &&
+        (!filter || agentOf(c).key === filter),
+    )
+    .sort((a, b) => b.createdAt - a.createdAt);
   const onNewChatPage = current !== undefined && isBlank(current) && !newDrafts.includes(current);
+
+  // Otter Code's sidebar search: titles ranked first, then chats listed for a message.
+  const titleResults = searching ? rankChatTitles(shown, query, now) : [];
+  const titled = new Set(titleResults.map((r) => r.chat.id));
+  const shownById = new Map(shown.map((c) => [c.id, c]));
+  const messageResults =
+    messageQuery && messageSearch.data
+      ? messageSearch.data.flatMap((match) => {
+          const chat = shownById.get(match.id);
+          return chat && !titled.has(chat.id) ? [{ chat, ranges: [], match }] : [];
+        })
+      : [];
+  const results: {
+    chat: Conversation;
+    ranges: readonly SearchRange[];
+    match?: ChatMessageMatch;
+  }[] = [...titleResults, ...messageResults];
+  const active = Math.max(
+    0,
+    results.findIndex((r) => r.chat.id === highlighted),
+  );
+  const settledIds = new Set(shelves.settled.map((c) => c.id));
+  const clearSearch = () => {
+    setQuery("");
+    setHighlighted(null);
+  };
+  const pickResult = ({ chat, match }: (typeof results)[number]) => {
+    showFoundMessage(match ? { turnId: match.turnId, query: messageQuery } : null);
+    clearSearch();
+    onSelect(chat.id);
+  };
+  const onSearchKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing) return;
+    if (e.key === "Escape" && query) {
+      e.preventDefault();
+      e.stopPropagation();
+      clearSearch();
+    } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && results.length > 0) {
+      e.preventDefault();
+      const step = e.key === "ArrowDown" ? 1 : -1;
+      setHighlighted(results[(active + step + results.length) % results.length]!.chat.id);
+    } else if (e.key === "Enter" && results[active]) {
+      e.preventDefault();
+      pickResult(results[active]);
+    }
+  };
 
   const status = (c: Conversation): ReactNode => {
     if (approving.has(c.id))
@@ -406,34 +466,140 @@ export function AgentSidebar({
     );
   };
 
+  const resultRow = (result: (typeof results)[number], index: number) => {
+    const { chat: c, ranges, match } = result;
+    const lit = index === active;
+    const selected = c.id === chatId;
+    const settled = settledIds.has(c.id);
+    return (
+      <li key={c.id} ref={lit ? scrollIntoView : undefined} role="presentation">
+        <button
+          id={resultId(index)}
+          type="button"
+          role="option"
+          tabIndex={-1}
+          aria-selected={lit}
+          aria-current={selected ? "page" : undefined}
+          onMouseMove={() => setHighlighted(c.id)}
+          onClick={() => pickResult(result)}
+          className={cn(
+            "flex w-full min-w-0 cursor-pointer items-center gap-2.5 rounded-lg py-1.5 ps-(--sidebar-row-content-inset) pe-(--sidebar-row-content-inset) text-left outline-none",
+            lit || selected
+              ? "bg-sidebar-row-selected text-sidebar-foreground"
+              : "text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
+          )}
+        >
+          <AgentAvatar
+            kind={c.provider}
+            agent={openClawAgentId(c.sessionId)}
+            className={cn(
+              "size-3.5 shrink-0",
+              settled && !lit && !selected && "opacity-40 grayscale",
+            )}
+          />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span
+                className={cn(
+                  "min-w-0 flex-1 truncate text-sm",
+                  (!settled || lit || selected) && "text-sidebar-foreground",
+                )}
+              >
+                <Highlighted text={c.title} ranges={ranges} />
+              </span>
+              <span className="shrink-0 ps-1 text-[11px] tabular-nums text-sidebar-muted-foreground/70">
+                {shortAgo(c.updatedAt, now)}
+              </span>
+            </span>
+            {match ? (
+              <span className="truncate text-xs text-sidebar-muted-foreground/85">
+                <span
+                  className={
+                    match.role === "user" ? "text-info-foreground" : "text-success-foreground"
+                  }
+                >
+                  {match.role === "user" ? "You:" : "Agent:"}
+                </span>{" "}
+                <Highlighted
+                  text={match.snippet}
+                  ranges={findTokenRanges(match.snippet, messageTokens(messageQuery))}
+                />
+              </span>
+            ) : null}
+          </span>
+        </button>
+      </li>
+    );
+  };
+
   const empty = newDrafts.length === 0 && Object.values(shelves).every((list) => list.length === 0);
   const divider = <div aria-hidden className="mx-2.5 my-1.5 h-px shrink-0 bg-sidebar-border/60" />;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 flex-col pt-(--sidebar-content-inset)">
-        {/* Otter Code's "All projects ⌄" and search: which agent's chats, and a search of them. */}
+        {/* Otter Code's thread search and project filter: a search of the chats, and which agent's. */}
         <div className="flex items-center gap-1 px-(--sidebar-content-inset) pb-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-(--sidebar-row-content-inset) text-sidebar-muted-foreground focus-within:bg-sidebar-row-hover focus-within:text-sidebar-foreground focus-within:ring-1 focus-within:ring-focus-ring focus-within:ring-inset hover:bg-sidebar-row-hover hover:text-sidebar-foreground">
+            <SearchIcon aria-hidden className="size-4 shrink-0" />
+            <input
+              ref={searchRef}
+              type="search"
+              value={query}
+              placeholder="Search"
+              aria-label="Search chats"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={searching && results.length > 0}
+              aria-controls={searching && results.length > 0 ? "agent-search-results" : undefined}
+              aria-activedescendant={searching && results[active] ? resultId(active) : undefined}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setHighlighted(null);
+              }}
+              onKeyDown={onSearchKeyDown}
+              className="min-w-0 flex-1 bg-transparent text-sm text-sidebar-foreground outline-none placeholder:text-sidebar-muted-foreground [&::-webkit-search-cancel-button]:hidden"
+            />
+            {searching ? (
               <button
                 type="button"
-                className="flex h-8 min-w-0 cursor-pointer items-center gap-1.5 rounded-lg px-(--sidebar-row-content-inset) text-[15px] font-semibold text-sidebar-foreground outline-none hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-focus-ring data-[state=open]:bg-sidebar-row-hover"
+                aria-label="Clear search"
+                onClick={() => {
+                  clearSearch();
+                  searchRef.current?.focus();
+                }}
+                className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md text-sidebar-muted-foreground outline-none hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
               >
-                {filter ? (
-                  <AgentAvatar
-                    kind={agents.get(filter)!.kind}
-                    agent={agents.get(filter)!.agent}
-                    className="size-4"
-                  />
-                ) : null}
-                <span className="truncate">
-                  {filter
-                    ? agentName(agents.get(filter)!.kind, agents.get(filter)!.agent)
-                    : "All agents"}
-                </span>
-                <ChevronDownIcon className="size-3.5 shrink-0 text-sidebar-muted-foreground" />
+                <XIcon className="size-3" />
               </button>
-            </DropdownMenuTrigger>
+            ) : null}
+          </div>
+          <DropdownMenu>
+            <HintTooltip
+              label={
+                filter
+                  ? `Showing ${agentName(agents.get(filter)!.kind, agents.get(filter)!.agent)}'s chats`
+                  : "Filter chats by agent"
+              }
+              side="bottom"
+            >
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Filter chats by agent"
+                  className={cn(HEADER_BUTTON, "data-[state=open]:bg-sidebar-row-hover")}
+                >
+                  {filter ? (
+                    <AgentAvatar
+                      kind={agents.get(filter)!.kind}
+                      agent={agents.get(filter)!.agent}
+                      className="size-4"
+                    />
+                  ) : (
+                    <ListFilterIcon className="size-4" />
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+            </HintTooltip>
             <DropdownMenuContent>
               <DropdownMenuItem onSelect={() => pickAgent(null)}>All agents</DropdownMenuItem>
               {agents.size > 0 ? <DropdownMenuSeparator /> : null}
@@ -451,18 +617,6 @@ export function AgentSidebar({
                 ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <span className="flex-1" />
-          <button
-            type="button"
-            aria-label="Search chats"
-            onClick={() => setQuery((q) => (q === null ? "" : null))}
-            className={cn(
-              HEADER_BUTTON,
-              query !== null && "bg-sidebar-row-hover text-sidebar-foreground",
-            )}
-          >
-            <SearchIcon className="size-4" />
-          </button>
           <HintTooltip label="New chat" shortcut="agent.newChat" side="bottom">
             <button
               type="button"
@@ -478,41 +632,25 @@ export function AgentSidebar({
             </button>
           </HintTooltip>
         </div>
-        {query !== null ? (
-          <div className="relative px-(--sidebar-content-inset) pb-1">
-            <Input
-              autoFocus
-              size="sm"
-              value={query}
-              placeholder="Search chats"
-              aria-label="Search chats"
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") setQuery(null);
-              }}
-              className="pe-7"
-            />
-            <button
-              type="button"
-              aria-label="Close search"
-              onClick={() => setQuery(null)}
-              className="absolute inset-y-0 end-(--sidebar-content-inset) flex w-7 cursor-pointer items-center justify-center pb-1 text-sidebar-muted-foreground hover:text-sidebar-foreground"
-            >
-              <XIcon className="size-3.5" />
-            </button>
-          </div>
-        ) : null}
       </div>
       <SidebarBody contentClassName="flex flex-col" flushBottom>
-        {empty ? (
+        {searching ? (
+          results.length > 0 ? (
+            <ul id="agent-search-results" role="listbox" aria-label="Chat search results">
+              {results.map(resultRow)}
+            </ul>
+          ) : (
+            <p
+              role="status"
+              className="px-(--sidebar-row-content-inset) py-6 text-center text-xs text-sidebar-muted-foreground"
+            >
+              {messageSearch.isFetching ? "Searching messages…" : "No chats found"}
+            </p>
+          )
+        ) : empty ? (
           <p className="px-(--sidebar-row-content-inset) py-1.5 text-[13px] text-sidebar-muted-foreground">
-            {needle || filter ? "No chats match." : "Chats you start show up here."}
+            {filter ? "No chats match." : "Chats you start show up here."}
           </p>
-        ) : needle ? (
-          (Object.entries(shelves) as [ChatShelf, Conversation[]][])
-            .flatMap(([shelf, list]) => list.map((c) => ({ c, shelf })))
-            .sort((a, b) => b.c.updatedAt - a.c.updatedAt)
-            .map(({ c, shelf }) => row(c, shelf))
         ) : (
           <>
             {newDrafts.map(draftRow)}
@@ -548,6 +686,19 @@ export function AgentSidebar({
         )}
       </SidebarBody>
     </div>
+  );
+}
+
+function Highlighted({ text, ranges }: { text: string; ranges: readonly SearchRange[] }) {
+  if (ranges.length === 0) return text;
+  return splitSearchText(text, ranges).map((part) =>
+    part.highlighted ? (
+      <mark key={part.start} className="bg-transparent font-semibold text-sidebar-foreground">
+        {part.text}
+      </mark>
+    ) : (
+      part.text
+    ),
   );
 }
 

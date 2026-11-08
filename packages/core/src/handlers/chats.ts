@@ -20,6 +20,10 @@ function chat(value: unknown): Chat {
 export function registerChatHandlers(): void {
   handle("chats:list", () => chats.listChats());
   handle("chats:get", (params: unknown) => chats.getChat(str((params as Params)?.id, "id")));
+  handle("chats:search", (params: unknown) => {
+    const query = (params as Params)?.query;
+    return chats.searchChats(typeof query === "string" ? query : "");
+  });
   handle("chats:save", (params: unknown) => {
     const p = params as Params;
     return chats.saveChat(chat(p?.chat), p?.settled !== false);
