@@ -2,17 +2,17 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { agentContribution } from "../extensions/registry";
 import { useQuery } from "@tanstack/react-query";
 import { CheckIcon, CornerUpRightIcon, ListPlusIcon, PlusIcon, QuoteIcon } from "lucide-react";
-import { IconBtn, HintTooltip, cn } from "./ui";
-import { COMPOSER_SURFACE } from "./composer-kit";
+import { IconBtn, HintTooltip, cn } from "../mail/ui";
+import { COMPOSER_SURFACE } from "../mail/composer-kit";
 import {
   mailApi,
   type AgentSettingsPatch,
   type ApprovalDecision,
   type ProviderKind,
   type Skill,
-} from "./api";
+} from "../mail/api";
 import { openClawAgentId, type ChatProvider } from "./agent-providers";
-import { ProviderModelPicker, RuntimeModePicker, TraitsPicker } from "./model-picker";
+import { ProviderModelPicker, RuntimeModePicker, TraitsPicker } from "../mail/model-picker";
 import { ApprovalCard } from "./approval-card";
 import { QuestionCard } from "./question-card";
 import { buildHandoffText, type MailChatContext } from "./chat-context";
@@ -42,7 +42,7 @@ import {
   type Outgoing,
 } from "./chat-store";
 import { ContextKindIcon, SkillBadge } from "./chat-transcript";
-import { toast } from "./toast";
+import { toast } from "../mail/toast";
 import { useCommandHandlers } from "../keybindings/dispatch";
 import { modKeyName, shortcutText } from "../keybindings/keys";
 import { useLatest } from "../use-latest";

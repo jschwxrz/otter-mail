@@ -1,9 +1,9 @@
 import type { ChatContextKind, ChatContextMeta } from "@otter/contracts/chats";
 
-import type { ProviderKind } from "./api";
+import type { ProviderKind } from "../mail/api";
 import { clampTitle } from "./chat-store";
-import { useAccounts, useMessage } from "./hooks";
-import type { MessageSummary } from "./types";
+import { useAccounts, useMessage } from "../mail/hooks";
+import type { MessageSummary } from "../mail/types";
 
 /**
  * Pointer-sized mail context for the agent chat. The agent can read the same

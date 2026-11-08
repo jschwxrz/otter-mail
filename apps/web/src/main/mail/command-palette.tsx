@@ -34,7 +34,7 @@ import {
   SunIcon,
   SunMoonIcon,
 } from "lucide-react";
-import { AgentIcon } from "./agent-icon";
+import { AgentIcon } from "../agent/agent-icon";
 import { AccountPicture } from "./account-picture";
 import { useDebouncedValue, useSearchMessages } from "./hooks";
 import { getAccountColor, getAccountDisplayName } from "./account-style";
@@ -60,7 +60,7 @@ import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
 import { requestTour, startSetup } from "../onboarding/onboarding";
 import { updateNow, useUpdateState } from "../updates";
 import { requestProblemReport } from "../support/report-problem";
-import { isBlank, useChats } from "./chat-store";
+import { isBlank, useChats } from "../agent/chat-store";
 import { ViewMark } from "./view-icon";
 import { useWorkspaces, workspaceSpace } from "../extensions/workspaces";
 import { CALENDAR_SPACE } from "./spaces";

@@ -28,7 +28,7 @@ import {
 } from "@otter/shared/chat-search";
 import { SCHEDULED_TASKS, useScheduledTasks } from "./agent-scheduled";
 import { AgentAvatar, openClawAgentId, useAgentProviders } from "./agent-providers";
-import { readableError } from "./add-mailbox";
+import { readableError } from "../mail/add-mailbox";
 import {
   discardDraft,
   hasDraft,
@@ -65,11 +65,11 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "./menu";
-import { SidebarBody } from "./sidebar-ui";
+} from "../mail/menu";
+import { SidebarBody } from "../mail/sidebar-ui";
 import { TitleInput } from "./chat-title";
-import { toast } from "./toast";
-import { HintTooltip, cn } from "./ui";
+import { toast } from "../mail/toast";
+import { HintTooltip, cn } from "../mail/ui";
 
 const SETTLED_FIRST = 10;
 const SETTLED_PAGE = 25;

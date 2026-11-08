@@ -18,7 +18,7 @@ import {
   providerVersionLabel,
   useAgentProviders,
   useSetProvidersState,
-} from "../mail/agent-providers";
+} from "../agent/agent-providers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../mail/select";
 import { Btn, cn } from "../mail/ui";
 import {
@@ -36,7 +36,7 @@ import {
   setFollowUpBehavior,
   useFollowUpBehavior,
   type FollowUpBehavior,
-} from "../mail/chat-queue";
+} from "../agent/chat-queue";
 import { shortcutText } from "../keybindings/keys";
 
 function useNow(intervalMs: number): number {

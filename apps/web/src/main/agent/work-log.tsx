@@ -11,9 +11,9 @@ import {
   TerminalIcon,
   WrenchIcon,
 } from "lucide-react";
-import type { ToolStep } from "./api";
+import type { ToolStep } from "../mail/api";
 import { ChatMarkdown } from "./chat-markdown";
-import { cn } from "./ui";
+import { cn } from "../mail/ui";
 
 export type TurnItem =
   | { kind: "text"; id?: string; text: string }

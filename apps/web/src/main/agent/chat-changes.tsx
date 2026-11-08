@@ -8,9 +8,9 @@ import {
   PaletteIcon,
   TagIcon,
 } from "lucide-react";
-import type { ChatChange } from "./api";
-import { cn } from "./ui";
-import { toast } from "./toast";
+import type { ChatChange } from "../mail/api";
+import { cn } from "../mail/ui";
+import { toast } from "../mail/toast";
 
 export function chatChangeKey({ target }: ChatChange): string {
   return JSON.stringify([target.kind, "accountId" in target ? target.accountId : null, target.id]);

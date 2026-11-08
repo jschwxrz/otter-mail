@@ -10,7 +10,7 @@ import {
   providerSummary,
   useAgentProviders,
   useSetProvidersState,
-} from "../mail/agent-providers";
+} from "../agent/agent-providers";
 import { mailApi, type AgentSettingsPatch, type ProviderSnapshot } from "../mail/api";
 import { toast } from "../mail/toast";
 import { Btn, cn } from "../mail/ui";

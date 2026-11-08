@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState, type RefObject } from "react";
 import { MessageScroller } from "@shadcn/react/message-scroller";
 import { ArrowDownIcon, MailIcon } from "lucide-react";
 import { ScrollArea } from "~/components/ui/scroll-area";
-import { buttonClass, cn } from "./ui";
-import { mailApi, type AgentSettingsPatch, type ChatChange, type ProviderKind } from "./api";
+import { buttonClass, cn } from "../mail/ui";
+import { mailApi, type AgentSettingsPatch, type ChatChange, type ProviderKind } from "../mail/api";
 import {
   ProviderIcon,
   providerSummary,
@@ -17,13 +17,13 @@ import {
   rangeAnchor,
   type Citation,
 } from "./chat-cite";
-import { AttachmentPreview, attachmentPreview, type PreviewFile } from "./attachment-preview";
+import { AttachmentPreview, attachmentPreview, type PreviewFile } from "../mail/attachment-preview";
 import { DropOverlay, useChatAttachments, useFileDrop } from "./chat-attachments";
 import { forkChat, isElsewhere, loadChat, setCitations, useChats } from "./chat-store";
 import { ChatTranscript } from "./chat-transcript";
 import { ChatComposer } from "./chat-composer";
 import { isProviderUsable } from "./agent-providers";
-import { toast } from "./toast";
+import { toast } from "../mail/toast";
 
 const NO_CITATIONS: Citation[] = [];
 

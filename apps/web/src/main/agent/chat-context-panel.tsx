@@ -16,8 +16,8 @@ import { AgentAvatar, openClawAgentId, useChatProvider } from "./agent-providers
 import { keyOf, useScheduledTasks } from "./agent-scheduled";
 import { isOpenTab, type Conversation } from "./chat-store";
 import { scheduleText, untilText } from "./scheduled-text";
-import { toast } from "./toast";
-import { HintTooltip, cn } from "./ui";
+import { toast } from "../mail/toast";
+import { HintTooltip, cn } from "../mail/ui";
 
 export const TAB_ICONS = {
   thread: MailIcon,

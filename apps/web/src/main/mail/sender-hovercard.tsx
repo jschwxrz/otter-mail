@@ -2,7 +2,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "./toast";
 import { CopyIcon, SearchIcon, SquarePenIcon } from "lucide-react";
-import { AgentIcon } from "./agent-icon";
+import { AgentIcon } from "../agent/agent-icon";
 import { SenderAvatar } from "./sender-avatar";
 
 export function SenderHoverCard({

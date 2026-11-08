@@ -1,8 +1,8 @@
 import { CheckIcon, MessageCircleQuestionIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { ChatQuestion } from "./api";
-import { COMPOSER_SURFACE } from "./composer-kit";
-import { Btn, cn, Kbd } from "./ui";
+import type { ChatQuestion } from "../mail/api";
+import { COMPOSER_SURFACE } from "../mail/composer-kit";
+import { Btn, cn, Kbd } from "../mail/ui";
 
 export function QuestionCard({
   agent,

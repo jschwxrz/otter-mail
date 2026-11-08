@@ -1,10 +1,10 @@
 import { useRef, useState } from "react";
-import { readableError } from "./add-mailbox";
+import { readableError } from "../mail/add-mailbox";
 import { useAgentProviders } from "./agent-providers";
 import { regenerateTitle, renameChat, type Conversation } from "./chat-store";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "./menu";
-import { toast } from "./toast";
-import { cn } from "./ui";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "../mail/menu";
+import { toast } from "../mail/toast";
+import { cn } from "../mail/ui";
 
 /** A chat's title in a header: double-click to rename, right-click to rename or regenerate it. */
 export function ChatTitle({ chat, className }: { chat: Conversation; className?: string }) {

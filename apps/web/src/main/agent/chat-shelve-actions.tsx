@@ -1,8 +1,13 @@
 import { useState, type ReactNode } from "react";
 import { shelveChat } from "./chat-store";
 import { snoozePresets } from "./chat-shelves";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./menu";
-import { HintTooltip } from "./ui";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../mail/menu";
+import { HintTooltip } from "../mail/ui";
 
 export function settleChat(id: string) {
   void shelveChat(id, { snoozedUntil: null, settledAt: Date.now() });

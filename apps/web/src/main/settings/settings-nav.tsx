@@ -28,7 +28,7 @@ import {
   Settings2Icon,
   XIcon,
 } from "lucide-react";
-import { AgentIcon } from "../mail/agent-icon";
+import { AgentIcon } from "../agent/agent-icon";
 import { changelogUrl } from "@otter/shared/changelog";
 import { openLink } from "../browser/store";
 import { ScrollArea } from "~/components/ui/scroll-area";

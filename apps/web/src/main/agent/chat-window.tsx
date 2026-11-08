@@ -9,14 +9,14 @@ import {
 import { AlarmClockIcon, CheckIcon, Maximize2Icon, MinusIcon } from "lucide-react";
 import { AgentAvatar, openClawAgentId } from "./agent-providers";
 
-import type { ChatChange } from "./api";
+import type { ChatChange } from "../mail/api";
 import type { MailChatContext } from "./chat-context";
 import { isBlank, useChats, watchChat } from "./chat-store";
 import { settleChat, SnoozeMenu } from "./chat-shelve-actions";
 import { ChatTitle } from "./chat-title";
 import { ChatView } from "./chat-view";
-import { isOverlayOpen } from "./keyboard";
-import { HintTooltip, IconBtn } from "./ui";
+import { isOverlayOpen } from "../mail/keyboard";
+import { HintTooltip, IconBtn } from "../mail/ui";
 
 type Size = { width: number; height: number };
 type Axis = "width" | "height" | "both";

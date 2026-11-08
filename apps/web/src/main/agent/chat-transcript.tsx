@@ -15,9 +15,9 @@ import {
   TextQuoteIcon,
   XIcon,
 } from "lucide-react";
-import { IconBtn, HintTooltip } from "./ui";
+import { IconBtn, HintTooltip } from "../mail/ui";
 import { WorkLog } from "./work-log";
-import type { ChatChange } from "./api";
+import type { ChatChange } from "../mail/api";
 import type { ContextKind, ContextMeta } from "./chat-context";
 import { findTokenRanges, messageTokens } from "@otter/shared/chat-search";
 import { useChats, type ChatTurn } from "./chat-store";
@@ -26,8 +26,13 @@ import { messageTime } from "./chat-time";
 import { ChatChanges } from "./chat-changes";
 import { SentAttachments } from "./chat-attachments";
 import { IntentMarker } from "./chat-queue";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./menu";
-import { toast } from "./toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../mail/menu";
+import { toast } from "../mail/toast";
 
 export function ContextKindIcon({ kind, className }: { kind: ContextKind; className?: string }) {
   const Icon =

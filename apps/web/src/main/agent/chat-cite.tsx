@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { QuoteIcon } from "lucide-react";
-import { buttonClass } from "./ui";
+import { buttonClass } from "../mail/ui";
 import { useLatest } from "../use-latest";
 
 export type Citation = { id: string; text: string; comment?: string };

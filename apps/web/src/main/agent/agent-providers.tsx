@@ -1,7 +1,12 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { mailApi, type ProviderKind, type ProviderSnapshot, type ProvidersState } from "./api";
-import { cn } from "./ui";
+import {
+  mailApi,
+  type ProviderKind,
+  type ProviderSnapshot,
+  type ProvidersState,
+} from "../mail/api";
+import { cn } from "../mail/ui";
 import { BotIcon } from "lucide-react";
 import { EXTENSIONS, agentContribution } from "../extensions/registry";
 

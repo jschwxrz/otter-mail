@@ -23,7 +23,7 @@ import {
 import { features } from "../features";
 import { useCommandHandlers } from "../keybindings/dispatch";
 import { useLatest } from "../use-latest";
-import { mailApi, type ChatChange } from "./api";
+import { mailApi, type ChatChange } from "../mail/api";
 import { useMailChatContext } from "./chat-context";
 import {
   closeChatTab,
@@ -41,14 +41,14 @@ import { AgentBrowser, AgentBrowserTabIcon } from "./agent-browser";
 import { ChatContextButton, TAB_ICONS } from "./chat-context-panel";
 import { ChatTitle } from "./chat-title";
 import { ChatView } from "./chat-view";
-import { DitherBackdrop } from "./dither-backdrop";
-import { FilePreview } from "./attachment-preview";
-import { MessageReader } from "./message-reader";
-import { PanelTab } from "./panel-tab";
-import { mostRecentTab } from "./panel-tabs";
+import { DitherBackdrop } from "../mail/dither-backdrop";
+import { FilePreview } from "../mail/attachment-preview";
+import { MessageReader } from "../mail/message-reader";
+import { PanelTab } from "../mail/panel-tab";
+import { mostRecentTab } from "../mail/panel-tabs";
 import { AgentAvatar, openClawAgentId, useChatProvider } from "./agent-providers";
-import { usePanelTabDrag } from "./use-panel-tab-drag";
-import { HintTooltip, cn } from "./ui";
+import { usePanelTabDrag } from "../mail/use-panel-tab-drag";
+import { HintTooltip, cn } from "../mail/ui";
 
 export type ChatPanelControl = { toggle: () => void; newPage: () => void };
 

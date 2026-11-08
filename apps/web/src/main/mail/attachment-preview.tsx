@@ -11,8 +11,8 @@ import {
 } from "lucide-react";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "~/components/ui/dialog";
 import { features } from "../features";
-import { ChatMarkdown } from "./chat-markdown";
-import { formatAttachmentSize } from "./chat-attachments";
+import { ChatMarkdown } from "../agent/chat-markdown";
+import { formatAttachmentSize } from "../agent/chat-attachments";
 import { HintTooltip, IconBtn } from "./ui";
 
 type PreviewKind = "pdf" | "html" | "markdown" | "table" | "text" | "image" | "video" | "audio";

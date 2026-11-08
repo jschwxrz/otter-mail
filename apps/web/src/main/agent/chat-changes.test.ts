@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import type { ChatChange } from "./api";
+import type { ChatChange } from "../mail/api";
 import { mergeChatChanges } from "./chat-changes";
 
 const draft = (accountId: string, action: ChatChange["action"], title: string): ChatChange => ({
