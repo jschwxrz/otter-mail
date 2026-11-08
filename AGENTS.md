@@ -167,7 +167,9 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
   (on a Mac), `pnpm dist:desktop:deb` a .deb (on Linux).
 - Data homes (`apps/desktop/src/paths.ts`, as in T3 Code): the installed app uses
   `~/.otter/userdata` (`~/.otter-mail/userdata` for installs from before the rename, never moved); dev runs use `~/.otter/dev`, or `<worktree>/.otter` in a
-  linked worktree. `pnpm dev:desktop --home <dir>` overrides. Never point dev at the installed app's home.
+  linked worktree. `pnpm dev:desktop --home <dir>` overrides. Never point dev at the installed app's home: `pnpm dev:desktop` seeds an empty
+  one from it instead, one way, without the Otter account, sign-ins or secrets (`pnpm dev:seed`
+  refreshes it; docs/development.md#data-homes).
 - Main-process logs: the terminal, and `logs/main.log` in the state directory.
 
 ## Releases

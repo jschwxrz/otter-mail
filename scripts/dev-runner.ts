@@ -24,6 +24,7 @@ import { localConfig } from "../infra/relay/scripts/local-config.ts";
 import { buildTranslator, findTranslatorBinary, repoRoot } from "./build-translator.ts";
 import { login } from "./demo-login.ts";
 import { devMailbox, devMailCa, startDevMail } from "./dev-mail.ts";
+import { devStateDir, installedStateDir, needsSeed, seedDevHome } from "./seed-dev-home.ts";
 
 const BASE_WEB_PORT = 5833;
 const BASE_RELAY_PORT = 8787;
@@ -62,11 +63,14 @@ Options:
                   app's ~/.otter/userdata); for the demo, its demo/ inside.
   --login         Demo runs: sign the demo Gmail mailboxes in to Google (Outlook ones to Microsoft) first
                   (once per machine), saving the sign-ins in .env.local.
+  --no-seed       \`pnpm dev:desktop\`: start empty instead of seeding a new data
+                  home from the installed app's (\`pnpm dev:seed\` refreshes it).
   --dry-run       Print the resolved ports and commands, then exit.
   -h, --help      Show this help.
 
 Environment:
   OTTER_HOME         Data home, same as --home.
+  OTTER_DEV_SEED=0   Same as --no-seed.
   OTTER_REMOTE_DEBUGGING_PORT
                           Chrome DevTools port of the dev app (default: dev server
                           port + 1000; 0 turns it off). Playwright and agents attach
@@ -238,9 +242,11 @@ interface Task {
 async function main(): Promise<void> {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
+    allowNegative: true,
     options: {
       home: { type: "string" },
       login: { type: "boolean", default: false },
+      seed: { type: "boolean", default: process.env.OTTER_DEV_SEED !== "0" },
       "dry-run": { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
     },
@@ -358,6 +364,15 @@ async function main(): Promise<void> {
     prepareRelay(wrangler);
   }
   const mailboxes = demo ? await demoMailboxes(mode, values.login) : [];
+  if (mode === "dev:desktop" && values.seed) {
+    const stateDir = devStateDir(dataHome);
+    if (needsSeed(stateDir) && NodeFS.existsSync(installedStateDir())) {
+      console.log(
+        `[dev] Seeding ${stateDir} from ${installedStateDir()} (one way; --no-seed skips it). Sign the mailboxes in again to sync.`,
+      );
+      seedDevHome(stateDir);
+    }
+  }
   if (desktop) {
     ensureTranslator();
     // A stale bundle would let Electron start before the first fresh build.

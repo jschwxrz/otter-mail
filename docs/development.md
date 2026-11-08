@@ -82,7 +82,13 @@ profile in `chromium/` and logs in `logs/main.log`. Delete it to start fresh.
 - Each state directory signs in to its accounts separately. Dev runs are named
   "Otter (Dev)" and use their own Keychain key ("Otter Mail (Dev) Safe Storage": the app keeps the
   key it had before the rename, `apps/desktop/src/paths.ts`), so they can't read the installed app's tokens.
-- Nothing is ever copied between homes.
+- The first `pnpm dev:desktop` on an empty data home seeds it from the installed app's
+  (`scripts/seed-dev-home.ts`): a snapshot of the mail cache, the mailboxes, views, appearance,
+  settings (launch at login off) and agent chats. One way, never back: the Otter account,
+  sign-ins, secrets, agent settings, push watches and scheduled sends stay behind, so the dev app
+  never syncs to the account or acts as you. Sign its mailboxes in again to sync them.
+  `pnpm dev:seed` (dev app quit) refreshes the copy and keeps the dev sign-ins; `--no-seed` or
+  `OTTER_DEV_SEED=0` starts empty. The demo homes are never seeded.
 - Renderer logs are in the DevTools console (View → Toggle Developer Tools).
 
 ## Demo mailboxes
