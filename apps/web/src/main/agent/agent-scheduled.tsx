@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarClockIcon,
@@ -9,6 +9,7 @@ import {
   EllipsisIcon,
   ListFilterIcon,
   LoaderCircleIcon,
+  LockIcon,
   MessageSquareIcon,
   PencilIcon,
   PlayIcon,
@@ -622,6 +623,40 @@ function TaskMenu({ task, onDeleted }: { task: ScheduledTask; onDeleted: () => v
   );
 }
 
+/** Text that can run long (an agent's instructions): its first lines, and the rest on request. */
+function LongText({ text }: { text: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [open, setOpen] = useState(false);
+  const [long, setLong] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && !open) setLong(el.scrollHeight > el.clientHeight + 1);
+  }, [open]);
+  return (
+    <>
+      <span
+        ref={ref}
+        className={cn(
+          "whitespace-pre-wrap [overflow-wrap:anywhere]",
+          open ? "block" : "line-clamp-8",
+        )}
+      >
+        {text}
+      </span>
+      {long || open ? (
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          className="mt-1 cursor-pointer rounded-sm text-xs font-medium text-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus-ring"
+        >
+          {open ? "Show less" : "Show all"}
+        </button>
+      ) : null}
+    </>
+  );
+}
+
 function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5 border-b border-border/60 pb-5 last:border-b-0">
@@ -692,6 +727,17 @@ function TaskPage({
           {task.description && task.prompt ? (
             <p className="pt-1 text-sm text-muted-foreground">{task.description}</p>
           ) : null}
+          {agent.readOnly ? null : task.managedBy ? (
+            <p className="flex items-center gap-1.5 pt-2 text-xs text-muted-foreground">
+              <LockIcon aria-hidden className="size-3.5 shrink-0" />
+              {task.managedBy} keeps this one: run or pause it here, and change it there.
+            </p>
+          ) : task.schedule.kind === "other" ? (
+            <p className="flex items-center gap-1.5 pt-2 text-xs text-muted-foreground">
+              <LockIcon aria-hidden className="size-3.5 shrink-0" />
+              Otter can't change this kind of schedule: change it in {agentName(task.provider)}.
+            </p>
+          ) : null}
         </div>
         {agent.readOnly ? null : (
           <div className="flex shrink-0 items-center gap-3 pt-1">
@@ -711,6 +757,12 @@ function TaskPage({
               <PlayIcon />
               Run now
             </Btn>
+            {editable ? (
+              <Btn size="sm" onClick={onEdit}>
+                <PencilIcon />
+                Edit
+              </Btn>
+            ) : null}
             <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
               {task.enabled ? "Active" : "Paused"}
               <Switch
@@ -772,7 +824,7 @@ function TaskPage({
         <dl className="flex min-w-0 flex-col gap-5">
           {task.prompt ? (
             <Detail label="Instructions">
-              <span className="block whitespace-pre-wrap">{task.prompt}</span>
+              <LongText key={task.prompt} text={task.prompt} />
             </Detail>
           ) : task.runs ? (
             <Detail label="What it runs">
@@ -804,19 +856,6 @@ function TaskPage({
           </Detail>
           {task.failureAlerts ? (
             <Detail label="Failures reported to">{task.failureAlerts}</Detail>
-          ) : null}
-          {task.managedBy ? (
-            <Detail label="Kept by">
-              {task.managedBy}: it can be paused or run here, and changed in its config.
-            </Detail>
-          ) : null}
-          {editable ? (
-            <div>
-              <Btn size="sm" variant="ghost" className="-ms-2.5" onClick={onEdit}>
-                <PencilIcon />
-                Edit task
-              </Btn>
-            </div>
           ) : null}
         </dl>
       </div>
