@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarClockIcon,
@@ -7,7 +7,9 @@ import {
   CircleCheckIcon,
   CircleMinusIcon,
   EllipsisIcon,
+  ListFilterIcon,
   LoaderCircleIcon,
+  LockIcon,
   MessageSquareIcon,
   PencilIcon,
   PlayIcon,
@@ -35,8 +37,11 @@ import { useChats } from "./chat-store";
 import { useLatest } from "../use-latest";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../mail/menu";
 import {
@@ -164,6 +169,8 @@ export function ScheduledTasksView({
   const agentName = useAgentName();
 
   const tasks = agents.flatMap((a) => a.tasks);
+  const [filter, setFilter] = useState<TaskFilter>(NO_FILTER);
+  const shown = tasks.filter((t) => matches(t, filter));
   const agentOf = (task: ScheduledTask) => agents.find((a) => a.provider === task.provider)!;
   const current = taskKey ? (tasks.find((t) => keyOf(t) === taskKey) ?? null) : null;
   const creatable = agents.some((a) => a.can.create && !a.readOnly);
@@ -182,10 +189,10 @@ export function ScheduledTasksView({
 
   const byNext = (a: ScheduledTask, b: ScheduledTask) =>
     (a.nextRunAt ?? Infinity) - (b.nextRunAt ?? Infinity) || a.name.localeCompare(b.name);
-  const own = tasks.filter((t) => !t.managedBy);
+  const own = shown.filter((t) => !t.managedBy);
   const active = own.filter((t) => t.enabled).sort(byNext);
   const paused = own.filter((t) => !t.enabled).sort((a, b) => a.name.localeCompare(b.name));
-  const managed = tasks.filter((t) => t.managedBy).sort(byNext);
+  const managed = shown.filter((t) => t.managedBy).sort(byNext);
   const card = (task: ScheduledTask) => (
     <TaskCard key={keyOf(task)} task={task} now={now} onOpen={() => onOpenTask(keyOf(task))} />
   );
@@ -248,6 +255,9 @@ export function ScheduledTasksView({
               <h1 className="min-w-0 flex-1 text-2xl font-semibold tracking-tight text-foreground">
                 Scheduled tasks
               </h1>
+              {tasks.length > 0 ? (
+                <TaskFilterMenu tasks={tasks} value={filter} onChange={setFilter} />
+              ) : null}
               {creatable ? (
                 <Btn size="sm" onClick={() => setEditing("new")}>
                   <PlusIcon />
@@ -292,6 +302,16 @@ export function ScheduledTasksView({
                   ) : null
                 }
               />
+            ) : shown.length === 0 ? (
+              <Empty
+                title="No tasks match"
+                body="Nothing scheduled fits this filter."
+                action={
+                  <Btn size="sm" onClick={() => setFilter(NO_FILTER)}>
+                    Show all
+                  </Btn>
+                }
+              />
             ) : (
               <>
                 {active.length > 0 ? (
@@ -328,6 +348,91 @@ export function ScheduledTasksView({
         />
       ) : null}
     </div>
+  );
+}
+
+type TaskFilter = { agent: string | null; status: "all" | "active" | "paused" | "attention" };
+const NO_FILTER: TaskFilter = { agent: null, status: "all" };
+const agentKey = (task: ScheduledTask) => `${task.provider}|${task.agent ?? ""}`;
+const needsAttention = (task: ScheduledTask) =>
+  task.lastRun?.status === "error" || Boolean(task.autoPaused || task.deliveryProblem);
+
+function matches(task: ScheduledTask, filter: TaskFilter): boolean {
+  if (filter.agent && agentKey(task) !== filter.agent) return false;
+  if (filter.status === "active") return task.enabled;
+  if (filter.status === "paused") return !task.enabled;
+  if (filter.status === "attention") return needsAttention(task);
+  return true;
+}
+
+const STATUSES: { value: TaskFilter["status"]; label: string }[] = [
+  { value: "all", label: "Any status" },
+  { value: "active", label: "Active" },
+  { value: "paused", label: "Paused" },
+  { value: "attention", label: "Needs attention" },
+];
+
+function TaskFilterMenu({
+  tasks,
+  value,
+  onChange,
+}: {
+  tasks: ScheduledTask[];
+  value: TaskFilter;
+  onChange: (filter: TaskFilter) => void;
+}) {
+  const agentName = useAgentName();
+  const agents = new Map<string, { task: ScheduledTask; count: number }>();
+  for (const task of tasks) {
+    const seen = agents.get(agentKey(task));
+    agents.set(agentKey(task), { task: seen?.task ?? task, count: (seen?.count ?? 0) + 1 });
+  }
+  const filtering = value.agent !== null || value.status !== "all";
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <IconBtn label="Filter tasks" active={filtering}>
+          <ListFilterIcon />
+        </IconBtn>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>Agent</DropdownMenuLabel>
+        <DropdownMenuCheckboxItem
+          checked={value.agent === null}
+          onCheckedChange={() => onChange({ ...value, agent: null })}
+        >
+          All agents
+        </DropdownMenuCheckboxItem>
+        {[...agents]
+          .sort((a, b) => b[1].count - a[1].count)
+          .map(([key, { task, count }]) => (
+            <DropdownMenuCheckboxItem
+              key={key}
+              checked={value.agent === key}
+              onCheckedChange={() => onChange({ ...value, agent: key })}
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <AgentAvatar kind={task.provider} agent={task.agent} className="size-4" />
+                <span className="min-w-0 flex-1 truncate">
+                  {agentName(task.provider, task.agent)}
+                </span>
+                <span className="text-xs text-muted-foreground tabular-nums">{count}</span>
+              </span>
+            </DropdownMenuCheckboxItem>
+          ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Status</DropdownMenuLabel>
+        {STATUSES.map((status) => (
+          <DropdownMenuCheckboxItem
+            key={status.value}
+            checked={value.status === status.value}
+            onCheckedChange={() => onChange({ ...value, status: status.value })}
+          >
+            {status.label}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -518,6 +623,40 @@ function TaskMenu({ task, onDeleted }: { task: ScheduledTask; onDeleted: () => v
   );
 }
 
+/** Text that can run long (an agent's instructions): its first lines, and the rest on request. */
+function LongText({ text }: { text: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [open, setOpen] = useState(false);
+  const [long, setLong] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && !open) setLong(el.scrollHeight > el.clientHeight + 1);
+  }, [open]);
+  return (
+    <>
+      <span
+        ref={ref}
+        className={cn(
+          "whitespace-pre-wrap [overflow-wrap:anywhere]",
+          open ? "block" : "line-clamp-8",
+        )}
+      >
+        {text}
+      </span>
+      {long || open ? (
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          className="mt-1 cursor-pointer rounded-sm text-xs font-medium text-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus-ring"
+        >
+          {open ? "Show less" : "Show all"}
+        </button>
+      ) : null}
+    </>
+  );
+}
+
 function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5 border-b border-border/60 pb-5 last:border-b-0">
@@ -588,6 +727,17 @@ function TaskPage({
           {task.description && task.prompt ? (
             <p className="pt-1 text-sm text-muted-foreground">{task.description}</p>
           ) : null}
+          {agent.readOnly ? null : task.managedBy ? (
+            <p className="flex items-center gap-1.5 pt-2 text-xs text-muted-foreground">
+              <LockIcon aria-hidden className="size-3.5 shrink-0" />
+              {task.managedBy} keeps this one: run or pause it here, and change it there.
+            </p>
+          ) : task.schedule.kind === "other" ? (
+            <p className="flex items-center gap-1.5 pt-2 text-xs text-muted-foreground">
+              <LockIcon aria-hidden className="size-3.5 shrink-0" />
+              Otter can't change this kind of schedule: change it in {agentName(task.provider)}.
+            </p>
+          ) : null}
         </div>
         {agent.readOnly ? null : (
           <div className="flex shrink-0 items-center gap-3 pt-1">
@@ -607,6 +757,12 @@ function TaskPage({
               <PlayIcon />
               Run now
             </Btn>
+            {editable ? (
+              <Btn size="sm" onClick={onEdit}>
+                <PencilIcon />
+                Edit
+              </Btn>
+            ) : null}
             <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
               {task.enabled ? "Active" : "Paused"}
               <Switch
@@ -668,7 +824,7 @@ function TaskPage({
         <dl className="flex min-w-0 flex-col gap-5">
           {task.prompt ? (
             <Detail label="Instructions">
-              <span className="block whitespace-pre-wrap">{task.prompt}</span>
+              <LongText key={task.prompt} text={task.prompt} />
             </Detail>
           ) : task.runs ? (
             <Detail label="What it runs">
@@ -700,19 +856,6 @@ function TaskPage({
           </Detail>
           {task.failureAlerts ? (
             <Detail label="Failures reported to">{task.failureAlerts}</Detail>
-          ) : null}
-          {task.managedBy ? (
-            <Detail label="Kept by">
-              {task.managedBy}: it can be paused or run here, and changed in its config.
-            </Detail>
-          ) : null}
-          {editable ? (
-            <div>
-              <Btn size="sm" variant="ghost" className="-ms-2.5" onClick={onEdit}>
-                <PencilIcon />
-                Edit task
-              </Btn>
-            </div>
           ) : null}
         </dl>
       </div>

@@ -137,7 +137,7 @@ function ContextRecap({
   );
 }
 
-/** A turn no message of yours started: an automation's result, or a message the agent sent. */
+/** A turn no message of yours started: a scheduled task's result, or a message the agent sent. */
 function DeliveryRow({ turn }: { turn: ChatTurn }) {
   const delivered = turn.delivered;
   if (!delivered) return null;

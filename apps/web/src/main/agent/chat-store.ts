@@ -1104,7 +1104,7 @@ async function followAgentRun(run: AgentRun): Promise<void> {
       title: convo.title,
       subtitle:
         run.delivery?.kind === "automation"
-          ? (run.delivery.name ?? "Scheduled")
+          ? (run.delivery.name ?? "Scheduled task")
           : "Sent you a message",
     });
   const wait = () => {
@@ -1125,7 +1125,7 @@ async function followAgentRun(run: AgentRun): Promise<void> {
       [convo.id]: { requestId: run.requestId, convoId: convo.id, provider: run.provider },
     },
   }));
-  // Something new from the agent (an automation still running, say) brings a settled or snoozed chat back.
+  // Something new from the agent (a scheduled task still running, say) brings a settled or snoozed chat back.
   const now = Date.now();
   const away = current.settledAt != null || (current.snoozedUntil ?? 0) > now;
   patchConversation(convo.id, (c) => ({
