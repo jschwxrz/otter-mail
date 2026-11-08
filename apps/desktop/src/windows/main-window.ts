@@ -2,9 +2,10 @@ import { app, BrowserWindow, screen, shell, type WebContents } from "electron";
 
 import { logger } from "../logger.js";
 import { hostOS } from "../os/index.js";
-import { attachBrowser } from "../services/browser.js";
+import { attachBrowser, focusedBrowserPage } from "../services/browser.js";
 import { isDriveContent } from "../services/drive-content.js";
 import { addContextMenu } from "./context-menu.js";
+import { followHistoryButtons } from "./history-buttons.js";
 import { getPreloadPath, getWindowUrl } from "./window-paths.js";
 import { saveOpenWindows, savedFrame, savedOpenWindows, trackFrame } from "./window-state.js";
 
@@ -119,6 +120,7 @@ function createAppWindow(
   openLinksExternally(win);
   addContextMenu(win);
   attachBrowser(win);
+  followHistoryButtons(win, focusedBrowserPage);
 
   win.once("ready-to-show", () => {
     if (!win.isVisible()) win.show();

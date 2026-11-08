@@ -16,6 +16,7 @@ import {
 } from "react";
 import { useMatch, useNavigate, useRouter } from "@tanstack/react-router";
 import { placeHref as hrefOf } from "./places";
+import { getNewTabPlace } from "./new-tab-place";
 import { ArrowLeftIcon } from "lucide-react";
 import { EmptyState } from "~/components/ui/empty-state";
 import { useQueryClient } from "@tanstack/react-query";
@@ -1040,7 +1041,8 @@ function MailHome() {
 
   // ⌘[ / ⌘] (the menu accelerators, main.ts "Go"; a DOM keydown never
   // arrives for them because the webview consumes it) and the mouse's
-  // back/forward buttons move through the window's history. A browser does
+  // back/forward buttons (main's history-buttons.ts, which sees them in a
+  // message's iframe too) move through the window's history. A browser does
   // all of this itself.
   useEffect(() => {
     const back = () => {
@@ -1055,21 +1057,9 @@ function MailHome() {
     };
     const unsubBack = window.desktopBridge.on("nav:back", back);
     const unsubForward = window.desktopBridge.on("nav:forward", forward);
-    const mouse = (e: MouseEvent) => {
-      if (e.button === 3) {
-        e.preventDefault();
-        back();
-      } else if (e.button === 4) {
-        e.preventDefault();
-        forward();
-      }
-    };
-    const handlesMouse = window.desktopBridge.platform !== "web";
-    if (handlesMouse) window.addEventListener("mouseup", mouse);
     return () => {
       unsubBack();
       unsubForward();
-      if (handlesMouse) window.removeEventListener("mouseup", mouse);
     };
   }, [router]);
 
@@ -1488,10 +1478,15 @@ function MailHome() {
     void navigate({ href, replace: true });
   };
   const newWindowTab = () => {
+    const place = getNewTabPlace();
     const mailbox =
       space?.kind === "mailbox" || space?.kind === "alias" ? space.id : firstRealAccountId;
-    if (!mailbox) return;
-    const href = hrefOf(mailbox, "INBOX");
+    let href: string;
+    if (place === "agents") href = hrefOf(CHATS_SPACE, NEW_CHAT);
+    else if (place === "calendar" && calendarAccounts(accounts).length > 0)
+      href = hrefOf(CALENDAR_SPACE, lastCalendarMode.current);
+    else if (mailbox) href = hrefOf(mailbox, "INBOX");
+    else return;
     addTab(href);
     showWindowTab(href);
   };

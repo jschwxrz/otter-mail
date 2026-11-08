@@ -17,6 +17,7 @@ import { focusedBrowserPage, setupBrowser } from "./services/browser.js";
 import { embedDriveContent } from "./services/drive-content.js";
 import { parseMailtoUrl, setPendingMailto } from "./services/mailto-target.js";
 import { initUpdates } from "./updates.js";
+import { stepHistory } from "./windows/history-buttons.js";
 import { setSettingsTarget } from "./windows/settings-window.js";
 import {
   allowWindows,
@@ -250,20 +251,12 @@ function setupApplicationMenu(): void {
       {
         label: "Back",
         accelerator: "CommandOrControl+[",
-        click: () => {
-          const page = focusedBrowserPage();
-          if (page) page.navigationHistory.goBack();
-          else focusedAppWindow()?.webContents.send("nav:back");
-        },
+        click: () => stepHistory(focusedAppWindow(), focusedBrowserPage(), "back"),
       },
       {
         label: "Forward",
         accelerator: "CommandOrControl+]",
-        click: () => {
-          const page = focusedBrowserPage();
-          if (page) page.navigationHistory.goForward();
-          else focusedAppWindow()?.webContents.send("nav:forward");
-        },
+        click: () => stepHistory(focusedAppWindow(), focusedBrowserPage(), "forward"),
       },
     ],
     mailbox: [

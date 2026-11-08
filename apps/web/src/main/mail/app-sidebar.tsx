@@ -12,9 +12,11 @@ import { UpdateCard } from "../updates";
 import { AccountPicture } from "./account-picture";
 import { MailboxFolders, SearchRow, type SidebarSearch } from "./accounts-sidebar";
 import { AddMailboxMenu } from "./add-mailbox";
+import { AgentIcon } from "./agent-icon";
 import { type NavGlyphProps, OtterCalendarIcon, OtterMailIcon } from "./app-icons";
 import { AgentSidebar } from "./agent-sidebar";
 import type { SettingsPane } from "./api";
+import { useChats } from "./chat-store";
 import { useAddAccount, useViewUnreadCounts } from "./hooks";
 import { ScheduledMailButton } from "./mail-schedule";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "./menu";
@@ -34,6 +36,7 @@ import { useInboxUnread, useMailboxOptions, type MailboxOption } from "./top-bar
 import type { MailAccount, MailView } from "./types";
 import type { MailboxTab } from "../mailboxes";
 import { HintTooltip, IconBtn, cn } from "./ui";
+import { usePanelTabDrag } from "./use-panel-tab-drag";
 import { ViewMark } from "./view-icon";
 
 export function AppSidebar({
@@ -176,7 +179,15 @@ function ModeSwitcher({
   onMode: (mode: AppMode) => void;
 }) {
   const unread = Object.values(useInboxUnread(accounts)).some((n) => n > 0);
+  const agentDot = useChats((s) => s.unseen.size > 0);
   const workspaces = useWorkspaces();
+  const [order, setOrder] = useState(loadModeOrder);
+  const { ref, draggingId, handlers } = usePanelTabDrag((shown) => {
+    // A mode hidden now (Calendar without a calendar) keeps its saved place.
+    const next = [...shown, ...order.filter((id) => !shown.includes(id))];
+    setOrder(next);
+    saveModeOrder(next);
+  });
   const modes: {
     mode: AppMode;
     label: string;
@@ -208,24 +219,56 @@ function ModeSwitcher({
       Icon: w.Icon,
       dot: false,
     })),
+    {
+      mode: "agent",
+      label: "Agent",
+      Icon: AgentIcon,
+      shortcut: "mode.agent",
+      dot: agentDot,
+    },
   ];
+  // Modes not yet ordered (new ones) keep their place after the ordered ones.
+  const rank = (mode: string) => {
+    const at = order.indexOf(mode);
+    return at < 0 ? order.length : at;
+  };
+  const sorted = modes
+    .map((m, i) => ({ m, i }))
+    .sort((a, b) => rank(a.m.mode) - rank(b.m.mode) || a.i - b.i)
+    .map(({ m }) => m);
   return (
-    <div role="tablist" aria-label="Mode" className="flex items-center gap-0.5" data-tour="modes">
-      {modes.map((m) => {
+    <div
+      ref={ref}
+      role="tablist"
+      aria-label="Mode"
+      className="relative flex items-center gap-0.5"
+      data-tour="modes"
+      {...handlers}
+    >
+      {sorted.map((m) => {
         const selected = m.mode === mode;
+        const dragging = draggingId === m.mode;
         return (
-          <HintTooltip key={m.mode} label={m.label} shortcut={m.shortcut}>
-            <button
-              type="button"
+          <HintTooltip key={m.mode} label={m.label} shortcut={m.shortcut} disabled={dragging}>
+            <div
               role="tab"
+              tabIndex={0}
+              data-panel-tab-id={m.mode}
               aria-label={m.label}
               aria-selected={selected}
               onClick={() => onMode(m.mode)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onMode(m.mode);
+                }
+              }}
               className={cn(
-                "relative flex h-7 w-8 cursor-pointer items-center justify-center rounded-lg outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-focus-ring [&>svg]:size-4",
+                "relative flex h-7 w-8 cursor-pointer touch-none select-none items-center justify-center rounded-lg outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-focus-ring [&>svg]:size-4",
                 selected
                   ? "text-sidebar-foreground"
                   : "text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
+                dragging && "z-10 cursor-grabbing bg-sidebar-row-hover text-sidebar-foreground",
               )}
             >
               <m.Icon selected={selected} />
@@ -235,12 +278,32 @@ function ModeSwitcher({
                   className="absolute right-1.5 top-1 size-1.5 rounded-full bg-sidebar-foreground ring-2 ring-sidebar-surface"
                 />
               ) : null}
-            </button>
+            </div>
           </HintTooltip>
         );
       })}
     </div>
   );
+}
+
+/** This computer's order of the mode switcher; not synced. */
+const MODE_ORDER_KEY = "otter:mode-order";
+
+function loadModeOrder(): string[] {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(MODE_ORDER_KEY) ?? "[]");
+    return Array.isArray(saved) ? saved.filter((id) => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveModeOrder(order: string[]): void {
+  try {
+    localStorage.setItem(MODE_ORDER_KEY, JSON.stringify(order));
+  } catch {
+    // Unsaved, the order lasts until reload.
+  }
 }
 
 function SidebarTabs({
