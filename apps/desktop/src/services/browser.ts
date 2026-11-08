@@ -21,6 +21,7 @@ import { extensionMenuItems, reachOf, setupExtensions, trackTab } from "./extens
 import { parseMailtoUrl, setPendingMailto } from "./mailto-target.js";
 import { hostOS } from "../os/index.js";
 import { editingItems } from "../windows/context-menu.js";
+import { followPageHistoryButtons } from "../windows/history-buttons.js";
 
 export const BROWSER_PARTITION = "persist:browser";
 
@@ -171,6 +172,7 @@ export function attachBrowser(win: BrowserWindow): void {
   win.webContents.on("did-attach-webview", (_event, page) => {
     preparePage(win, page);
     trackTab(page);
+    followPageHistoryButtons(page);
     // A focused guest page's keys never reach the panel's dispatcher.
     page.on("before-input-event", (event, input) => {
       const mod = hostOS.modifierKey === "metaKey";
