@@ -1,4 +1,4 @@
-// A worktree home must override inherited OTTER_HOME to protect the installed app's database.
+// A worktree home must override inherited OTTER_HOME (or OTTER_MAIL_HOME) to protect the installed app's database.
 
 import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
@@ -36,30 +36,23 @@ export function resolveDevHome({ cwd, explicitHome, env = process.env }) {
   if (explicit) return NodePath.resolve(explicit);
   const worktree = resolveLinkedWorktree(cwd);
   if (worktree)
-    return moveLegacyHome(
+    return keepLegacyHome(
       NodePath.join(worktree, ".otter-mail"),
       NodePath.join(worktree, ".otter"),
     );
-  const ambient = env.OTTER_HOME?.trim();
+  const ambient = (env.OTTER_HOME ?? env.OTTER_MAIL_HOME)?.trim();
   return ambient ? NodePath.resolve(ambient) : undefined;
 }
 
 /** ~/.otter, as the app finds it (apps/desktop/src/paths.ts). */
 export function otterHome() {
-  return moveLegacyHome(
+  return keepLegacyHome(
     NodePath.join(NodeOS.homedir(), ".otter-mail"),
     NodePath.join(NodeOS.homedir(), ".otter"),
   );
 }
 
-/** Moves Otter Mail's home to the new one, leaving a link for what still points at it. */
-function moveLegacyHome(legacy, home) {
-  if (NodeFS.existsSync(home) || !NodeFS.existsSync(legacy)) return home;
-  try {
-    NodeFS.renameSync(legacy, home);
-    NodeFS.symlinkSync(home, legacy);
-    return home;
-  } catch {
-    return NodeFS.existsSync(home) ? home : legacy;
-  }
+/** A home from before the rename to Otter stays where it is (apps/desktop/src/paths.ts says why). */
+function keepLegacyHome(legacy, home) {
+  return NodeFS.existsSync(legacy) ? legacy : home;
 }

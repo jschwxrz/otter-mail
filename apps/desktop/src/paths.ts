@@ -8,7 +8,7 @@ export function configureAppPaths(): string {
   // Electron names the Keychain (macOS) and libsecret (Linux) key after the name the app has when
   // its startup code is done: this one, the name its secrets were sealed under. `nameApp` renames it at ready.
   app.setName(app.isPackaged ? "Otter Mail" : "Otter Mail (Dev)");
-  const configuredHome = process.env.OTTER_HOME?.trim();
+  const configuredHome = (process.env.OTTER_HOME ?? process.env.OTTER_MAIL_HOME)?.trim();
   const home = configuredHome ? path.resolve(configuredHome) : otterHome();
   const useDevDir = !app.isPackaged && !configuredHome;
   const stateDir = path.join(home, useDevDir ? "dev" : "userdata");
@@ -22,16 +22,11 @@ export function nameApp(): void {
   app.setName(app.isPackaged ? "Otter" : "Otter (Dev)");
 }
 
-/** ~/.otter, moved from Otter Mail's ~/.otter-mail with a link left there for what still points at it. */
+/**
+ * ~/.otter; an install from before the rename keeps ~/.otter-mail. Never moved: Claude files its
+ * chats under the workspace's real path, and an older copy may still have it open.
+ */
 function otterHome(): string {
-  const home = path.join(os.homedir(), ".otter");
   const legacy = path.join(os.homedir(), ".otter-mail");
-  if (fs.existsSync(home) || !fs.existsSync(legacy)) return home;
-  try {
-    fs.renameSync(legacy, home);
-    fs.symlinkSync(home, legacy);
-    return home;
-  } catch {
-    return fs.existsSync(home) ? home : legacy;
-  }
+  return fs.existsSync(legacy) ? legacy : path.join(os.homedir(), ".otter");
 }

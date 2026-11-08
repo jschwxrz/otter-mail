@@ -72,7 +72,8 @@ directory per kind of run, so development never shares a database with the insta
 inherited variable pointing at `~/.otter` would otherwise put a branch on the installed
 app's database. The rules live in `apps/desktop/src/paths.ts` and
 `apps/desktop/scripts/dev-home.mjs`. Before the rename to Otter the home was `~/.otter-mail`
-(`<worktree>/.otter-mail`): the first run that finds one moves it, leaving a link at the old path.
+(`<worktree>/.otter-mail`, `OTTER_MAIL_HOME`): where one exists it stays the home, never moved
+(Claude files its chats under the workspace's real path).
 
 A state directory holds the mail cache (`mail-cache.db`), accounts, Google tokens
 (`google-tokens.json`, encrypted with a Keychain key), settings, views, keybindings, Chromium's

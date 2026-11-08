@@ -155,7 +155,7 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
 - `pnpm start` runs the built app unpackaged; `pnpm dist:desktop:dmg` builds a DMG in `release/`
   (on a Mac), `pnpm dist:desktop:deb` a .deb (on Linux).
 - Data homes (`apps/desktop/src/paths.ts`, as in T3 Code): the installed app uses
-  `~/.otter/userdata`; dev runs use `~/.otter/dev`, or `<worktree>/.otter` in a
+  `~/.otter/userdata` (`~/.otter-mail/userdata` for installs from before the rename, never moved); dev runs use `~/.otter/dev`, or `<worktree>/.otter` in a
   linked worktree. `pnpm dev:desktop --home <dir>` overrides. Never point dev at the installed app's home.
 - Main-process logs: the terminal, and `logs/main.log` in the state directory.
 
