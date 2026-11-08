@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { MousePointer2Icon } from "lucide-react";
-import { Btn, cn } from "./ui";
+import { Btn, cn } from "../mail/ui";
 
 /** Where a point of the page (CSS px) is over the canvas, which shows the frame `object-contain object-top`. */
 export type Placer = (x: number, y: number) => { left: number; top: number; scale: number } | null;

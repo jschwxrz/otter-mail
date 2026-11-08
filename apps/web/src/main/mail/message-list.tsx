@@ -45,7 +45,7 @@ import {
   ChevronDownIcon,
   PaperclipIcon,
 } from "lucide-react";
-import { AgentIcon } from "./agent-icon";
+import { AgentIcon } from "../agent/agent-icon";
 import { IconBtn, HintTooltip, cn } from "./ui";
 import {
   useMessages,

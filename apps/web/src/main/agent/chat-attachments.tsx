@@ -9,9 +9,9 @@ import {
   type ReactNode,
 } from "react";
 import { FileTextIcon, ImageIcon, LoaderCircleIcon, PaperclipIcon, XIcon } from "lucide-react";
-import { toast } from "./toast";
-import { mailApi, type ChatAttachment } from "./api";
-import { cn } from "./ui";
+import { toast } from "../mail/toast";
+import { mailApi, type ChatAttachment } from "../mail/api";
+import { cn } from "../mail/ui";
 
 const IMAGE_TYPES = new Set(["image/gif", "image/jpeg", "image/png", "image/webp"]);
 const IMAGE_EXTENSIONS = /\.(gif|jpe?g|png|webp)$/i;

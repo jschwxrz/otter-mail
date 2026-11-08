@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { CheckIcon, HistoryIcon, SearchIcon, Trash2Icon } from "lucide-react";
 import { AgentAvatar, openClawAgentId } from "./agent-providers";
-import type { ChatSession, ProviderKind } from "./api";
-import { cn } from "./ui";
+import type { ChatSession, ProviderKind } from "../mail/api";
+import { cn } from "../mail/ui";
 import { isBlank, type Conversation } from "./chat-store";
 
 function sourceLabel(source: string): string {

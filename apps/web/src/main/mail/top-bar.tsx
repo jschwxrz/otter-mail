@@ -21,7 +21,7 @@ import {
   TagIcon,
   Trash2Icon,
 } from "lucide-react";
-import { AgentIcon } from "./agent-icon";
+import { AgentIcon } from "../agent/agent-icon";
 import { IconBtn, HintTooltip, cn } from "./ui";
 import { getAccountDisplayName } from "./account-style";
 import { useQueries } from "@tanstack/react-query";

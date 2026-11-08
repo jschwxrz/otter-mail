@@ -3,9 +3,9 @@ import { createElement, useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 
 import { mailApi } from "./mail/api";
-import { AgentIcon } from "./mail/agent-icon";
-import { AgentAvatar, openClawAgentId } from "./mail/agent-providers";
-import { isBlank, useChats } from "./mail/chat-store";
+import { AgentIcon } from "./agent/agent-icon";
+import { AgentAvatar, openClawAgentId } from "./agent/agent-providers";
+import { isBlank, useChats } from "./agent/chat-store";
 import { PanelTab } from "./mail/panel-tab";
 import { HistoryControls, recentIcon } from "./mail/top-bar";
 import { HintTooltip, IconBtn, cn } from "./mail/ui";

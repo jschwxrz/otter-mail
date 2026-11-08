@@ -9,7 +9,7 @@ import {
   Redo2Icon,
   XIcon,
 } from "lucide-react";
-import { Btn, HintTooltip, IconBtn, cn } from "./ui";
+import { Btn, HintTooltip, IconBtn, cn } from "../mail/ui";
 import { useShortcutLabel } from "../keybindings/store";
 
 export type FollowUpBehavior = "queue" | "steer";

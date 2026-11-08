@@ -17,7 +17,7 @@ import {
   ServerIcon,
   ZapIcon,
 } from "lucide-react";
-import { AgentIcon } from "../mail/agent-icon";
+import { AgentIcon } from "../agent/agent-icon";
 import { Switch } from "~/components/ui/switch";
 import { mailApi, type NotificationsMode, type SyncSettings } from "../mail/api";
 import {
@@ -41,7 +41,7 @@ import {
   providerSummary,
   useAgentProviders,
   useSetProvidersState,
-} from "../mail/agent-providers";
+} from "../agent/agent-providers";
 import {
   syncLabel,
   useAccountSync,

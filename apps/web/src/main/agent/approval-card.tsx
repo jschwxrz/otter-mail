@@ -1,9 +1,14 @@
 import { EllipsisIcon, FileIcon, HandIcon } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
-import type { ApprovalDecision, ApprovalRequest } from "./api";
-import { COMPOSER_SURFACE } from "./composer-kit";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./menu";
-import { Btn, cn, Kbd } from "./ui";
+import type { ApprovalDecision, ApprovalRequest } from "../mail/api";
+import { COMPOSER_SURFACE } from "../mail/composer-kit";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../mail/menu";
+import { Btn, cn, Kbd } from "../mail/ui";
 
 const basename = (path: string) => path.replace(/\/+$/, "").split("/").pop() || path;
 

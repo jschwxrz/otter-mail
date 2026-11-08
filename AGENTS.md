@@ -51,7 +51,7 @@ when a feature lands or goes.
   addresses from before the rename, without `/mail` or with `/chats`, redirect).
   `src/main/browser/` is the browser (Mac): the panel of `<webview>` tabs beside the mail, a
   chat's pages in the AI workspace, and `openLink`, where links from mail and chat go.
-  The agent's chats are `src/main/mail/chat-store.ts` (synced through core), shown in the
+  The agents' UI is `src/main/agent/`: the chats (`chat-store.ts`, synced through core), shown in the
   small window over the mail (⌘I, `chat-window.tsx`) or the AI workspace, the Chats space
   (`/agents/<id>`, `chat-workspace.tsx`), with what each chat used and made as tabs.
   `src/web/` is the browser shell: core in a Web Worker (SQLite WASM on OPFS) hosted by one
@@ -112,7 +112,7 @@ when a feature lands or goes.
   Otterware's mark, `prod/otterware-symbol.svg`; the iPhone app (still Otter Mail) from
   `prod/otter-mail-symbol.svg`. `pnpm icons:export` regenerates them all.
   `agent/` is Otterware's agent (the Pilot): the app draws it with `AgentIcon`
-  (`apps/web/src/main/mail/agent-icon.tsx`), the iPhone with its `OtterAgent` image.
+  (`apps/web/src/main/agent/agent-icon.tsx`), the iPhone with its `OtterAgent` image.
 - `changelog/`: notes on Mac and web releases (`<version>.md`, images in `images/`), shown on
   otterware.app/mail/changelog (the website repository copies them hourly) and on the version's
   GitHub Release (workflows copy it there); the app only links there. A note is marketing, written only when the user asks for one (the

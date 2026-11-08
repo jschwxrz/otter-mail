@@ -14,7 +14,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../mail/select";
 import { Btn, cn } from "../mail/ui";
 import { shortcutText } from "../keybindings/keys";
-import { AgentAvatar } from "../mail/agent-providers";
+import { AgentAvatar } from "../agent/agent-providers";
 import type { AgentSettingsProps } from "../extensions/types";
 import { CopyButton } from "./agent-tokens-section";
 import {

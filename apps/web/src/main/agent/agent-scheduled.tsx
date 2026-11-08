@@ -26,14 +26,19 @@ import { Dialog } from "~/components/ui/dialog";
 import { Field } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
 import { Switch } from "~/components/ui/switch";
-import { mailApi, type ProviderSnapshot } from "./api";
+import { mailApi, type ProviderSnapshot } from "../mail/api";
 import { AgentAvatar, useAgentProviders } from "./agent-providers";
-import { readableError } from "./add-mailbox";
+import { readableError } from "../mail/add-mailbox";
 import { ChatMarkdown } from "./chat-markdown";
 import { useNow } from "./chat-shelves";
 import { useChats } from "./chat-store";
 import { useLatest } from "../use-latest";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../mail/menu";
 import {
   agoText,
   durationText,
@@ -48,9 +53,9 @@ import {
   type Repeat,
   type WhenForm,
 } from "./scheduled-text";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
-import { toast } from "./toast";
-import { Btn, IconBtn, cn } from "./ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../mail/select";
+import { toast } from "../mail/toast";
+import { Btn, IconBtn, cn } from "../mail/ui";
 
 /** The Agents space's place for every agent's scheduled tasks: /agents/scheduled. */
 export const SCHEDULED_TASKS = "scheduled";

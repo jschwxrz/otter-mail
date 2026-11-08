@@ -29,14 +29,14 @@ import {
   type ProviderKind,
   type ProviderSnapshot,
   type Skill,
-} from "./api";
+} from "../mail/api";
 import type { SentAttachment } from "./chat-attachments";
 import { mergeChatChanges } from "./chat-changes";
 import { placeDelivered } from "./chat-order";
 import type { Citation } from "./chat-cite";
 import { isChatFileLink } from "./chat-links";
 import type { FollowUpBehavior } from "./chat-queue";
-import { toast } from "./toast";
+import { toast } from "../mail/toast";
 
 export type { ChatTab, ChatTurn };
 

@@ -30,15 +30,15 @@ import { MessageReader } from "./mail/message-reader";
 import { NewMessageView } from "./mail/new-message-view";
 import { CommandPalette } from "./mail/command-palette";
 import { BrowserPanel } from "./browser/browser-panel";
-import { ChatBar } from "./mail/chat-bar";
-import { ChatWindow } from "./mail/chat-window";
-import { ChatWorkspace, type ChatPanelControl } from "./mail/chat-workspace";
-import { SCHEDULED_TASKS, ScheduledTasksView } from "./mail/agent-scheduled";
+import { ChatBar } from "./agent/chat-bar";
+import { ChatWindow } from "./agent/chat-window";
+import { ChatWorkspace, type ChatPanelControl } from "./agent/chat-workspace";
+import { SCHEDULED_TASKS, ScheduledTasksView } from "./agent/agent-scheduled";
 import { CALENDAR_MODES, CalendarView, calendarAccounts } from "./calendar/calendar-view";
 import type { CalendarMode } from "./calendar/dates";
-import { newChat, showChat, useChatEvents, useChats } from "./mail/chat-store";
-import { useMailChatContext } from "./mail/chat-context";
-import { useChatProvider } from "./mail/agent-providers";
+import { newChat, showChat, useChatEvents, useChats } from "./agent/chat-store";
+import { useMailChatContext } from "./agent/chat-context";
+import { useChatProvider } from "./agent/agent-providers";
 import { SEARCH_MAILBOX } from "./mail/gmail-query";
 import { searchTabId, searchTitle, type SearchTab } from "./mail/search-tabs";
 import {
@@ -86,7 +86,7 @@ import {
 } from "./mail/undo";
 import { getAccountColor, getAccountContrastColor } from "./mail/account-style";
 import { mailApi, type ChatChange, type MailtoTarget, type SettingsPane } from "./mail/api";
-import type { QuoteContext } from "./mail/chat-context";
+import type { QuoteContext } from "./agent/chat-context";
 import type { MailAccount, MessageSummary, MailView } from "./mail/types";
 import {
   useMailViews,

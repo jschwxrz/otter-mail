@@ -9,7 +9,7 @@ import {
   MousePointer2Icon,
   RotateCwIcon,
 } from "lucide-react";
-import { mailApi, type ProviderKind } from "./api";
+import { mailApi, type ProviderKind } from "../mail/api";
 import { controlBrowser } from "./agent-browser-input";
 import {
   AgentCursor,
@@ -22,8 +22,8 @@ import {
 import { faviconFor } from "../browser/browser-view";
 import { addressToUrl, hostOf } from "../browser/store";
 import { useLatest } from "../use-latest";
-import { HintTooltip, IconBtn, cn } from "./ui";
-import { toast } from "./toast";
+import { HintTooltip, IconBtn, cn } from "../mail/ui";
+import { toast } from "../mail/toast";
 
 /** Held tabs are let go a while after the last heartbeat, so a closed app never keeps one. */
 const HEARTBEAT_MS = 10_000;

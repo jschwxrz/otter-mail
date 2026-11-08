@@ -4,7 +4,7 @@ import { CheckIcon, HistoryIcon, LoaderCircleIcon, PlusIcon } from "lucide-react
 
 import { AgentAvatar, openClawAgentId, useChatProvider } from "./agent-providers";
 import { AgentIcon } from "./agent-icon";
-import { mailApi, type ChatSession } from "./api";
+import { mailApi, type ChatSession } from "../mail/api";
 import { HistoryList } from "./chat-history";
 import {
   deleteConversation,
@@ -15,7 +15,7 @@ import {
 } from "./chat-store";
 import { settleChat } from "./chat-shelve-actions";
 import { shelveChats, useNow } from "./chat-shelves";
-import { HintTooltip, cn } from "./ui";
+import { HintTooltip, cn } from "../mail/ui";
 
 type Status = "waiting" | "working" | "finished" | null;
 
