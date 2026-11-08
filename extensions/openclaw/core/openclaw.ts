@@ -178,6 +178,8 @@ export function openClawFullAccess(): { allowed: boolean | null; request: string
 const holdsAll = (scopes: string[]) => SCOPES.every((scope) => scopes.includes(scope));
 
 let current: { url: string; ready: Promise<Gateway> } | null = null;
+/** Connections reset for new credentials: what was retrying for the old ones stops. */
+let resets = 0;
 const listeners = new Set<(event: EventFrame) => void>();
 const closeListeners = new Set<(client: Gateway["client"]) => void>();
 
@@ -354,6 +356,7 @@ function disconnect(): void {
 
 /** Before connecting to `url` with new credentials: nothing goes on reaching the gateway it had. */
 export async function resetOpenClawConnection(url: string): Promise<void> {
+  resets++;
   if (watching) watching.settings = { ...watching.settings, url };
   for (const [requestId, turn] of turns)
     turn.finish({ requestId, type: "error", message: "detached" });
@@ -975,7 +978,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 async function follow(
   turn: Turn,
   settings: OpenClawSettings,
-  start: () => Promise<void>,
+  start: (going: () => boolean) => Promise<void>,
 ): Promise<void> {
   const { requestId, sessionKey, emit } = turn;
   let ended: (() => void) | null = null;
@@ -1072,6 +1075,7 @@ async function follow(
         if (state.active.length === 0 && !turn.yielded) return await settle(state);
         catchUp(turn, state);
         await watch(turn);
+        if (lost === turn.gateway.client) continue;
         return hush();
       } catch (error) {
         if (error instanceof Error && error.message === "not_configured")
@@ -1223,15 +1227,19 @@ async function follow(
   };
   // Until it has started, `start` deals with a dropped socket itself (a send it may have to repeat).
   let started = false;
+  /** The last connection that closed: one that closes while subscribing is picked up after. */
+  let lost: Gateway["client"] | null = null;
   const onClose = (client: Gateway["client"]) => {
+    lost = client;
     if (started && client === turn.gateway.client) void reconnect();
   };
   listeners.add(onEvent);
   closeListeners.add(onClose);
   try {
     hush();
-    await start();
+    await start(() => ended !== null);
     started = true;
+    if (lost === turn.gateway.client) void reconnect();
     await finished;
   } catch (error) {
     logger.info("agent", "openclaw turn failed", { requestId, error: String(error) });
@@ -1883,17 +1891,28 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
         type: "error",
         message: "agent_error: Those files are too large for OpenClaw: about 18 MB per message.",
       });
-    await follow(turn, settings, async () => {
-      let sent: { runId?: string };
+    await follow(turn, settings, async (going) => {
+      let sent: { runId?: string } | undefined;
       try {
         sent = await sendAsOwner(g, send);
       } catch (error) {
         if (error instanceof GatewayProtocolRequestError) throw error;
         // The socket went before the gateway answered, which may have the message already.
         logger.info("agent", "openclaw send lost its connection", { requestId });
-        await sleep(RECONNECT_DELAYS_MS[0]);
-        turn.gateway = await gateway(settings);
-        sent = (await runState(turn)).found ? {} : await sendAsOwner(turn.gateway, send);
+        for (let attempt = 0; !sent; attempt++) {
+          await sleep(RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)]);
+          if (!going()) return;
+          try {
+            turn.gateway = await gateway(settings);
+            const { found } = await runState(turn);
+            if (!going()) return;
+            sent = found ? {} : await sendAsOwner(turn.gateway, send);
+          } catch (retry) {
+            if (retry instanceof GatewayProtocolRequestError) throw retry;
+            if (retry instanceof Error && retry.message === "not_configured") throw retry;
+            logger.info("agent", "openclaw send retry failed", { requestId, error: String(retry) });
+          }
+        }
       }
       turn.runId = sent.runId ?? requestId;
       await watch(turn);
@@ -1966,17 +1985,29 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
         sessionKey: turn.sessionKey,
         ...(turn.steers.size > 0 || waiting ? {} : { runId: turn.runId }),
       });
-    // On a connection that just dropped, the run goes on: ask on the next one.
-    void abort(turn.gateway.client)
-      .catch(async (error: unknown) => {
-        if (error instanceof GatewayProtocolRequestError) throw error;
-        await sleep(RECONNECT_DELAYS_MS[0]);
-        return abort((await gateway({ ...OPENCLAW_DEFAULTS, url: turn.gateway.url })).client);
-      })
-      .then(
-        () => waiting && turn.finish({ requestId, type: "error", message: "cancelled" }),
-        () => turn.finish({ requestId, type: "error", message: "cancelled" }),
-      );
+    const stopped = () => turn.finish({ requestId, type: "error", message: "cancelled" });
+    const { url } = turn.gateway;
+    const reset = resets;
+    void abort(turn.gateway.client).then(
+      () => waiting && stopped(),
+      async (error: unknown) => {
+        stopped();
+        if (error instanceof GatewayProtocolRequestError) return;
+        // On a connection that just dropped, the run goes on: ask again once the gateway is back.
+        for (let attempt = 0; attempt < 120; attempt++) {
+          await sleep(RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)]);
+          if (reset !== resets) return;
+          try {
+            const g = await gateway({ ...OPENCLAW_DEFAULTS, url });
+            if (reset !== resets) return;
+            return void (await abort(g.client));
+          } catch (retry) {
+            if (retry instanceof GatewayProtocolRequestError) return;
+            if (retry instanceof Error && retry.message === "not_configured") return;
+          }
+        }
+      },
+    );
   },
 
   async steer(requestId, input) {

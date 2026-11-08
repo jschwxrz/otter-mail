@@ -285,6 +285,90 @@ describe("an OpenClaw turn whose connection drops", () => {
     await flush(1_000);
     expect(calls("chat.abort")).toHaveLength(2);
   });
+
+  it("keeps asking to stop until the gateway is back, and shows it stopped at once", async () => {
+    let failures = 3;
+    gateway((method) => {
+      if (method === "chat.abort" && failures-- > 0) throw new Error("gateway client stopped");
+    });
+    const { events } = send();
+    await flush();
+    openClawProvider.cancel("req-1");
+    await flush();
+    expect(events.at(-1)).toEqual({ requestId: "req-1", type: "error", message: "cancelled" });
+    await flush(1_000 + 2_000 + 5_000);
+    expect(calls("chat.abort")).toHaveLength(4);
+  });
+
+  it("keeps trying to send while the gateway is away", async () => {
+    let first = true;
+    history = () => missing;
+    gateway((method) => {
+      if (method === "chat.send" && first) {
+        first = false;
+        fixture.fail = { error: new Error("Can't reach the gateway.") };
+        fixture.clients[0].options.onClose();
+        throw new Error("gateway closed (1006): ");
+      }
+    });
+    const { events, ended } = send();
+    await flush(20_000);
+    expect(events.some((e) => e.type === "error" || e.type === "done")).toBe(false);
+    fixture.fail = null;
+    await flush(30_000);
+    expect(calls("chat.send")).toHaveLength(2);
+    final();
+    await ended;
+    expect(events.at(-1)).toEqual({ requestId: "req-1", type: "done", responseId: null });
+  });
+
+  it("doesn't send again for a turn that ended while it looked", async () => {
+    let first = true;
+    history = () => {
+      void resetOpenClawConnection("wss://gateway.test");
+      return missing;
+    };
+    gateway((method) => {
+      if (method === "chat.send" && first) {
+        first = false;
+        throw new Error("gateway closed (1006): ");
+      }
+    });
+    const { ended } = send();
+    await flush(2_000);
+    await ended;
+    expect(calls("chat.send")).toHaveLength(1);
+  });
+
+  it("stops asking to stop once the connection is reset for a new gateway", async () => {
+    gateway((method) => {
+      if (method === "chat.abort") {
+        void resetOpenClawConnection("wss://new.test");
+        throw new Error("gateway client stopped");
+      }
+    });
+    send();
+    await flush();
+    openClawProvider.cancel("req-1");
+    await flush(10_000);
+    expect(calls("chat.abort")).toHaveLength(1);
+  });
+
+  it("picks the turn up when the socket drops while it subscribes", async () => {
+    let first = true;
+    gateway((method) => {
+      if (method === "sessions.messages.subscribe" && first) {
+        first = false;
+        fixture.clients[0].connected = false;
+        fixture.clients[0].options.onClose();
+        throw new Error("gateway closed (1006): ");
+      }
+      if (method === "exec.approval.list") return [];
+    });
+    send();
+    await flush(2_000);
+    expect(fixture.clients).toHaveLength(2);
+  });
 });
 
 describe("an OpenClaw turn whose message isn't in the history read", () => {
