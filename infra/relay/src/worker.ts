@@ -41,6 +41,7 @@ import { AgentHub as AgentHubObject } from "./agent-hub.ts";
 import { NotificationMailbox as NotificationMailboxObject } from "./notification-mailbox.ts";
 import * as apns from "./apns.ts";
 import * as tunnel from "./tunnel.ts";
+import { forHost } from "./hosts.ts";
 import { SESSION_HEADER, UserHub as UserHubObject } from "./user-hub.ts";
 
 export const AgentHub = Sentry.instrumentDurableObjectWithSentry(errorReports, AgentHubObject);
@@ -77,6 +78,8 @@ export interface Env {
   GOOGLE_GMAIL_CLIENT_SECRET: string;
   /** Where the web app runs (https://mail.otterware.app): trusted for CORS and redirects. */
   APP_ORIGIN: string;
+  /** Other hosts the relay answers on, with their own web app: see hosts.ts. */
+  RELAY_HOSTS?: string;
   DRIVE_ORIGIN: string;
   COOKIE_DOMAIN?: string;
   PUSH_TOPIC: string;
@@ -164,6 +167,11 @@ const mailbox = z
   .pipe(z.email());
 
 const app = new Hono<App>();
+
+app.use(async (c, next) => {
+  c.env = forHost(c.env, c.req.url);
+  await next();
+});
 
 app.use("/v1/*", (c, next) =>
   cors({ origin: c.env.APP_ORIGIN, credentials: true, maxAge: 86_400 })(c, next),

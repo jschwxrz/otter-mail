@@ -1,7 +1,7 @@
 # Otter relay
 
-https://relay.mail.otterware.app, a Cloudflare Worker. It gives Otter eight things (the
-Mac app works without it; the web app needs it):
+https://relay.otterware.app (and, for clients built before the rename, https://relay.mail.otterware.app),
+a Cloudflare Worker. It gives Otter eight things (the Mac app works without it; the web app needs it):
 
 - **Otter accounts.** Sign in with Google once per Mac, and the mailboxes you use come along to
   every Mac. The relay keeps the list of linked addresses (Gmail, Outlook, or IMAP with its server
@@ -347,3 +347,16 @@ Official references: [Apple APNs requests](https://developer.apple.com/documenta
 [token authentication](https://developer.apple.com/documentation/usernotifications/establishing-a-token-based-connection-to-apns),
 [APNs errors](https://developer.apple.com/documentation/usernotifications/handling-notification-responses-from-apns),
 [Workers stub modules](https://developers.cloudflare.com/workers/runtime-apis/nodejs/#non-functional-stub-modules).
+
+## Hosts
+
+The relay answers on several hosts, all one Worker. `BETTER_AUTH_URL`'s host
+(`relay.mail.otterware.app`) uses the env as written: its callbacks, `APP_ORIGIN`
+(`mail.otterware.app`) and `COOKIE_DOMAIN`. Each host in `RELAY_HOSTS` (`relay.otterware.app` →
+`otter.otterware.app`) answers as itself (`src/hosts.ts`): its OAuth callbacks
+(`/v1/auth/callback/*`, `/v1/gmail/callback`, `/v1/outlook/callback`,
+`/v1/notifications/callback`) are on its own origin, CORS and redirects go to its web app, and its
+cookies are host-only. Each of those callbacks has to be registered with Google, Microsoft and
+Otter Accounts (whose `MailIdentity` keeps the same map) before clients use that host.
+`relay.mail.otterware.dev` answers like `BETTER_AUTH_URL`'s host. Old hosts stay for good:
+installed apps call them, and Gmail's Pub/Sub push goes to `relay.mail.otterware.app/push/gmail`.
