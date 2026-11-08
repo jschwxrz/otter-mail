@@ -1,5 +1,7 @@
 import { useLatest } from "../use-latest";
 import { ExtensionContextMenuActions } from "../extensions/slots";
+import { inNewWindow } from "../new-window-click";
+import { PLACE } from "../place-menu";
 import type React from "react";
 import type { ReactNode } from "react";
 import { useLayoutEffect, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -305,6 +307,8 @@ type MessageRowProps = {
   /** Right-clicking a checked row acts on the whole selection. */
   selectionMenu?: ReactNode;
   onRowClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  /** Where the row goes: its conversation. */
+  onOpen: () => void;
   accountId: string;
   resolveLabel: ResolveLabel;
   combinedMeta: CombinedMeta | null;
@@ -329,6 +333,7 @@ function MessageRow({
   onToggleChecked,
   selectionMenu,
   onRowClick,
+  onOpen,
   accountId,
   resolveLabel,
   combinedMeta,
@@ -474,6 +479,7 @@ function MessageRow({
             type="button"
             data-message-row=""
             data-message-id={message.id}
+            {...PLACE}
             data-draft={isDraft || undefined}
             data-flagged={message.starred || undefined}
             data-unread={unread || undefined}
@@ -718,6 +724,10 @@ function MessageRow({
           <ContextMenuContent>{selectionMenu}</ContextMenuContent>
         ) : (
           <ContextMenuContent>
+            <ContextMenuItem onSelect={() => inNewWindow(onOpen)}>
+              Open in New Window
+            </ContextMenuItem>
+            <ContextMenuSeparator />
             <ContextMenuItem
               icon={unread ? "envelope.open" : "envelope.badge"}
               onSelect={handleToggleRead}
@@ -817,6 +827,7 @@ function ThreadMessageRow({
       ref={ref}
       type="button"
       onClick={onClick}
+      {...PLACE}
       data-read={!message.unread || undefined}
       data-selected={selected || undefined}
       className={cn(
@@ -1830,6 +1841,7 @@ export function MessageList({
         onToggleExpanded={() => setThreadExpanded(message, !expanded.has(threadKey(message)))}
         onDragStart={(e) => handleRowDragStart(e, message)}
         onRowClick={(e) => handleRowClick(e, message)}
+        onOpen={() => onSelectMessage(message.id, message.accountId ?? accountId)}
         accountId={accountId}
         resolveLabel={resolveLabel}
         combinedMeta={resolveCombinedMeta(message, combined, accounts, resolveLabel)}

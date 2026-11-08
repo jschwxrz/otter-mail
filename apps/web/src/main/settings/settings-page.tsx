@@ -11,7 +11,6 @@ import {
   setAdvanceDirection as persistAdvanceDirection,
   type AdvanceDirection,
 } from "../mail/advance-direction";
-import { getNewTabPlace, setNewTabPlace, type NewTabPlace } from "../new-tab-place";
 import { AppearancePane } from "./appearance-pane";
 import { KeybindingsPane } from "./keybindings-pane";
 import { AccountsPane } from "./accounts-pane";
@@ -63,19 +62,12 @@ const ADVANCE_DIRECTION_OPTIONS: { value: AdvanceDirection; label: string }[] = 
   { value: "none", label: "Don't select another message" },
 ];
 
-const NEW_TAB_PLACE_OPTIONS: { value: NewTabPlace; label: string }[] = [
-  { value: "mail", label: "Mail" },
-  { value: "agents", label: "Agents" },
-  { value: "calendar", label: "Calendar" },
-];
-
 function GeneralPane() {
   const [syncInterval, setSyncInterval] = useState<number | null>(null);
   const [notificationsMode, setNotificationsMode] = useState<NotificationsMode | null>(null);
   const [advanceDirection, setAdvanceDirectionState] = useState<AdvanceDirection>(() =>
     getAdvanceDirection(),
   );
-  const [newTabPlace, setNewTabPlaceState] = useState<NewTabPlace>(() => getNewTabPlace());
   const [launchAtLogin, setLaunchAtLogin] = useState(DEFAULT_SETTINGS.launchAtLogin);
   const [dockBadge, setDockBadge] = useState(DEFAULT_SETTINGS.dockBadgeEnabled);
   const [errorReports, setErrorReports] = useState(DEFAULT_SETTINGS.errorReports);
@@ -118,7 +110,6 @@ function GeneralPane() {
     );
     const onStorage = () => {
       setAdvanceDirectionState(getAdvanceDirection());
-      setNewTabPlaceState(getNewTabPlace());
     };
     window.addEventListener("storage", onStorage);
     return () => {
@@ -156,12 +147,6 @@ function GeneralPane() {
     console.log("[Settings:setAdvanceDirection]", { direction });
     setAdvanceDirectionState(direction);
     persistAdvanceDirection(direction);
-  };
-
-  const handleNewTabPlaceChange = (value: string) => {
-    const place = value as NewTabPlace;
-    setNewTabPlaceState(place);
-    setNewTabPlace(place);
   };
 
   const handleLaunchAtLoginChange = async (checked: boolean) => {
@@ -256,31 +241,6 @@ function GeneralPane() {
               }
             />
           ) : null}
-        </SettingsSection>
-      ) : null}
-
-      {features.windowTabs ? (
-        <SettingsSection title="Tabs">
-          <SettingsRow
-            {...searchableSetting("new-tab-place")}
-            resetAction={
-              newTabPlace !== "mail" ? (
-                <SettingResetButton
-                  label="new tabs open"
-                  onClick={() => handleNewTabPlaceChange("mail")}
-                />
-              ) : null
-            }
-            description="Where a new tab starts."
-            control={
-              <RowSelect
-                value={newTabPlace}
-                onValueChange={handleNewTabPlaceChange}
-                options={NEW_TAB_PLACE_OPTIONS}
-                ariaLabel="New tabs open"
-              />
-            }
-          />
         </SettingsSection>
       ) : null}
 

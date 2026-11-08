@@ -129,13 +129,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     pane: "calendar",
     searchTerms: ["12-hour 24-hour clock AM PM calendar"],
   },
-  {
-    id: "new-tab-place",
-    title: "New tabs open",
-    pane: "general",
-    available: features.windowTabs,
-    searchTerms: ["new tab default start agents chats calendar mail inbox"],
-  },
+
   {
     id: "advance-direction",
     title: "After archive, delete, or move",

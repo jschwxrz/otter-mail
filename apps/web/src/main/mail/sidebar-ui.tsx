@@ -10,6 +10,7 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 import type { KeybindingCommand } from "../keybindings/commands";
 
 import { HintTooltip, UnreadPill, cn } from "./ui";
+import { PLACE } from "../place-menu";
 
 export type RowDragProps = {
   draggable?: boolean;
@@ -27,12 +28,15 @@ export function NewRow({
   label,
   selected = false,
   tour,
+  place = false,
   onClick,
 }: {
   icon: ReactNode;
   label: string;
   selected?: boolean;
   tour?: string;
+  /** Goes to a place (not a dialog): it opens in a new window too. */
+  place?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -40,6 +44,7 @@ export function NewRow({
       <button
         type="button"
         onClick={onClick}
+        {...(place ? PLACE : {})}
         aria-current={selected ? "page" : undefined}
         className={`${SIDEBAR_ROW} px-(--sidebar-row-content-inset) ${
           selected
@@ -93,6 +98,7 @@ export function SkRow({
   dragProps,
   dropActive,
   dot,
+  place = false,
 }: {
   icon: ReactNode;
   title: string;
@@ -104,6 +110,8 @@ export function SkRow({
   dragProps?: RowDragProps;
   dropActive?: boolean;
   dot?: boolean;
+  /** Goes to a place: it opens in a new window too. */
+  place?: boolean;
 }) {
   const style: CSSProperties = { paddingLeft: 10 + depth * 16 };
   return (
@@ -112,6 +120,7 @@ export function SkRow({
       onClick={onClick}
       style={style}
       {...dragProps}
+      {...(place ? PLACE : {})}
       className={[
         SIDEBAR_ROW,
         "pr-(--sidebar-row-content-inset)",
@@ -285,6 +294,7 @@ export function SidebarPicker({
               aria-label={label}
               aria-current={selected ? "page" : undefined}
               onClick={() => onSelect(id)}
+              {...PLACE}
               draggable={onMove ? true : undefined}
               onDragStart={
                 onMove

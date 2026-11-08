@@ -22,6 +22,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
   DropdownMenu,
   DropdownMenuContent,
@@ -45,6 +46,8 @@ import type { MailAccount, MailView } from "./types";
 import type { MailboxTab } from "../mailboxes";
 import { HintTooltip, IconBtn } from "./ui";
 import { ViewMark } from "./view-icon";
+import { inNewWindow } from "../new-window-click";
+import { PLACE } from "../place-menu";
 
 export function AppSidebar({
   accounts,
@@ -123,6 +126,7 @@ export function AppSidebar({
               label="New message"
               selected={composing}
               tour="compose"
+              place
               onClick={onCompose}
             />
             <ScheduledMailButton />
@@ -158,7 +162,12 @@ export function AppSidebar({
         <span className="min-w-0 flex-1" />
         {mode === "mail" ? <SyncButton accountIds={healthIds} /> : null}
         <HintTooltip label="Settings" hint={shortcutText("mod+,")}>
-          <IconBtn label="Settings" active={settingsOpen} onClick={() => onOpenSettings()}>
+          <IconBtn
+            label="Settings"
+            active={settingsOpen}
+            onClick={() => onOpenSettings()}
+            {...PLACE}
+          >
             <SettingsIcon />
           </IconBtn>
         </HintTooltip>
@@ -414,10 +423,15 @@ function MailPage({
                   title={view.name}
                   selected={view.id === spaceId}
                   badge={viewUnread[view.id] ?? 0}
+                  place
                   onClick={() => onGo(view.id, VIEW_LIST)}
                 />
               </ContextMenuTrigger>
               <ContextMenuContent>
+                <ContextMenuItem onSelect={() => inNewWindow(() => onGo(view.id, VIEW_LIST))}>
+                  Open in New Window
+                </ContextMenuItem>
+                <ContextMenuSeparator />
                 <ContextMenuItem onSelect={() => onEditView(view.id)}>Edit view…</ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>

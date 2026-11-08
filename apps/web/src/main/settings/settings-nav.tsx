@@ -50,6 +50,7 @@ import {
 } from "./settings-search";
 import { requestProblemReport } from "../support/report-problem";
 import { hasIntegrations } from "../extensions/registry";
+import { PLACE } from "../place-menu";
 
 const SETTINGS_SECTION_ICONS: Readonly<
   Record<SettingsPane, ComponentType<{ className?: string }>>
@@ -213,6 +214,7 @@ export function SettingsNav({
                     tabIndex={-1}
                     onMouseMove={() => setActiveResultIndex(index)}
                     onClick={() => openResult(item)}
+                    {...PLACE}
                     className={cn(
                       ROW,
                       "h-auto min-h-11 items-start py-1.5 [&>svg]:mt-0.5",
@@ -252,6 +254,7 @@ export function SettingsNav({
                 <button
                   type="button"
                   onClick={() => onSelect(section.id)}
+                  {...PLACE}
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     ROW,
