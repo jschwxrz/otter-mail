@@ -1,22 +1,77 @@
-# Otter
+<p align="center">
+  <img src="assets/prod/otter-macos-1024.png" width="128" height="128" alt="" />
+</p>
 
-Gmail, calm and fast. An app for macOS and Linux, and the same app in your browser at
-[otter.otterware.app](https://otter.otterware.app).
+<h1 align="center">Otter</h1>
 
-- Several mailboxes side by side: Gmail, Outlook and any IMAP server
-- Gmail labels, plus saved views that filter across accounts
+<p align="center">
+  <b>Your daily work, with your agents.</b><br />
+  Mail, calendar, files and tasks in one calm app, and the agents you already use working right
+  beside you. On the Mac, Linux, the web and the iPhone.
+</p>
+
+<p align="center">
+  <a href="https://otterware.app">otterware.app</a> ·
+  <a href="https://github.com/otterware-app/otter/releases/latest">Download</a> ·
+  <a href="https://otter.otterware.app">Open in your browser</a> ·
+  <a href="https://otterware.app/mail/changelog/">Changelog</a>
+</p>
+
+Otter is made of **modules**, the areas of your work. **Plugins** bring their features, UI and
+agent tools, and connect your accounts through **connectors**. Your own **agents** work across
+all of it, with the same tools you use.
+
+| Layer      | Today                                                                                       |
+| ---------- | ------------------------------------------------------------------------------------------- |
+| Agents     | Claude Code, Codex, OpenClaw, Hermes, OpenRouter, and any agent on your Mac that speaks MCP |
+| Modules    | Mail, Calendar, Drive, Tasks; Code soon                                                     |
+| Plugins    | Sign-in codes, Calendar invitations, Translation, Todoist, Otter Drive (`extensions/`)      |
+| Connectors | Gmail, Outlook, IMAP, Google Calendar, Todoist, Otter Drive, an OpenClaw gateway, Hermes    |
+
+## Modules
+
+**Mail**: Gmail, Outlook and IMAP from a local cache, made for the keyboard.
+
+- Several mailboxes side by side, with Gmail labels, Outlook folders and categories, and saved
+  views that filter across all of them
 - A local SQLite cache with full-text search, so mail opens instantly and works offline
-- New-mail notifications, and a Dock unread badge
-- iPhone alerts for verified Gmail, Outlook and IMAP arrivals, with previews fetched on the phone
-- On-device translation of mail in other languages (Apple Translation on the Mac, Chrome's
-  built-in translator on the web; nothing leaves your device)
-- Calendar invitations you can answer in place, and one-click unsubscribe
-- An agent that works on your mail through OpenRouter, Claude Code, Codex, Hermes or OpenClaw
+- New mail the moment it lands, with notifications, a Dock unread badge, and iPhone alerts for
+  verified arrivals (previews fetched on the phone)
+- Send later, snooze, undo send, one-click unsubscribe, sign-in codes copied in a click
+- On-device translation (Apple Translation on the Mac, Chrome's built-in translator on the web;
+  nothing leaves your device)
+- A browser beside your mail on the Mac, with Chrome Web Store extensions such as 1Password
 - Keyboard shortcuts for everything, editable in Settings
 
-## Mac app and web app
+**Calendar**: every Google and Outlook calendar in one week, beside your mail. Day, week and
+month views; draw, drag and resize events; Meet, Teams, Zoom and Webex with Join; Yes, No and
+Maybe in place; teammates' calendars over yours.
 
-Both run the same app and the same mail backend (`packages/core`); what a browser can't do is
+**Drive**: [Otter Drive](https://otterware.app/drive/), versioned documents for people and
+agents, as a module beside Mail: every drive, previews, edits, versions and sharing, and
+attachments saved straight from an email. Also a drive of its own at drive.otterware.app.
+
+**Tasks**: turn an email into a Todoist task in a keystroke, with its link back, and work
+through today's list without leaving your mail.
+
+## Agents
+
+Bring your own. Otter is where you see them, answer them and hand them work.
+
+- Claude Code and Codex on your Mac, OpenClaw and Hermes on your own gateway, or the OpenRouter
+  agent on your key
+- A chat over the mail in front of you (⌘I), or a workspace with everything it read and made in
+  tabs; chats follow your Otter account to every device
+- Otter's tools for mail, calendar, themes and views, asking before anything it can't undo
+- Otter's tools for any other agent on your Mac (Cursor, a terminal's Claude Code, …) over MCP,
+  with a read-only, safe or full-access token
+- **Scheduled** (coming to Agents): what your agents run on a schedule lands in Otter, each run
+  in its own chat. It already works with OpenClaw through Otter's channel
+  (`extensions/openclaw/gateway`).
+
+## Desktop app and web app
+
+Both run the same app and the same backend (`packages/core`); what a browser can't do is
 switched off in the web app.
 Mac releases support Apple Silicon Macs (arm64).
 
@@ -43,7 +98,7 @@ Mac releases support Apple Silicon Macs (arm64).
 
 ## Install
 
-The native [iPhone app](apps/ios/README.md) supports background notifications after connecting
+On the iPhone, [Otter Mail](apps/ios/README.md) (the iPhone app keeps that name) supports background notifications after connecting
 each mailbox in Settings. Gmail and Outlook request separate limited permissions; IMAP asks
 to store its password securely. Message content is fetched directly on the phone for previews.
 

@@ -2,7 +2,7 @@
   "name": "@otter/desktop",
   "version": "0.13.39",
   "private": true,
-  "description": "Gmail, calm and fast.",
+  "description": "Your daily work, with your agents.",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "scripts": {
