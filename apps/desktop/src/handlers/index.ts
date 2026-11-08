@@ -6,36 +6,10 @@ import { logger } from "../logger.js";
 import { hostOS } from "../os/index.js";
 import { takePendingMailto } from "../services/mailto-target.js";
 import { takePendingOpenMessage } from "../services/open-message-target.js";
-import {
-  carryTabWindow,
-  carryWindow,
-  dropTabWindow,
-  focusMainWindow,
-  openTabWindow,
-  returnTabWindow,
-  type CarriedTab,
-} from "../windows/main-window.js";
+import { focusMainWindow, openPlaceWindow } from "../windows/main-window.js";
 import { setSettingsTarget, takeSettingsTarget } from "../windows/settings-window.js";
 import { registerSupportHandlers } from "./support.js";
 import { registerBrowserHandlers } from "./browser.js";
-
-const num = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : 0);
-
-function tabDragParams(
-  params: unknown,
-): { tab: CarriedTab; grab: { x: number; y: number } } | null {
-  const p = (params ?? {}) as Record<string, unknown>;
-  const t = (p.tab ?? {}) as Record<string, unknown>;
-  if (typeof t.href !== "string" || !t.href.startsWith("/")) return null;
-  return {
-    tab: {
-      href: t.href,
-      title: typeof t.title === "string" ? t.title : "",
-      icon: typeof t.icon === "string" ? t.icon : "inbox",
-    },
-    grab: { x: num(p.grabX), y: num(p.grabY) },
-  };
-}
 
 export function registerHandlers(): void {
   registerBrowserHandlers();
@@ -58,21 +32,10 @@ export function registerHandlers(): void {
     (await focusMainWindow()).webContents.send("settings:open");
   });
 
-  ipcMain.handle("window:openTab", (event, params: unknown) => {
-    const p = tabDragParams(params);
-    if (p) openTabWindow(event.sender, p.tab, p.grab);
+  ipcMain.handle("window:open", (_event, params: unknown) => {
+    const href = (params as { href?: unknown } | undefined)?.href;
+    if (typeof href === "string" && href.startsWith("/")) openPlaceWindow(href);
   });
-
-  ipcMain.handle("window:carry", (event, params: unknown) => {
-    const p = tabDragParams(params);
-    if (p) carryWindow(event.sender, p.tab, p.grab);
-  });
-
-  ipcMain.handle("window:carryTo", (event) => carryTabWindow(event.sender));
-
-  ipcMain.handle("window:dropTab", (event) => dropTabWindow(event.sender));
-
-  ipcMain.handle("window:returnTab", (event) => returnTabWindow(event.sender));
 
   ipcMain.handle("window:getSettingsTarget", async () => takeSettingsTarget());
 

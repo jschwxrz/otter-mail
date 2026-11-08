@@ -385,13 +385,16 @@ export function ChatWorkspace({
             }}
           />
         ) : null}
+        {chat}
         {/* data-toolbar: the window's own drag strip steps back, so it can't swallow the tabs' clicks.
-            A new chat has no title of its own: its bar floats over the backdrop. */}
+            A new chat has no title of its own: its bar floats over the backdrop. After the
+            transcript in the page (first on screen): Electron's drag regions go in page order,
+            and the transcript's, scrolled up under the bar, would otherwise cut it out. */}
         <div
           data-toolbar=""
           className={cn(
             "drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-2 px-4",
-            blank ? "absolute inset-x-0 top-0 z-10" : "relative",
+            blank ? "absolute inset-x-0 top-0 z-10" : "relative order-first",
           )}
         >
           {titleLeading}
@@ -417,7 +420,6 @@ export function ChatWorkspace({
           )}
           {panelOpen ? null : titleTrailing}
         </div>
-        {chat}
         {find !== null || (docked && detailsShown && convo) ? (
           <div className="pointer-events-none absolute top-(--workspace-topbar-height) right-3 bottom-4 z-20 flex w-80 flex-col gap-2 *:pointer-events-auto">
             {find !== null ? (
@@ -447,7 +449,39 @@ export function ChatWorkspace({
             </div>
           </div>
           <div className="flex min-h-0 min-w-[360px] flex-[1_1_0] flex-col">
-            <div className="drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-1 px-3">
+            <div className="relative flex min-h-0 flex-1 flex-col">
+              {liveShown && convo ? (
+                <AgentBrowser
+                  key={liveSession}
+                  provider={convo.provider}
+                  sessionId={liveSession}
+                  agentName={agentName}
+                  activity={browserSteps + browserDone}
+                  onPage={setLivePage}
+                />
+              ) : null}
+              {shown && (shown.ref.kind === "thread" || shown.ref.kind === "draft") ? (
+                message.error ? (
+                  <TabProblem message={message.error.message} />
+                ) : message.data ? (
+                  <MessageReader
+                    key={shown.id}
+                    accountId={shown.ref.accountId}
+                    messageId={message.data}
+                    autoFocusDraft={false}
+                    onDeselect={() => close(shown)}
+                    onAdvance={() => close(shown)}
+                  />
+                ) : null
+              ) : shown?.ref.kind === "file" ? (
+                <FileTab key={shown.id} chatId={chatId} href={shown.ref.href} />
+              ) : null}
+              {features.browser && shown?.ref.kind === "page" ? (
+                <PageSlot key={shown.id} tabId={chatPageId(chatId, shown.id)} />
+              ) : null}
+            </div>
+            {/* After the tab's page, as the chat's bar is: so it scrolls under the bar without cutting it out. */}
+            <div className="drag-region order-first flex h-(--workspace-topbar-height) shrink-0 items-center gap-1 px-3">
               <div
                 role="tablist"
                 ref={stripRef}
@@ -502,37 +536,6 @@ export function ChatWorkspace({
               ) : null}
               <span className="min-w-0 flex-1" />
               {titleTrailing}
-            </div>
-            <div className="relative flex min-h-0 flex-1 flex-col">
-              {liveShown && convo ? (
-                <AgentBrowser
-                  key={liveSession}
-                  provider={convo.provider}
-                  sessionId={liveSession}
-                  agentName={agentName}
-                  activity={browserSteps + browserDone}
-                  onPage={setLivePage}
-                />
-              ) : null}
-              {shown && (shown.ref.kind === "thread" || shown.ref.kind === "draft") ? (
-                message.error ? (
-                  <TabProblem message={message.error.message} />
-                ) : message.data ? (
-                  <MessageReader
-                    key={shown.id}
-                    accountId={shown.ref.accountId}
-                    messageId={message.data}
-                    autoFocusDraft={false}
-                    onDeselect={() => close(shown)}
-                    onAdvance={() => close(shown)}
-                  />
-                ) : null
-              ) : shown?.ref.kind === "file" ? (
-                <FileTab key={shown.id} chatId={chatId} href={shown.ref.href} />
-              ) : null}
-              {features.browser && shown?.ref.kind === "page" ? (
-                <PageSlot key={shown.id} tabId={chatPageId(chatId, shown.id)} />
-              ) : null}
             </div>
           </div>
         </>

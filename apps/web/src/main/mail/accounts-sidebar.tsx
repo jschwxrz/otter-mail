@@ -3,6 +3,7 @@ import { Dialog } from "~/components/ui/dialog";
 import { Field } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
 import { Text } from "~/components/ui/text";
+import { inNewWindow } from "../new-window-click";
 import { toast } from "./toast";
 import {
   ContextMenu,
@@ -140,6 +141,7 @@ export function SearchRow({
       title={search.title}
       depth={depth + 1}
       selected={search.selected}
+      place
       onClick={onSelect}
       trailing={
         <span
@@ -268,6 +270,7 @@ function LabelNode({
       depth={depth}
       selected={label ? selectedLabelId === label.id : false}
       badge={unread}
+      place={!!label}
       dragProps={dragProps}
       dropActive={dropActive}
       onClick={
@@ -287,6 +290,10 @@ function LabelNode({
         <ContextMenu>
           <ContextMenuTrigger>{row}</ContextMenuTrigger>
           <ContextMenuContent>
+            <ContextMenuItem onSelect={() => inNewWindow(() => onSelectLabel(label.id))}>
+              Open in New Window
+            </ContextMenuItem>
+            <ContextMenuSeparator />
             <ContextMenuItem icon="pencil" onSelect={() => actions.onRename(label)}>
               Rename…
             </ContextMenuItem>
@@ -519,20 +526,25 @@ export function MailboxFolders({
     },
   };
 
-  const withEmptyMenu = (row: ReactNode, labelId: string) => {
-    // Emptying the account's Junk or Trash takes every alias mailbox's with it.
-    if ((labelId !== "SPAM" && labelId !== "TRASH") || alias) return row;
-    return (
-      <ContextMenu>
-        <ContextMenuTrigger>{row}</ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuItem icon="trash" color="red" onSelect={() => setEmptyTarget(labelId)}>
-            {labelId === "SPAM" ? "Empty Junk…" : "Empty Trash…"}
-          </ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
-    );
-  };
+  const withMenu = (row: ReactNode, labelId: string) => (
+    <ContextMenu>
+      <ContextMenuTrigger>{row}</ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onSelect={() => inNewWindow(() => onSelectLabel(labelId))}>
+          Open in New Window
+        </ContextMenuItem>
+        {/* Emptying the account's Junk or Trash takes every alias mailbox's with it. */}
+        {(labelId === "SPAM" || labelId === "TRASH") && !alias ? (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem icon="trash" color="red" onSelect={() => setEmptyTarget(labelId)}>
+              {labelId === "SPAM" ? "Empty Junk…" : "Empty Trash…"}
+            </ContextMenuItem>
+          </>
+        ) : null}
+      </ContextMenuContent>
+    </ContextMenu>
+  );
   return (
     <SearchRowsContext.Provider value={searchRows ?? noSearchRows}>
       <>
@@ -549,13 +561,14 @@ export function MailboxFolders({
           const isDrafts = id === "DRAFT";
           return (
             <Fragment key={id}>
-              {withEmptyMenu(
+              {withMenu(
                 <SkRow
                   icon={meta.icon}
                   title={meta.name}
                   depth={depth}
                   selected={selectedLabelId === id}
                   badge={isDrafts ? total : unread}
+                  place
                   onClick={() => {
                     console.log("[AccountsSidebar:selectLabel]", { labelId: id });
                     onSelectLabel(id);

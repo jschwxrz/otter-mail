@@ -347,12 +347,6 @@ export type AddImapAccountParams = {
   imap: ImapSettings;
 };
 
-export type TabDrag = {
-  tab: { href: string; title: string; icon: string };
-  grabX: number;
-  grabY: number;
-};
-
 export const mailApi = {
   notificationConnections: (): Promise<{
     connections: NotificationConnection[];
@@ -560,17 +554,7 @@ export const mailApi = {
 
   openSettings: (target?: SettingsTarget): Promise<void> => ipc("window:openSettings", target),
   closeMainWindow: (): Promise<void> => ipc("window:closeMain"),
-  /**
-   * Window tab drags between windows (the main process follows the cursor).
-   * `openTabWindow`: a window of its own for a tab pulled off the strip;
-   * `carryWindow`: this window, its only tab dragged. Either follows
-   * `carryTabWindow` until `dropTabWindow` (or `returnTabWindow`: back in the strip).
-   */
-  openTabWindow: (params: TabDrag): Promise<void> => ipc("window:openTab", params),
-  carryWindow: (params: TabDrag): Promise<void> => ipc("window:carry", params),
-  carryTabWindow: (): Promise<void> => ipc("window:carryTo"),
-  dropTabWindow: (): Promise<void> => ipc("window:dropTab"),
-  returnTabWindow: (): Promise<void> => ipc("window:returnTab"),
+  openWindow: (href: string): Promise<void> => ipc("window:open", { href }),
 
   getSettingsTarget: (): Promise<SettingsTarget | null> => ipc("window:getSettingsTarget"),
 

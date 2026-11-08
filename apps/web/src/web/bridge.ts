@@ -203,6 +203,10 @@ const backend = connectBackend({
 let settingsTarget: unknown = null;
 
 const pageChannels: Record<string, (params: unknown) => unknown> = {
+  "window:open": (params) => {
+    const href = (params as { href?: unknown } | undefined)?.href;
+    if (typeof href === "string" && href.startsWith("/")) window.open(href, "_blank", "noopener");
+  },
   "window:openSettings": (params) => {
     settingsTarget = params;
     emit("settings:open");
@@ -297,8 +301,6 @@ export const webBridge: DesktopBridge = {
   features: {
     windowControls: null,
     historyButtons: false,
-    windowTabs: false,
-    tabWindows: false,
     launchAtLogin: false,
     dockBadge: false,
     defaultMailApp: false,

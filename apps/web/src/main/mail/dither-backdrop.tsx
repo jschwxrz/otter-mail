@@ -143,7 +143,7 @@ export function DitherBackdrop({
       aria-hidden
       onTransitionEnd={onTransitionEnd}
       className={cn(
-        "pointer-events-none absolute inset-0 overflow-hidden rounded-xl not-dark:[mask-image:linear-gradient(to_bottom,transparent,black_45%)]",
+        "pointer-events-none absolute inset-x-0 top-(--workspace-card-top) bottom-0 overflow-hidden rounded-xl not-dark:[mask-image:linear-gradient(to_bottom,transparent,black_45%)]",
         className,
       )}
     >

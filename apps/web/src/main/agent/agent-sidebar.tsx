@@ -68,6 +68,8 @@ import {
 import { NewRow, SIDEBAR_ROW, SidebarBody } from "../mail/sidebar-ui";
 import { TitleInput } from "./chat-title";
 import { toast } from "../mail/toast";
+import { inNewWindow } from "../new-window-click";
+import { PLACE } from "../place-menu";
 import { HintTooltip, cn } from "../mail/ui";
 
 const SETTLED_FIRST = 10;
@@ -364,6 +366,7 @@ export function AgentSidebar({
         now={now}
         titles={titles}
         regenerating={busy}
+        onOpen={() => onSelect(c.id)}
         onRename={startRename}
         onRegenerate={() => {
           setRegenerating((ids) => new Set(ids).add(c.id));
@@ -409,6 +412,7 @@ export function AgentSidebar({
             <button
               type="button"
               onClick={() => onSelect(c.id)}
+              {...PLACE}
               onDoubleClick={(e) => {
                 if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
                 e.preventDefault();
@@ -542,6 +546,7 @@ export function AgentSidebar({
           icon={<SquarePenIcon />}
           label="New chat"
           selected={onNewChatPage}
+          place
           onClick={onNewChat}
         />
         <ScheduledRow
@@ -711,6 +716,7 @@ function ScheduledRow({ selected, onSelect }: { selected: boolean; onSelect: () 
       <button
         type="button"
         onClick={onSelect}
+        {...PLACE}
         aria-current={selected ? "page" : undefined}
         className={cn(
           SIDEBAR_ROW,
@@ -783,6 +789,7 @@ function ChatRowMenu({
   now,
   titles,
   regenerating,
+  onOpen,
   onRename,
   onRegenerate,
   children,
@@ -792,6 +799,7 @@ function ChatRowMenu({
   now: number;
   titles: boolean;
   regenerating: boolean;
+  onOpen: () => void;
   onRename: () => void;
   onRegenerate: () => void;
   children: ReactNode;
@@ -802,6 +810,8 @@ function ChatRowMenu({
     <ContextMenu>
       <ContextMenuTrigger>{children}</ContextMenuTrigger>
       <ContextMenuContent>
+        <ContextMenuItem onSelect={() => inNewWindow(onOpen)}>Open in New Window</ContextMenuItem>
+        <ContextMenuSeparator />
         <ContextMenuItem onSelect={() => void pinChat(chat.id, !pinned)}>
           {pinned ? "Unpin" : "Pin"}
         </ContextMenuItem>

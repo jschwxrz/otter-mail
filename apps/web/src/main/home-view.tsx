@@ -16,7 +16,6 @@ import {
 } from "react";
 import { useMatch, useNavigate, useRouter } from "@tanstack/react-router";
 import { placeHref as hrefOf } from "./places";
-import { getNewTabPlace } from "./new-tab-place";
 import { ArrowLeftIcon } from "lucide-react";
 import { EmptyState } from "~/components/ui/empty-state";
 import { useQueryClient } from "@tanstack/react-query";
@@ -114,17 +113,9 @@ import {
   spansMailboxes as spanning,
 } from "./mail/spaces";
 import { useSignInAlerts } from "./mail/sync-health";
-import { useRecordRecentlyViewed, type RecentIcon } from "./recently-viewed";
-import { iconForHref, takeNewTabClick, watchNewTabClicks } from "./new-tab-click";
-import {
-  addTab,
-  closeTab as closeWindowTab,
-  followLocation,
-  nameTab,
-  selectTab as selectWindowTab,
-  useWindowTabs,
-  WindowTabsBar,
-} from "./window-tabs";
+import { useRecordRecentlyViewed } from "./recently-viewed";
+import { takeNewWindowClick, watchNewWindowClicks } from "./new-window-click";
+import { PlaceMenu } from "./place-menu";
 import { SetupFlow } from "./onboarding/setup";
 import {
   newTab,
@@ -464,17 +455,9 @@ function MailHome() {
         if (closeBrowserTabRef.current?.()) return;
         if (closeWorkspaceTabRef.current?.()) return;
         if (closeChatWindowRef.current()) return;
-        if (features.windowTabs) {
-          const { tabs, activeId } = useWindowTabs.getState();
-          const next = tabs.length > 1 ? closeWindowTab(activeId) : null;
-          if (next) {
-            void router.navigate({ href: next, replace: true });
-            return;
-          }
-        }
         void mailApi.closeMainWindow();
       }),
-    [router],
+    [],
   );
 
   const go = (to: Partial<MailLoc>, replace = false) => {
@@ -538,18 +521,12 @@ function MailHome() {
   useExternalMailChanges();
   useBrowserEvents();
   useEffect(() => {
-    const unwatch = watchNewTabClicks();
+    const unwatch = watchNewWindowClicks();
     const unblock = router.history.block({
       blockerFn: ({ nextLocation }) => {
-        const click = takeNewTabClick();
-        if (!click) return false;
-        const { href } = nextLocation;
-        if (!features.windowTabs) {
-          window.open(href, "_blank", "noopener");
-          return true;
-        }
-        addTab(href, { background: !click.show, title: click.title, icon: iconForHref(href) });
-        return !click.show;
+        if (!takeNewWindowClick()) return false;
+        void mailApi.openWindow(nextLocation.href);
+        return true;
       },
       enableBeforeUnload: false,
     });
@@ -1028,11 +1005,8 @@ function MailHome() {
   const goForEffect = useLatest(go);
   useEffect(() => {
     if (!onIndex || !hasMail) return;
-    const { tabs, activeId } = useWindowTabs.getState();
-    const tab = features.windowTabs ? tabs.find((t) => t.id === activeId) : undefined;
-    if (tab) void navigate({ href: tab.href, replace: true });
-    else goForEffect.current({}, true);
-  }, [onIndex, hasMail, goForEffect, navigate]);
+    goForEffect.current({}, true);
+  }, [onIndex, hasMail, goForEffect]);
 
   useEffect(() => {
     if (!initialized || !selectedAccountId) return;
@@ -1450,7 +1424,7 @@ function MailHome() {
     (title: string | null) => setWorkspaceTitle(title ? { href: locationHref, title } : null),
     [locationHref],
   );
-  const place = useRecordRecentlyViewed({
+  useRecordRecentlyViewed({
     ready: initialized,
     href: locationHref,
     workspaceTitle: workspaceTitle?.href === locationHref ? workspaceTitle.title : null,
@@ -1464,32 +1438,6 @@ function MailHome() {
     aliases,
     views,
   });
-  const routed = routeLoc !== null || settingsRoute !== null || composeOpen;
-  const placeKey = place ? JSON.stringify([place.title, place.icon]) : null;
-  const placeHref = place?.href ?? null;
-  useEffect(() => {
-    if (!features.windowTabs || !initialized || !routed) return;
-    followLocation(locationHref);
-    if (!placeKey || placeHref !== locationHref) return;
-    const [title, icon] = JSON.parse(placeKey) as [string, RecentIcon];
-    nameTab(locationHref, title, icon);
-  }, [initialized, routed, locationHref, placeKey, placeHref]);
-  const showWindowTab = (href: string | null) => {
-    if (!href) return;
-    void navigate({ href, replace: true });
-  };
-  const newWindowTab = () => {
-    const place = getNewTabPlace();
-    const mailbox =
-      space?.kind === "mailbox" || space?.kind === "alias" ? space.id : firstRealAccountId;
-    let href: string;
-    if (place === "agents") href = hrefOf(CHATS_SPACE, NEW_CHAT);
-    else if (place === "calendar") href = hrefOf(CALENDAR_SPACE, lastCalendarMode.current);
-    else if (mailbox) href = hrefOf(mailbox, "INBOX");
-    else return;
-    addTab(href);
-    showWindowTab(href);
-  };
   const hasListTarget = effectiveAccountId != null && !ownsMain;
   const showMain =
     !!settingsRoute || !fullInbox || !hasListTarget || !!selectedMessageId || composeOpen;
@@ -1589,21 +1537,13 @@ function MailHome() {
   );
   return (
     <>
+      <PlaceMenu />
       <div
         className="surface-grain flex h-full flex-col bg-sidebar-surface text-foreground"
         data-panel-animations={panelAnimationsActive ? "true" : "false"}
         data-mail-layout={ownsMain ? "split" : mailLayout}
         style={{ "--panel-animation-duration": `${panelAnimationDurationMs}ms` } as CSSProperties}
       >
-        {features.windowTabs ? (
-          <WindowTabsBar
-            sidebarOpen={sidebarOpen}
-            onSelect={(id) => showWindowTab(selectWindowTab(id))}
-            onClose={(id) => showWindowTab(closeWindowTab(id))}
-            onShow={showWindowTab}
-            onNew={newWindowTab}
-          />
-        ) : null}
         <div className="flex min-h-0 flex-1">
           {/* The frame's width round the cards (the right edge is the last
               card's own gap), so they float with every corner rounded. */}
@@ -1661,10 +1601,8 @@ function MailHome() {
                         </>
                       ) : (
                         <>
-                          {/* The traffic lights and the pinned toggle sit over its band (or the tabs' row). */}
-                          {features.windowTabs ? null : (
-                            <div className="drag-region h-(--workspace-topbar-height) shrink-0" />
-                          )}
+                          {/* The traffic lights and the pinned toggle sit over its band. */}
+                          <div className="drag-region h-(--workspace-topbar-height) shrink-0" />
                           {sidebar}
                         </>
                       )}

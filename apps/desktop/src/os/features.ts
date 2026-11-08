@@ -2,7 +2,6 @@ import type { BridgeFeatures } from "@otter/contracts";
 
 const everywhere = {
   historyButtons: true,
-  windowTabs: true,
   launchAtLogin: true,
   defaultMailApp: true,
   dragOut: true,
@@ -15,7 +14,6 @@ const everywhere = {
 const mac: BridgeFeatures = {
   ...everywhere,
   windowControls: "left",
-  tabWindows: true,
   dockBadge: true,
   translation: true,
   phoneCalls: true,
@@ -24,7 +22,6 @@ const mac: BridgeFeatures = {
 const linux: BridgeFeatures = {
   ...everywhere,
   windowControls: "right",
-  tabWindows: false,
   dockBadge: false,
   translation: false,
   phoneCalls: false,

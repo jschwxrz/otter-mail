@@ -19,7 +19,6 @@ const SYNCED_KEYS = [
   "otter:mark-read-delay",
   "gmail:panel-animation-duration",
   "gmail:advance-direction",
-  "otter:new-tab-place",
   "assistant:favorite-models",
   "assistant:hidden-models",
   "assistant:follow-up-behavior",
