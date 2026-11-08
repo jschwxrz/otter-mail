@@ -12,6 +12,7 @@ import { isNightlyVersion } from "../packages/shared/src/release-channel.ts";
 
 const APP_ID = "dev.otterware.mail";
 const PRODUCT_NAME = "Otter";
+const MAC_BUNDLE_NAME = "Otter Mail";
 const LINUX_NAME = "otter-mail";
 const MAINTAINER = "Christophe Kafrouni <chris.kafrouni@gmail.com>";
 const DEFAULT_UPDATE_REPOSITORY = "otterware-app/otter";
@@ -211,6 +212,12 @@ export function createBuildConfig(options: {
       { name: PRODUCT_NAME, schemes: ["ottermail"] },
     ],
     mac: {
+      // The bundle and its executable keep their name from before the rename to Otter; the
+      // menus and About say productName (CFBundleName). When an update's
+      // executable name differs, Squirrel renames the bundle, then launches its relaunch
+      // helper from the old path and fails: the app quits to update and never reopens. That
+      // Squirrel is the installed app's, so no later build can fix it.
+      executableName: MAC_BUNDLE_NAME,
       extraResources: [{ from: "bin/translator", to: "bin/translator" }],
       target: options.target === "dmg" ? ["dmg", "zip"] : ["zip"],
       category: "public.app-category.productivity",
