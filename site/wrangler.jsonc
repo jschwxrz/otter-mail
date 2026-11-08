@@ -6,11 +6,13 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
-    // Every old-domain URL, including static assets and /app, must redirect.
+    // Every old-host URL, including static assets and /app, must redirect.
     "run_worker_first": true,
   },
   "workers_dev": false,
   "routes": [
+    { "pattern": "otter.otterware.app", "custom_domain": true },
+    // The old hosts redirect to otter.otterware.app.
     { "pattern": "mail.otterware.app", "custom_domain": true },
     { "pattern": "mail.otterware.dev", "custom_domain": true },
   ],

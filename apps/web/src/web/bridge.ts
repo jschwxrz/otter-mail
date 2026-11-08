@@ -23,8 +23,8 @@ import {
   type PageEffect,
   type PageRequests,
 } from "./protocol";
+import { RELAY_URL } from "./relay";
 
-const RELAY_URL = import.meta.env.VITE_RELAY_URL || "https://relay.mail.otterware.app";
 const THEME_SOURCE_KEY = "otter:theme-source";
 const TITLE = __DEMO__ ? "Otter (demo)" : "Otter";
 if (__DEMO__) document.title = TITLE;

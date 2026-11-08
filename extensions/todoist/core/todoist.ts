@@ -164,7 +164,7 @@ export async function createTodoistTask(input: unknown): Promise<void> {
     const message = account && getMessageLabelIds(account.id, p.email.messageId);
     if (!account || !message)
       throw new Error("This email is no longer available. Reopen it and try again.");
-    const link = `https://mail.otterware.app/${encodeURIComponent(account.id)}/INBOX/${encodeURIComponent(p.email.messageId)}`;
+    const link = `https://otter.otterware.app/mail/${encodeURIComponent(account.id)}/INBOX/${encodeURIComponent(p.email.messageId)}`;
     description = `${description}${description ? "\n\n" : ""}[Open conversation in Otter](${link})`;
   }
   await command("item_add", p.requestId, {

@@ -1,7 +1,7 @@
 # Otter
 
 Gmail, calm and fast. An app for macOS and Linux, and the same app in your browser at
-[mail.otterware.app](https://mail.otterware.app).
+[otter.otterware.app](https://otter.otterware.app).
 
 - Several mailboxes side by side: Gmail, Outlook and any IMAP server
 - Gmail labels, plus saved views that filter across accounts
@@ -50,7 +50,7 @@ to store its password securely. Message content is fetched directly on the phone
 Download the latest DMG (Mac) or .deb (Debian, Ubuntu: `sudo apt install ./Otter-*.deb`)
 from [Releases](https://github.com/otterware-app/otter/releases).
 Installed apps update themselves from the same page. Or open
-[mail.otterware.app](https://mail.otterware.app) in your browser.
+[otter.otterware.app](https://otter.otterware.app) in your browser.
 
 ## Develop
 

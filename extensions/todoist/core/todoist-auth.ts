@@ -118,7 +118,7 @@ export async function signInTodoist(): Promise<void> {
         else {
           const registered = await oauth<{ client_id: string }>("register", {
             client_name: "Otter",
-            client_uri: "https://mail.otterware.app",
+            client_uri: "https://otter.otterware.app",
             redirect_uris: [uri],
             scope: "data:read_write data:delete",
             grant_types: ["authorization_code", "refresh_token"],

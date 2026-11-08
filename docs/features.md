@@ -206,7 +206,7 @@ it, replaces its keys, chooses where new uploads go, disconnects it), transferri
 and deleting it once empty. New shared drive… makes one; Agents shows the otterdrive CLI's setup and
 your API keys (create, copy once, revoke). "Save to Otter Drive…" in a message's menu saves an
 attachment, or the email as a page, into the drive you pick. The sign-in and the switches stay on
-this device (this browser, on the web: Drive's API answers mail.otterware.app with a token, never
+this device (this browser, on the web: Drive's API answers otter.otterware.app with a token, never
 cookies).
 
 | Feature                                             | Mac | Web | iPhone |

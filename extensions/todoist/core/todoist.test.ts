@@ -162,7 +162,7 @@ describe("Todoist projects and tasks", () => {
       args: {
         content: "Follow up",
         description:
-          "My notes\n\n[Open conversation in Otter](https://mail.otterware.app/me%40example.com/INBOX/message-1)",
+          "My notes\n\n[Open conversation in Otter](https://otter.otterware.app/mail/me%40example.com/INBOX/message-1)",
         project_id: "work",
         due: { string: "every Monday" },
         priority: 4,

@@ -13,6 +13,7 @@ import { webGoogleAuth } from "./google";
 import { connectMailSocket } from "./mail-socket";
 import { webMicrosoftAuth } from "./microsoft";
 import { webSecrets } from "./secrets";
+import { RELAY_URL } from "./relay";
 import type { PageEffect, PageRequests } from "./protocol";
 
 export type Page = {
@@ -121,9 +122,7 @@ export async function webPlatform(page: Page): Promise<Platform> {
   const demoOutlook = __DEMO__ ? await import("./demo/outlook") : null;
   if (demo) await demo.installFakeGmail(files);
   if (demoOutlook) await demoOutlook.installFakeOutlook(files);
-  const relayUrl = demo
-    ? demo.DEMO_RELAY_URL
-    : import.meta.env.VITE_RELAY_URL || "https://relay.mail.otterware.app";
+  const relayUrl = demo ? demo.DEMO_RELAY_URL : RELAY_URL;
   const platform: Platform = {
     kind: "web",
     supportDiagnostics: async () => ({ environment: navigator.userAgent }),

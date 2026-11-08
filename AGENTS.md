@@ -1,7 +1,7 @@
 # Otter
 
 Otter is a calm, fast Gmail client: an Electron app for macOS and Linux (Debian and
-Ubuntu, a .deb), and the same app in the browser at https://mail.otterware.app. It is laid out
+Ubuntu, a .deb), and the same app in the browser at https://otter.otterware.app. It is laid out
 like Otter Code (our fork of T3 Code): a pnpm monorepo built with Vite+ (`vp`); the desktop app
 ships through GitHub Releases with auto-update.
 
@@ -39,12 +39,13 @@ when a feature lands or goes.
   provider (sidebar, lists, reader, composer); it gates on the mailbox's capabilities.
   Where the main window is (mailbox, label, conversation, Settings pane) is its route
   (`src/main/router.tsx`, TanStack Router): in the hash in the desktop app, real paths on the web
-  (`/you@gmail.com/INBOX/<id>`, `/all/inbox`, `/settings/appearance`).
+  (`/mail/you@gmail.com/INBOX/<id>`, `/agents/<id>`, `/calendar/week`, `/settings/appearance`; `src/main/places.ts`;
+  addresses from before the rename, without `/mail` or with `/chats`, redirect).
   `src/main/browser/` is the browser (Mac): the panel of `<webview>` tabs beside the mail, a
   chat's pages in the AI workspace, and `openLink`, where links from mail and chat go.
   The agent's chats are `src/main/mail/chat-store.ts` (synced through core), shown in the
   small window over the mail (⌘I, `chat-window.tsx`) or the AI workspace, the Chats space
-  (`/chats/<id>`, `chat-workspace.tsx`), with what each chat used and made as tabs.
+  (`/agents/<id>`, `chat-workspace.tsx`), with what each chat used and made as tabs.
   `src/web/` is the browser shell: core in a Web Worker (SQLite WASM on OPFS) hosted by one
   tab for every open tab (`backend.ts`), and the bridge that stands in for the preload. What only the desktop app has is off in `desktopBridge.features`.
   What the computer is called in copy (Mac / computer) is
@@ -83,7 +84,8 @@ when a feature lands or goes.
 - `packages/shared`: what every app shows the same, the iPhone app included: the color themes
   (`./themes`) and the demo mailbox (`./demo-mailboxes`). The web app imports it; the iPhone app
   bundles it as JSON.
-- `infra/relay`: https://relay.mail.otterware.app, a Cloudflare Worker (Hono, better-auth,
+- `infra/relay`: https://relay.otterware.app (and https://relay.mail.otterware.app, for clients from
+  before the rename; `src/hosts.ts`), a Cloudflare Worker (Hono, better-auth,
   Drizzle on D1, a Durable Object per user). Otter accounts, the Gmail accounts linked to them,
   the account's preferences (core's `services/preferences.ts` syncs them), its agent chats (core's
   `services/chats.ts`, transcripts included, so every device reads every chat), and realtime
@@ -106,7 +108,7 @@ when a feature lands or goes.
   otterware.app/mail/changelog (the website repository copies them hourly) and on the version's
   GitHub Release (workflows copy it there); the app only links there. A note is marketing, written only when the user asks for one (the
   `write-changelog` skill). Format in `packages/shared/src/changelog.ts`.
-- `site/`: https://mail.otterware.app, a Cloudflare Worker: the web app, at `/` and any other
+- `site/`: https://otter.otterware.app (mail.otterware.app redirects there), a Cloudflare Worker: the web app, at `/` and any other
   page that isn't a file (the app's own routes). Otter's page, privacy policy and terms are
   on https://otterware.app/mail/ (the `website` repository, with every Otterware app's page);
   their old addresses here redirect there.
@@ -172,8 +174,8 @@ The iPhone app releases separately, with its own version:
   Both channels use the same app identity and data; their icons change with the installed build.
   A release never needs a changelog note: don't write one, or ask about one, unless the user asks.
 - Web: each release deploys it too: a nightly, once its checks pass, to the
-  `otter-mail-site-nightly` Worker; a stable release, after its GitHub Release, to mail.otterware.app. Both answer at
-  mail.otterware.app (one browser cache and sign-in): Settings → General's channel sets a
+  `otter-mail-site-nightly` Worker; a stable release, after its GitHub Release, to otter.otterware.app. Both answer at
+  otter.otterware.app (one browser cache and sign-in): Settings → General's channel sets a
   cookie the stable Worker routes on (`site/src/worker.ts`); open tabs offer "Reload to update".
 - iPhone: run the Release iPhone workflow from `main` when `apps/ios` (or what it bundles from
   `packages/shared`) has changed. It uploads to TestFlight and tags `ios-vX.Y.Z`.

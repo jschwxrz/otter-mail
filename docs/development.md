@@ -160,7 +160,7 @@ browser needed; otherwise it runs the same browser flow with identity scopes onl
 The consent screen is published but not yet verified by Google, so sign-in shows an "unverified
 app" warning and is capped at 100 users. The home page, privacy policy and terms it links to are
 on https://otterware.app/mail/ (the `website` repository); the web app, at
-https://mail.otterware.app, is `site/`, which the Release workflow deploys with each nightly and
+https://otter.otterware.app, is `site/`, which the Release workflow deploys with each nightly and
 stable release (docs/runbook.md).
 
 ## The web app
