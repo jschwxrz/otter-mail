@@ -8,13 +8,15 @@ import {
 } from "react";
 import { AlarmClockIcon, CheckIcon, Maximize2Icon, MinusIcon } from "lucide-react";
 import { AgentAvatar, openClawAgentId } from "./agent-providers";
+import { ChatContextButton } from "./chat-context-panel";
 
 import type { ChatChange } from "../mail/api";
 import type { MailChatContext } from "./chat-context";
-import { isBlank, useChats, watchChat } from "./chat-store";
+import { isBlank, openChatTab, useChats, watchChat } from "./chat-store";
 import { settleChat, SnoozeMenu } from "./chat-shelve-actions";
 import { ChatTitle } from "./chat-title";
 import { ChatView } from "./chat-view";
+import { features } from "../features";
 import { isOverlayOpen } from "../mail/keyboard";
 import { HintTooltip, IconBtn } from "../mail/ui";
 
@@ -46,6 +48,7 @@ export function ChatWindow({
   onClearQuote,
   onOpenChange,
   onOpenWorkspace,
+  onOpenTask,
   onMinimize,
   onShelve,
   inputRef,
@@ -54,6 +57,7 @@ export function ChatWindow({
   onClearQuote: () => void;
   onOpenChange: (change: ChatChange) => Promise<void>;
   onOpenWorkspace: (chatId: string) => void;
+  onOpenTask: (key: string) => void;
   onMinimize: () => void;
   onShelve: () => void;
   inputRef: RefObject<HTMLTextAreaElement | null>;
@@ -197,6 +201,21 @@ export function ChatWindow({
             New chat
           </span>
         )}
+        {active && !blank ? (
+          <ChatContextButton
+            convo={active}
+            onOpenTask={onOpenTask}
+            // What it opens shows in the workspace, beside the chat.
+            onOpen={(tab) => {
+              if (tab.ref.kind === "page" && !features.browser) {
+                window.open(tab.ref.url, "_blank", "noopener");
+                return;
+              }
+              openChatTab(activeId, tab.ref, tab.title);
+              onOpenWorkspace(activeId);
+            }}
+          />
+        ) : null}
         <HintTooltip label="Minimize" shortcut="agent.toggle" side="bottom">
           <IconBtn label="Minimize" className="size-7" onClick={onMinimize}>
             <MinusIcon className="size-4" />

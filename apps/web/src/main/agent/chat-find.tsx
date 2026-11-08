@@ -1,0 +1,170 @@
+import { useEffect, useRef, useState, type RefObject } from "react";
+import { ChevronDownIcon, ChevronUpIcon, XIcon } from "lucide-react";
+
+import { IconBtn } from "../mail/ui";
+
+const ALL = "chat-find";
+const CURRENT = "chat-find-current";
+
+/**
+ * Where `query` occurs in each message under `root`, ignoring case: read as the message's whole
+ * text, so a phrase across formatting ("hello **world**") is found too.
+ */
+export function findRanges(root: Element, query: string): Range[] {
+  if (!query) return [];
+  // Case folded by the pattern, so the offsets are the text's own ("İstanbul" lowercased is longer).
+  const pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "giu");
+  const messages = root.querySelectorAll("[data-message-id]");
+  const ranges: Range[] = [];
+  for (const message of messages.length > 0 ? messages : [root]) {
+    const nodes: { node: Text; start: number }[] = [];
+    let text = "";
+    const walker = document.createTreeWalker(message, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      nodes.push({ node: node as Text, start: text.length });
+      text += node.textContent ?? "";
+    }
+    const at = (offset: number, end: boolean) => {
+      const i = nodes.findLastIndex((n) => (end ? n.start < offset : n.start <= offset));
+      return { node: nodes[i].node, offset: offset - nodes[i].start };
+    };
+    for (const match of text.matchAll(pattern)) {
+      const start = at(match.index, false);
+      const end = at(match.index + match[0].length, true);
+      const range = new Range();
+      range.setStart(start.node, start.offset);
+      range.setEnd(end.node, end.offset);
+      ranges.push(range);
+    }
+  }
+  return ranges;
+}
+
+/** Scrolls the nearest scrolling box so the match sits in its middle. */
+function reveal(range: Range) {
+  let box = range.startContainer.parentElement;
+  while (
+    box &&
+    !(box.scrollHeight > box.clientHeight && /auto|scroll/.test(getComputedStyle(box).overflowY))
+  )
+    box = box.parentElement;
+  if (!box) return;
+  const at = range.getBoundingClientRect();
+  const view = box.getBoundingClientRect();
+  box.scrollBy({ top: at.top + at.height / 2 - (view.top + view.height / 2) });
+}
+
+function clearHighlights() {
+  if (!("highlights" in CSS)) return;
+  CSS.highlights.delete(ALL);
+  CSS.highlights.delete(CURRENT);
+}
+
+/** Find in the chat's messages (⌘F / Ctrl+F in the chat): every match marked, the current one shown. */
+export function ChatFind({
+  transcript,
+  focusKey,
+  onClose,
+}: {
+  /** What's searched: the chat's messages. */
+  transcript: RefObject<HTMLElement | null>;
+  /** Changes each time find is asked for again, to select what's typed. */
+  focusKey: number;
+  onClose: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [query, setQuery] = useState("");
+  // What was found, for the query it was found for: until a new query's are in, the old ones show.
+  const [found, setFound] = useState<{ query: string; ranges: Range[] }>({ query: "", ranges: [] });
+  const ranges = found.ranges;
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [focusKey]);
+
+  // Read again as the messages change (a reply streaming in).
+  useEffect(() => {
+    const root = transcript.current;
+    if (!root) return;
+    const read = () => setFound({ query, ranges: findRanges(root, query.trim()) });
+    read();
+    // At most every 200 ms, so a reply streaming in keeps its matches current.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const observer = new MutationObserver(() => {
+      timer ??= setTimeout(() => {
+        timer = undefined;
+        read();
+      }, 200);
+    });
+    observer.observe(root, { subtree: true, childList: true, characterData: true });
+    return () => {
+      observer.disconnect();
+      clearTimeout(timer);
+    };
+  }, [transcript, query]);
+
+  const at = ranges.length === 0 ? -1 : Math.min(current, ranges.length - 1);
+  // Scrolled to when the match shown changes, not each time the messages are read again.
+  const revealed = useRef("");
+  useEffect(() => {
+    if (!("highlights" in CSS)) return;
+    CSS.highlights.set(ALL, new Highlight(...ranges));
+    const shown = ranges[at];
+    if (shown) {
+      CSS.highlights.set(CURRENT, new Highlight(shown));
+      const key = `${found.query}\n${at}`;
+      if (found.query === query && revealed.current !== key) {
+        reveal(shown);
+        revealed.current = key;
+      }
+    } else CSS.highlights.delete(CURRENT);
+  }, [ranges, at, found.query, query]);
+  useEffect(() => clearHighlights, []);
+
+  const step = (by: number) => {
+    if (ranges.length === 0) return;
+    setCurrent((at + by + ranges.length) % ranges.length);
+  };
+
+  return (
+    <div className="dropdown-glass flex items-center gap-1 rounded-lg py-1 pr-1 pl-3 shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]">
+      <input
+        ref={inputRef}
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setCurrent(0);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            step(e.shiftKey ? -1 : 1);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+          }
+        }}
+        placeholder="Find in chat"
+        aria-label="Find in chat"
+        className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-placeholder"
+      />
+      {query.trim() ? (
+        <span className="shrink-0 px-1 text-xs text-muted-foreground tabular-nums">
+          {ranges.length === 0 ? "No results" : `${at + 1}/${ranges.length}`}
+        </span>
+      ) : null}
+      <IconBtn label="Previous match" className="size-7" onClick={() => step(-1)}>
+        <ChevronUpIcon className="size-4" />
+      </IconBtn>
+      <IconBtn label="Next match" className="size-7" onClick={() => step(1)}>
+        <ChevronDownIcon className="size-4" />
+      </IconBtn>
+      <IconBtn label="Close find" className="size-7" onClick={onClose}>
+        <XIcon className="size-4" />
+      </IconBtn>
+    </div>
+  );
+}

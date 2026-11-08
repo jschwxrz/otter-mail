@@ -923,37 +923,54 @@ html[data-theme-switching] *::after {
   inherits: false;
   initial-value: 0px;
 }
+@property --scroll-fade-edge-start {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --scroll-fade-edge-end {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+/* A tab strip's edges fade only partway, so the tabs past them still read as there to scroll to. */
 @keyframes scroll-fade-x {
   from {
     --scroll-fade-start: 0px;
     --scroll-fade-end: 1.5rem;
+    --scroll-fade-edge-start: 100%;
+    --scroll-fade-edge-end: 35%;
   }
   2% {
     --scroll-fade-start: 1.5rem;
+    --scroll-fade-edge-start: 35%;
   }
   98% {
     --scroll-fade-end: 1.5rem;
+    --scroll-fade-edge-end: 35%;
   }
   to {
     --scroll-fade-start: 1.5rem;
     --scroll-fade-end: 0px;
+    --scroll-fade-edge-start: 35%;
+    --scroll-fade-edge-end: 100%;
   }
 }
 @utility scroll-fade-x {
   @supports (animation-timeline: scroll()) {
     -webkit-mask-image: linear-gradient(
       to right,
-      transparent,
+      rgb(0 0 0 / var(--scroll-fade-edge-start)),
       black var(--scroll-fade-start),
       black calc(100% - var(--scroll-fade-end)),
-      transparent
+      rgb(0 0 0 / var(--scroll-fade-edge-end))
     );
     mask-image: linear-gradient(
       to right,
-      transparent,
+      rgb(0 0 0 / var(--scroll-fade-edge-start)),
       black var(--scroll-fade-start),
       black calc(100% - var(--scroll-fade-end)),
-      transparent
+      rgb(0 0 0 / var(--scroll-fade-edge-end))
     );
     animation: scroll-fade-x linear both;
     animation-timeline: scroll(self inline);
@@ -1137,6 +1154,15 @@ html[data-theme-token-probe] *::after {
   stroke-width: 2px;
   opacity: 0.92;
   vector-effect: non-scaling-stroke;
+}
+
+::highlight(chat-find) {
+  background-color: color-mix(in srgb, var(--color-warning) 30%, transparent);
+}
+
+::highlight(chat-find-current) {
+  background-color: color-mix(in srgb, var(--color-warning) 75%, transparent);
+  color: var(--foreground);
 }
 
 ::highlight(chat-found) {

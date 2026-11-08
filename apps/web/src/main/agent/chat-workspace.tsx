@@ -4,6 +4,7 @@ import {
   useState,
   type MutableRefObject,
   type ReactNode,
+  type KeyboardEvent,
   type RefObject,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -21,7 +22,7 @@ import {
   useBrowser,
 } from "../browser/store";
 import { features } from "../features";
-import { useCommandHandlers } from "../keybindings/dispatch";
+import { matchesCommand, useCommandHandlers } from "../keybindings/dispatch";
 import { useLatest } from "../use-latest";
 import { mailApi, type ChatChange } from "../mail/api";
 import { useMailChatContext } from "./chat-context";
@@ -38,7 +39,14 @@ import {
   type ChatTab,
 } from "./chat-store";
 import { AgentBrowser, AgentBrowserTabIcon } from "./agent-browser";
-import { ChatContextButton, TAB_ICONS } from "./chat-context-panel";
+import {
+  ChatContextButton,
+  ChatDetailsDock,
+  TAB_ICONS,
+  readDetailsDocked,
+  saveDetailsDocked,
+} from "./chat-context-panel";
+import { ChatFind } from "./chat-find";
 import { ChatTitle } from "./chat-title";
 import { ChatView } from "./chat-view";
 import { DitherBackdrop } from "../mail/dither-backdrop";
@@ -51,6 +59,21 @@ import { usePanelTabDrag } from "../mail/use-panel-tab-drag";
 import { HintTooltip, cn } from "../mail/ui";
 
 export type ChatPanelControl = { toggle: () => void; newPage: () => void };
+
+/** Wide enough for the details to sit beside the chat's messages (max-w-3xl, centred) without covering them. */
+const DOCK_WIDTH = 768 + 2 * (320 + 24);
+
+function useWideEnough(ref: RefObject<HTMLElement | null>, min: number): boolean {
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setWide(entry.contentRect.width >= min));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref, min]);
+  return wide;
+}
 
 /** The agent's browser, live: a tab of this device's, not one the chat keeps. */
 const LIVE_TAB = "agent-browser";
@@ -226,6 +249,7 @@ export function ChatWorkspace({
     recentRef.current = [shownId, ...recentRef.current.filter((id) => id !== shownId)];
   }, [shownId, recentRef]);
   const workspaceRef = useRef<HTMLDivElement>(null);
+  const columnRef = useRef<HTMLDivElement>(null);
   const previousTab = () => {
     const id = mostRecentTab(
       tabs.map((t) => t.id),
@@ -299,6 +323,26 @@ export function ChatWorkspace({
     setBackdropChat(chatId);
     setBackdropShown(blank);
   } else if (blank && !backdropShown) setBackdropShown(true);
+  const openDetail = (tab: ChatTab) => {
+    if (tab.ref.kind === "page" && !features.browser) {
+      window.open(tab.ref.url, "_blank", "noopener");
+      return;
+    }
+    openChatTab(chatId, tab.ref, tab.title);
+    setPanelHidden(false);
+  };
+  const roomy = useWideEnough(columnRef, DOCK_WIDTH);
+  const [detailsShown, setDetailsShown] = useState(readDetailsDocked);
+  const docked = roomy && !blank;
+  const transcriptRef = useRef<HTMLElement | null>(null);
+  const [find, setFind] = useState<number | null>(null);
+  // ⌘F in the chat finds in it; elsewhere it's the app's search.
+  const findInChat = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (blank || !matchesCommand(event.nativeEvent, "search.focus")) return;
+    event.preventDefault();
+    transcriptRef.current = columnRef.current?.querySelector<HTMLElement>('[role="log"]') ?? null;
+    setFind((key) => (key ?? 0) + 1);
+  };
   const chat = (
     <ChatView
       chatId={chatId}
@@ -314,9 +358,12 @@ export function ChatWorkspace({
   return (
     <div ref={workspaceRef} className="relative flex min-h-0 min-w-0 flex-1" data-tour="workspace">
       <div
+        ref={columnRef}
+        tabIndex={-1}
+        onKeyDown={findInChat}
         style={panelOpen ? { flexBasis: width } : undefined}
         className={cn(
-          "relative flex min-h-0 flex-col",
+          "relative flex min-h-0 flex-col outline-none",
           panelOpen ? "min-w-[300px] shrink" : "min-w-0 flex-1",
           blank &&
             "[--chat-composer-blur:var(--glass-blur)] [--chat-composer-surface:color-mix(in_srgb,var(--canvas)_62%,transparent)]",
@@ -354,13 +401,12 @@ export function ChatWorkspace({
               <ChatContextButton
                 convo={convo}
                 onOpenTask={onOpenTask}
-                onOpen={(tab) => {
-                  if (tab.ref.kind === "page" && !features.browser) {
-                    window.open(tab.ref.url, "_blank", "noopener");
-                    return;
-                  }
-                  openChatTab(chatId, tab.ref, tab.title);
-                  setPanelHidden(false);
+                onOpen={openDetail}
+                docked={docked}
+                shown={detailsShown}
+                onToggle={() => {
+                  saveDetailsDocked(!detailsShown);
+                  setDetailsShown(!detailsShown);
                 }}
               />
             </>
@@ -368,6 +414,23 @@ export function ChatWorkspace({
           {panelOpen ? null : titleTrailing}
         </div>
         {chat}
+        {find !== null || (docked && detailsShown && convo) ? (
+          <div className="pointer-events-none absolute top-(--workspace-topbar-height) right-3 bottom-4 z-20 flex w-80 flex-col gap-2 *:pointer-events-auto">
+            {find !== null ? (
+              <ChatFind
+                transcript={transcriptRef}
+                focusKey={find}
+                onClose={() => {
+                  setFind(null);
+                  columnRef.current?.focus();
+                }}
+              />
+            ) : null}
+            {docked && detailsShown && convo ? (
+              <ChatDetailsDock convo={convo} onOpen={openDetail} onOpenTask={onOpenTask} />
+            ) : null}
+          </div>
+        ) : null}
       </div>
       {panelOpen ? (
         <>

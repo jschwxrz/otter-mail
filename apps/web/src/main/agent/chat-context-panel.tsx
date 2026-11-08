@@ -32,18 +32,106 @@ export const isOutput = (tab: ChatTab) =>
 
 const SHOWN = 5;
 
-/** The chat's context: the agent and session it runs in, and what it made and used, closed tabs included. */
-export function ChatContextButton({
-  convo,
-  onOpen,
-  onOpenTask,
-}: {
+/** Shown docked beside the chat when there's room; the button then hides or shows it. */
+const DOCKED_KEY = "otter:chat-details-docked";
+
+export function readDetailsDocked(): boolean {
+  try {
+    return localStorage.getItem(DOCKED_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+export function saveDetailsDocked(shown: boolean): void {
+  try {
+    localStorage.setItem(DOCKED_KEY, String(shown));
+  } catch {
+    // Without storage it shows each time.
+  }
+}
+
+type DetailsProps = {
   convo: Conversation;
   onOpen: (tab: ChatTab) => void;
   /** Opens one of the agent's scheduled tasks in Scheduled. */
   onOpenTask: (key: string) => void;
-}) {
+};
+
+const detailsButton =
+  "no-drag flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-foreground/[0.06] hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring";
+
+/**
+ * The chat's details: a popover, or with `docked`, a button that shows or hides them beside the
+ * chat (`ChatDetailsDock`).
+ */
+export function ChatContextButton({
+  docked,
+  shown,
+  onToggle,
+  ...props
+}: DetailsProps & { docked?: boolean; shown?: boolean; onToggle?: () => void }) {
   const [open, setOpen] = useState(false);
+  if (docked)
+    return (
+      <HintTooltip label={shown ? "Hide chat details" : "Chat details"} side="bottom">
+        <button
+          type="button"
+          aria-label="Chat details"
+          aria-pressed={shown}
+          onClick={onToggle}
+          className={cn(detailsButton, shown && "bg-foreground/[0.06] text-foreground")}
+        >
+          <ListTodoIcon className="size-4" />
+        </button>
+      </HintTooltip>
+    );
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <HintTooltip label="Chat details" side="bottom">
+        <PopoverTrigger
+          render={
+            <button
+              type="button"
+              aria-label="Chat details"
+              className={cn(detailsButton, open && "bg-foreground/[0.06] text-foreground")}
+            >
+              <ListTodoIcon className="size-4" />
+            </button>
+          }
+        />
+      </HintTooltip>
+      <PopoverPopup align="end" padding="compact" width="md">
+        <ChatDetails
+          {...props}
+          onOpen={(tab) => {
+            setOpen(false);
+            props.onOpen(tab);
+          }}
+          onOpenTask={(key) => {
+            setOpen(false);
+            props.onOpenTask(key);
+          }}
+        />
+      </PopoverPopup>
+    </Popover>
+  );
+}
+
+/** The details kept open beside the chat, where they leave its messages clear. */
+export function ChatDetailsDock(props: DetailsProps) {
+  return (
+    <aside
+      aria-label="Chat details"
+      className="dropdown-glass min-h-0 overflow-y-auto rounded-lg p-3 text-popover-foreground shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]"
+    >
+      <ChatDetails {...props} />
+    </aside>
+  );
+}
+
+/** The chat's context: the agent and session it runs in, and what it made and used, closed tabs included. */
+function ChatDetails({ convo, onOpen, onOpenTask }: DetailsProps) {
   const chatAgent = useChatProvider(convo);
   const agent = openClawAgentId(convo.sessionId);
   const agentName =
@@ -53,77 +141,59 @@ export function ChatContextButton({
   const where =
     convo.device?.name ??
     (chatAgent.provider?.status === "ready" ? chatAgent.provider.message : null);
+  const about = [agent ? chatAgent.name : null, where].filter(Boolean).join(" · ");
   const outputs = convo.tabs.filter(isOutput).toReversed();
   const sources = convo.tabs.filter((t) => !isOutput(t)).toReversed();
-  const choose = (tab: ChatTab) => {
-    setOpen(false);
-    onOpen(tab);
-  };
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <HintTooltip label="Chat details" side="bottom">
-        <PopoverTrigger
-          render={
-            <button
-              type="button"
-              aria-label="Chat details"
-              className={cn(
-                "no-drag flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-foreground/[0.06] hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring",
-                open && "bg-foreground/[0.06] text-foreground",
-              )}
-            >
-              <ListTodoIcon className="size-4" />
-            </button>
-          }
-        />
-      </HintTooltip>
-      <PopoverPopup align="end" padding="compact" width="md">
-        <div className="flex flex-col gap-3 text-sm">
-          <div className="flex items-center gap-2 px-1">
-            <AgentAvatar kind={convo.provider} agent={agent} />
-            <span className="min-w-0 truncate font-medium text-foreground">{agentName}</span>
-            {agent || where ? (
-              <span className="min-w-0 truncate text-muted-foreground">
-                {[agent ? chatAgent.name : null, where].filter(Boolean).join(" · ")}
-              </span>
-            ) : null}
-          </div>
-          {convo.sessionId ? (
-            <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
-              <span className="shrink-0">Session</span>
-              <span className="min-w-0 flex-1 truncate font-mono" title={convo.sessionId}>
-                {convo.sessionId}
-              </span>
-              <button
-                type="button"
-                aria-label="Copy session"
-                className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-foreground/[0.06] hover:text-foreground"
-                onClick={() =>
-                  void navigator.clipboard.writeText(convo.sessionId ?? "").then(
-                    () => toast.success("Session copied"),
-                    () => toast.error("Couldn't copy the session"),
-                  )
-                }
-              >
-                <CopyIcon className="size-3.5" />
-              </button>
-            </div>
+    <div className="flex flex-col gap-3 text-sm">
+      <div className="flex items-center gap-2.5 px-1">
+        <AgentAvatar kind={convo.provider} agent={agent} />
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate font-medium text-foreground">{agentName}</span>
+          {about ? (
+            <span className="truncate text-xs text-muted-foreground" title={about}>
+              {about}
+            </span>
           ) : null}
-          {convo.sessionId ? (
-            <ScheduledSection
-              sessionId={convo.sessionId}
-              onOpen={(key) => {
-                setOpen(false);
-                onOpenTask(key);
-              }}
-            />
-          ) : null}
-          <TabSection title="Outputs" empty="Nothing made yet" tabs={outputs} onOpen={choose} />
-          <TabSection title="Sources" empty="Nothing read yet" tabs={sources} onOpen={choose} />
         </div>
-      </PopoverPopup>
-    </Popover>
+      </div>
+      {convo.sessionId ? (
+        <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
+          <span className="shrink-0">Session</span>
+          <span className="min-w-0 flex-1 truncate font-mono" title={convo.sessionId}>
+            {convo.sessionId}
+          </span>
+          <button
+            type="button"
+            aria-label="Copy session"
+            className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-foreground/[0.06] hover:text-foreground"
+            onClick={() =>
+              void navigator.clipboard.writeText(convo.sessionId ?? "").then(
+                () => toast.success("Session copied"),
+                () => toast.error("Couldn't copy the session"),
+              )
+            }
+          >
+            <CopyIcon className="size-3.5" />
+          </button>
+        </div>
+      ) : null}
+      {convo.sessionId ? (
+        <ScheduledSection sessionId={convo.sessionId} onOpen={onOpenTask} />
+      ) : null}
+      <TabSection title="Outputs" empty="Nothing made yet" tabs={outputs} onOpen={onOpen} />
+      <TabSection title="Sources" empty="Nothing read yet" tabs={sources} onOpen={onOpen} />
+    </div>
   );
+}
+
+/** A page's title, or where it is when it has none of its own: its site and path. */
+function tabTitle(tab: ChatTab): string {
+  if (tab.ref.kind !== "page" || tab.title !== tab.ref.url || !URL.canParse(tab.ref.url))
+    return tab.title;
+  const url = new URL(tab.ref.url);
+  const path = url.pathname === "/" ? "" : decodeURIComponent(url.pathname).replace(/\/$/, "");
+  return url.host.replace(/^www\./, "") + path;
 }
 
 function TabSection({
@@ -158,7 +228,7 @@ function TabSection({
             )}
           >
             <Icon className="size-3.5 shrink-0" />
-            <span className="min-w-0 truncate">{tab.title}</span>
+            <span className="min-w-0 truncate">{tabTitle(tab)}</span>
           </button>
         );
       })}
