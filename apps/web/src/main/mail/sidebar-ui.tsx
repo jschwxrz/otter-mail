@@ -7,6 +7,8 @@ import {
 import { ChevronDownIcon, PlusIcon } from "lucide-react";
 import { ScrollArea } from "~/components/ui/scroll-area";
 
+import type { KeybindingCommand } from "../keybindings/commands";
+
 import { HintTooltip, UnreadPill, cn } from "./ui";
 
 export type RowDragProps = {
@@ -239,6 +241,7 @@ export type SidebarPickerItem = {
   label: string;
   icon: ReactNode;
   hint?: string;
+  shortcut?: KeybindingCommand;
   /** Added to the tooltip: "Mail · in iCloud". */
   detail?: string;
   dot?: boolean;
@@ -266,7 +269,7 @@ export function SidebarPicker({
   };
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-0.5" data-tour={tour}>
-      {items.map(({ id, label, icon, hint, detail, dot = false }) => {
+      {items.map(({ id, label, icon, hint, shortcut, detail, dot = false }) => {
         const selected = id === selectedId;
         const dropHere = drop?.id === id ? drop : null;
         return (
@@ -274,6 +277,7 @@ export function SidebarPicker({
             key={id}
             label={detail ? `${label} · ${detail}` : label}
             hint={hint}
+            shortcut={shortcut}
             disabled={selected || dragged !== null}
           >
             <button

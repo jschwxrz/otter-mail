@@ -1,10 +1,9 @@
 import { useState, type ComponentType } from "react";
-import { PlusIcon, SettingsIcon, SquarePenIcon } from "lucide-react";
+import { ChevronsUpDownIcon, PlusIcon, SettingsIcon, SquarePenIcon } from "lucide-react";
 
 import { CalendarSidebar } from "../calendar/calendar-sidebar";
 import type { WorkspaceProps } from "../extensions/types";
 import { useWorkspaces, type Workspace } from "../extensions/workspaces";
-import { calendarAccounts } from "../calendar/calendar-view";
 import type { CalendarMode } from "../calendar/dates";
 import type { KeybindingCommand } from "../keybindings/commands";
 import { shortcutText } from "../keybindings/keys";
@@ -19,7 +18,16 @@ import type { SettingsPane } from "./api";
 import { useChats } from "../agent/chat-store";
 import { useAddAccount, useViewUnreadCounts } from "./hooks";
 import { ScheduledMailButton } from "./mail-schedule";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "./menu";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./menu";
 import {
   NewRow,
   SIDEBAR_ROW,
@@ -35,8 +43,7 @@ import { toast } from "./toast";
 import { useInboxUnread, useMailboxOptions, type MailboxOption } from "./top-bar";
 import type { MailAccount, MailView } from "./types";
 import type { MailboxTab } from "../mailboxes";
-import { HintTooltip, IconBtn, cn } from "./ui";
-import { usePanelTabDrag } from "./use-panel-tab-drag";
+import { HintTooltip, IconBtn } from "./ui";
 import { ViewMark } from "./view-icon";
 
 export function AppSidebar({
@@ -51,7 +58,6 @@ export function AppSidebar({
   composing,
   onMode,
   onGo,
-  onMoveTab,
   onSelectChat,
   onNewChat,
   onCompose,
@@ -73,7 +79,6 @@ export function AppSidebar({
   composing: boolean;
   onMode: (mode: AppMode) => void;
   onGo: (spaceId: string, labelId?: string) => void;
-  onMoveTab: (id: string, target: string, after: boolean) => void;
   onSelectChat: (chatId: string) => void;
   onNewChat: () => void;
   onCompose: () => void;
@@ -97,6 +102,9 @@ export function AppSidebar({
   const healthIds = spaceTab ? [spaceTab.account.id] : accounts.map((a) => a.id);
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex shrink-0 flex-col px-(--sidebar-content-inset) pt-(--sidebar-content-inset) pb-2">
+        <ModePicker mode={composing ? "mail" : mode} accounts={accounts} onMode={onMode} />
+      </div>
       {workspace && !composing ? (
         <workspace.workspace.Sidebar
           location={workspace.location}
@@ -119,15 +127,16 @@ export function AppSidebar({
             />
             <ScheduledMailButton />
           </div>
-          <div className="flex shrink-0 flex-col px-(--sidebar-content-inset) pt-3">
-            <SidebarTabs
-              options={options}
-              tabs={tabs}
-              selectedId={mailbox}
-              onSelect={(id) => onGo(id)}
-              onMove={onMoveTab}
-            />
-          </div>
+          {options.length > 0 ? (
+            <div className="flex shrink-0 flex-col px-(--sidebar-content-inset) pt-3">
+              <MailboxSwitcher
+                options={options}
+                tabs={tabs}
+                selectedId={mailbox}
+                onSelect={(id) => onGo(id)}
+              />
+            </div>
+          ) : null}
           <MailPage
             accounts={accounts}
             views={views}
@@ -146,12 +155,6 @@ export function AppSidebar({
       <SignInCards accountIds={healthIds} />
       <UpdateCard />
       <div className="flex shrink-0 items-center gap-0.5 px-(--sidebar-content-inset) pb-(--sidebar-content-inset)">
-        <ModeSwitcher
-          mode={composing ? "mail" : mode}
-          accounts={accounts}
-          calendar={calendarAccounts(accounts).length > 0}
-          onMode={onMode}
-        />
         <span className="min-w-0 flex-1" />
         {mode === "mail" ? <SyncButton accountIds={healthIds} /> : null}
         <HintTooltip label="Settings" hint={shortcutText("mod+,")}>
@@ -164,27 +167,19 @@ export function AppSidebar({
   );
 }
 
-function ModeSwitcher({
+function ModePicker({
   mode,
   accounts,
-  calendar,
   onMode,
 }: {
   mode: AppMode;
   accounts: MailAccount[];
-  calendar: boolean;
   onMode: (mode: AppMode) => void;
 }) {
   const unread = Object.values(useInboxUnread(accounts)).some((n) => n > 0);
   const agentDot = useChats((s) => s.unseen.size > 0);
   const workspaces = useWorkspaces();
   const [order, setOrder] = useState(loadModeOrder);
-  const { ref, draggingId, handlers } = usePanelTabDrag((shown) => {
-    // A mode hidden now (Calendar without a calendar) keeps its saved place.
-    const next = [...shown, ...order.filter((id) => !shown.includes(id))];
-    setOrder(next);
-    saveModeOrder(next);
-  });
   const modes: {
     mode: AppMode;
     label: string;
@@ -192,37 +187,21 @@ function ModeSwitcher({
     shortcut?: KeybindingCommand;
     dot: boolean;
   }[] = [
+    { mode: "mail", label: "Mail", Icon: OtterMailIcon, shortcut: "mode.mail", dot: unread },
     {
-      mode: "mail",
-      label: "Mail",
-      Icon: OtterMailIcon,
-      shortcut: "mode.mail",
-      dot: unread,
+      mode: "calendar",
+      label: "Calendar",
+      Icon: OtterCalendarIcon,
+      shortcut: "mode.calendar",
+      dot: false,
     },
-    ...(calendar
-      ? [
-          {
-            mode: "calendar" as const,
-            label: "Calendar",
-            Icon: OtterCalendarIcon,
-            shortcut: "mode.calendar" as const,
-            dot: false,
-          },
-        ]
-      : []),
     ...workspaces.map((w) => ({
       mode: `workspace:${w.id}` as const,
       label: w.title,
       Icon: w.Icon,
       dot: false,
     })),
-    {
-      mode: "agent",
-      label: "Agent",
-      Icon: AgentIcon,
-      shortcut: "mode.agent",
-      dot: agentDot,
-    },
+    { mode: "agent", label: "Agent", Icon: AgentIcon, shortcut: "mode.agent", dot: agentDot },
   ];
   // Modes not yet ordered (new ones) keep their place after the ordered ones.
   const rank = (mode: string) => {
@@ -233,53 +212,28 @@ function ModeSwitcher({
     .map((m, i) => ({ m, i }))
     .sort((a, b) => rank(a.m.mode) - rank(b.m.mode) || a.i - b.i)
     .map(({ m }) => m);
+  const move = (id: string, target: string, after: boolean) => {
+    const shown = sorted.map((m) => m.mode as string).filter((m) => m !== id);
+    shown.splice(shown.indexOf(target) + (after ? 1 : 0), 0, id);
+    // A mode hidden now (a workspace turned off) keeps its saved place.
+    const next = [...shown, ...order.filter((m) => !shown.includes(m))];
+    setOrder(next);
+    saveModeOrder(next);
+  };
   return (
-    <div
-      ref={ref}
-      role="tablist"
-      aria-label="Mode"
-      className="relative flex items-center gap-0.5"
-      data-tour="modes"
-      {...handlers}
-    >
-      {sorted.map((m) => {
-        const selected = m.mode === mode;
-        const dragging = draggingId === m.mode;
-        return (
-          <HintTooltip key={m.mode} label={m.label} shortcut={m.shortcut} disabled={dragging}>
-            <div
-              role="tab"
-              tabIndex={0}
-              data-panel-tab-id={m.mode}
-              aria-label={m.label}
-              aria-selected={selected}
-              onClick={() => onMode(m.mode)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onMode(m.mode);
-                }
-              }}
-              className={cn(
-                "relative flex h-7 w-8 cursor-pointer touch-none select-none items-center justify-center rounded-lg outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-focus-ring [&>svg]:size-4",
-                selected
-                  ? "text-sidebar-foreground"
-                  : "text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
-                dragging && "z-10 cursor-grabbing bg-sidebar-row-hover text-sidebar-foreground",
-              )}
-            >
-              <m.Icon selected={selected} />
-              {m.dot && !selected ? (
-                <span
-                  aria-hidden
-                  className="absolute right-1.5 top-1 size-1.5 rounded-full bg-sidebar-foreground ring-2 ring-sidebar-surface"
-                />
-              ) : null}
-            </div>
-          </HintTooltip>
-        );
-      })}
-    </div>
+    <SidebarPicker
+      tour="modes"
+      selectedId={mode}
+      onSelect={(id) => onMode(id as AppMode)}
+      onMove={move}
+      items={sorted.map((m) => ({
+        id: m.mode,
+        label: m.label,
+        icon: <m.Icon selected={m.mode === mode} />,
+        shortcut: m.shortcut,
+        dot: m.dot,
+      }))}
+    />
   );
 }
 
@@ -303,38 +257,69 @@ function saveModeOrder(order: string[]): void {
   }
 }
 
-function SidebarTabs({
+function MailboxSwitcher({
   options,
   tabs,
   selectedId,
   onSelect,
-  onMove,
 }: {
   options: MailboxOption[];
   tabs: MailboxTab[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onMove: (id: string, target: string, after: boolean) => void;
 }) {
   const unread = useInboxUnread(
     tabs.flatMap((tab) => (tab.alias ? [] : [tab.account])),
     tabs.flatMap((tab) => (tab.alias ? [tab.alias] : [])),
   );
+  const selected = options.find((option) => option.id === selectedId) ?? options[0]!;
+  const elsewhere = options.some((o) => o.id !== selected.id && (unread[o.id] ?? 0) > 0);
+  const picture = (option: MailboxOption) => (
+    <AccountPicture account={option.account} className="size-5 rounded-md text-[10px]" />
+  );
   return (
-    <SidebarPicker
-      tour="mailbox"
-      selectedId={selectedId}
-      onSelect={onSelect}
-      onMove={onMove}
-      items={options.map((option) => ({
-        id: option.id,
-        label: option.name,
-        icon: <AccountPicture account={option.account} className="size-5 rounded-md text-[10px]" />,
-        hint: option.shortcut,
-        detail: option.detail,
-        dot: (unread[option.id] ?? 0) > 0,
-      }))}
-    />
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          data-tour="mailbox"
+          className={`${SIDEBAR_ROW} h-8 px-1.5 text-sidebar-foreground hover:bg-sidebar-row-hover data-[state=open]:bg-sidebar-row-hover`}
+        >
+          {picture(selected)}
+          <span className="min-w-0 truncate">{selected.name}</span>
+          {elsewhere ? (
+            <span
+              aria-label="Unread in another mailbox"
+              className="size-1.5 shrink-0 rounded-full bg-sidebar-foreground"
+            />
+          ) : null}
+          <ChevronsUpDownIcon className="ms-auto size-3.5 shrink-0 text-sidebar-muted-foreground" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="min-w-(--radix-dropdown-menu-trigger-width)">
+        {options.map((option) => (
+          <DropdownMenuItem
+            key={option.id}
+            icon={picture(option)}
+            accelerator={option.shortcut}
+            onSelect={() => onSelect(option.id)}
+          >
+            <span className={option.id === selected.id ? "font-medium" : undefined}>
+              {option.name}
+            </span>
+            {option.detail ? (
+              <span className="ms-1.5 text-muted-foreground">{option.detail}</span>
+            ) : null}
+            {(unread[option.id] ?? 0) > 0 ? (
+              <span
+                aria-label="Unread"
+                className="ms-1.5 inline-block size-1.5 rounded-full bg-foreground align-middle"
+              />
+            ) : null}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

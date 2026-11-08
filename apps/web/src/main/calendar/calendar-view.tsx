@@ -424,42 +424,36 @@ export function CalendarView({
             if (!(e.target as HTMLElement).closest("[data-event]")) select(null);
           }}
         >
-          {calendars.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
-              None of your mailboxes has a calendar Otter can open. Gmail and Outlook do.
-            </div>
-          ) : (
-            <div
-              key={mode === "month" ? `${mode}:${from}` : mode}
-              className="flex min-h-0 flex-1 flex-col animate-calendar-in motion-reduce:animate-none"
-            >
-              {mode === "month" ? (
-                <MonthGrid
-                  days={days}
-                  columns={weekends ? 7 : 5}
-                  month={date.getMonth()}
-                  events={events}
-                  colorOf={colorOf}
-                  defaultCalendar={defaultCalendar}
-                  onOpenDay={openDay}
-                />
-              ) : (
-                <TimeGrid
-                  days={strip}
-                  visible={days.length}
-                  buffer={buffer}
-                  stepRef={stepGrid}
-                  onSettle={(shift) => setStart(strip[buffer + shift]!)}
-                  onPeek={(shift) => setPeek(shift ? strip[buffer + shift]! : null)}
-                  events={events}
-                  colorOf={colorOf}
-                  defaultCalendar={defaultCalendar}
-                  actions={actions}
-                  onOpenDay={openDay}
-                />
-              )}
-            </div>
-          )}
+          <div
+            key={mode === "month" ? `${mode}:${from}` : mode}
+            className="flex min-h-0 flex-1 flex-col animate-calendar-in motion-reduce:animate-none"
+          >
+            {mode === "month" ? (
+              <MonthGrid
+                days={days}
+                columns={weekends ? 7 : 5}
+                month={date.getMonth()}
+                events={events}
+                colorOf={colorOf}
+                defaultCalendar={defaultCalendar}
+                onOpenDay={openDay}
+              />
+            ) : (
+              <TimeGrid
+                days={strip}
+                visible={days.length}
+                buffer={buffer}
+                stepRef={stepGrid}
+                onSettle={(shift) => setStart(strip[buffer + shift]!)}
+                onPeek={(shift) => setPeek(shift ? strip[buffer + shift]! : null)}
+                events={events}
+                colorOf={colorOf}
+                defaultCalendar={defaultCalendar}
+                actions={actions}
+                onOpenDay={openDay}
+              />
+            )}
+          </div>
           {selected || (draft && selection && "draft" in selection) ? (
             <EventPanel
               containerRef={bodyRef}
