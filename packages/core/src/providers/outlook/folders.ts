@@ -1,4 +1,4 @@
-import { ARCHIVE_LABEL_ID, SNOOZED_LABEL_ID } from "@otter-mail/contracts";
+import { ARCHIVE_LABEL_ID, SNOOZED_LABEL_ID } from "@otter/contracts";
 
 import * as store from "../../services/mail-store.js";
 import type { MailLabel } from "../../types.js";

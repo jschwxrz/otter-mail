@@ -1,5 +1,5 @@
 {
-  "name": "@otter-mail/desktop",
+  "name": "@otter/desktop",
   "version": "0.13.38",
   "private": true,
   "description": "Gmail, calm and fast.",
@@ -14,18 +14,18 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1",
-    "@otter-mail/contracts": "workspace:*",
-    "@otter-mail/core": "workspace:*",
-    "@otter-mail/extension-calendar-invites": "workspace:*",
-    "@otter-mail/extension-claude": "workspace:*",
-    "@otter-mail/extension-codex": "workspace:*",
-    "@otter-mail/extension-hermes": "workspace:*",
-    "@otter-mail/extension-openclaw": "workspace:*",
-    "@otter-mail/extension-openrouter": "workspace:*",
-    "@otter-mail/extension-otter-drive": "workspace:*",
-    "@otter-mail/extension-todoist": "workspace:*",
-    "@otter-mail/extension-translation": "workspace:*",
-    "@otter-mail/shared": "workspace:*",
+    "@otter/contracts": "workspace:*",
+    "@otter/core": "workspace:*",
+    "@otter/extension-calendar-invites": "workspace:*",
+    "@otter/extension-claude": "workspace:*",
+    "@otter/extension-codex": "workspace:*",
+    "@otter/extension-hermes": "workspace:*",
+    "@otter/extension-openclaw": "workspace:*",
+    "@otter/extension-openrouter": "workspace:*",
+    "@otter/extension-otter-drive": "workspace:*",
+    "@otter/extension-todoist": "workspace:*",
+    "@otter/extension-translation": "workspace:*",
+    "@otter/shared": "workspace:*",
     "@sentry/electron": "8.3.0",
     "better-auth": "^1.7.6",
     "electron": "44.4.2",
@@ -38,5 +38,5 @@
     "typescript": "catalog:",
     "vite-plus": "catalog:"
   },
-  "productName": "Otter Mail"
+  "productName": "Otter"
 }

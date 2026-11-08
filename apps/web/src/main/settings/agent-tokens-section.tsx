@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AgentToken, AgentTokens } from "@otter-mail/contracts/agent-tokens";
+import type { AgentToken, AgentTokens } from "@otter/contracts/agent-tokens";
 import { CheckIcon, CopyIcon } from "lucide-react";
 
 import { Button } from "~/components/ui/button";

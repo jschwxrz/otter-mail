@@ -40,7 +40,7 @@ import { useDebouncedValue, useSearchMessages } from "./hooks";
 import { getAccountColor, getAccountDisplayName } from "./account-style";
 import { senderLabel } from "./address";
 import { cn } from "./ui";
-import { changelogUrl } from "@otter-mail/shared/changelog";
+import { changelogUrl } from "@otter/shared/changelog";
 import { openLink } from "../browser/store";
 import { getThemeModes } from "../theme/themePalette";
 import {
@@ -418,7 +418,7 @@ export function CommandPalette({
               title:
                 update.status === "downloaded"
                   ? `Restart to update to ${update.availableVersion}`
-                  : "Update Otter Mail",
+                  : "Update Otter",
               description: `Version ${update.currentVersion}`,
               keywords: "upgrade install restart new version check for updates",
               run: updateNow,

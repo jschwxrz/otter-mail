@@ -5,7 +5,7 @@ import {
   SettingsRow,
   SettingsSection,
   searchableSetting,
-} from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { todoistApi } from "./api";

@@ -5,7 +5,7 @@ import {
   refreshProvider,
   updateProviderSettings,
   type CoreExtension,
-} from "@otter-mail/core/extension-kit";
+} from "@otter/core/extension-kit";
 
 import { manifest } from "../manifest.ts";
 import {

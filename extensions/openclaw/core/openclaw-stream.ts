@@ -1,5 +1,5 @@
-import { TextStream } from "@otter-mail/core/extension-kit";
-import type { Emit } from "@otter-mail/core/extension-kit";
+import { TextStream } from "@otter/core/extension-kit";
+import type { Emit } from "@otter/core/extension-kit";
 
 export function openClawMessageText(message: unknown): string {
   const content = (message as { content?: unknown })?.content;

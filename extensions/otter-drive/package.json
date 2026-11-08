@@ -1,5 +1,5 @@
 {
-  "name": "@otter-mail/extension-otter-drive",
+  "name": "@otter/extension-otter-drive",
   "version": "0.1.0",
   "private": true,
   "description": "Your drives' documents in a Drive workspace, and attachments saved from mail.",
@@ -15,8 +15,8 @@
   },
   "dependencies": {
     "@e965/xlsx": "0.20.3",
-    "@otter-mail/contracts": "workspace:*",
-    "@otter-mail/core": "workspace:*",
+    "@otter/contracts": "workspace:*",
+    "@otter/core": "workspace:*",
     "@tanstack/react-query": "^5.87.4",
     "@tanstack/react-router": "^1.131.36",
     "@tanstack/react-virtual": "^3.14.25",
@@ -28,7 +28,7 @@
     "typescript": "catalog:",
     "vite-plus": "catalog:"
   },
-  "otterMail": {
+  "otter": {
     "id": "otter-drive",
     "name": "Otter Drive",
     "description": "Your drives' documents in a Drive workspace, and attachments saved from mail.",

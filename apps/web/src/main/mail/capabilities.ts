@@ -1,4 +1,4 @@
-import { GMAIL_CAPABILITIES, type MailCapabilities } from "@otter-mail/contracts";
+import { GMAIL_CAPABILITIES, type MailCapabilities } from "@otter/contracts";
 import { useAccounts } from "./hooks";
 import type { MailAccount } from "./types";
 

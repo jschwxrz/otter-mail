@@ -13,8 +13,8 @@ import {
   SettingsRow,
   SettingsSection,
   searchableSetting,
-} from "@otter-mail/web/extension-kit";
-import { DEFAULT_SETTINGS } from "@otter-mail/contracts";
+} from "@otter/web/extension-kit";
+import { DEFAULT_SETTINGS } from "@otter/contracts";
 import { useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, StarIcon, XIcon } from "lucide-react";
 import {

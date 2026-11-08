@@ -1,4 +1,4 @@
-import { supportError, type SupportDiagnostics } from "@otter-mail/shared/support";
+import { supportError, type SupportDiagnostics } from "@otter/shared/support";
 import { platform } from "../platform.js";
 import { isSignedIn } from "../providers/index.js";
 import { listAccounts } from "./account-store.js";

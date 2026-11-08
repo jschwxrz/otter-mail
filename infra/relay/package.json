@@ -1,5 +1,5 @@
 {
-  "name": "@otter-mail/relay",
+  "name": "@otter/relay",
   "version": "0.0.0",
   "private": true,
   "description": "relay.mail.otterware.app: Otter account sign-in, linked accounts, agent chats and realtime Gmail notifications.",
@@ -15,9 +15,9 @@
   "dependencies": {
     "@better-auth/oauth-provider": "1.7.6",
     "@hono/zod-validator": "^0.9.1",
-    "@otter-mail/contracts": "workspace:*",
-    "@otter-mail/core": "workspace:*",
-    "@otter-mail/shared": "workspace:*",
+    "@otter/contracts": "workspace:*",
+    "@otter/core": "workspace:*",
+    "@otter/shared": "workspace:*",
     "@sentry/cloudflare": "11.8.0",
     "better-auth": "^1.7.6",
     "drizzle-orm": "^0.45.3",

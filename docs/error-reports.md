@@ -54,7 +54,7 @@ Mail sync logs what the user can see and fix (signed out, offline, rate limited)
 | iPhone  | the app (crashes as stack traces, hangs from iOS's MetricKit; Settings › Support) | `apps/ios/OtterMail/Reports/` (the same rules, in Swift)        |
 
 A build reports when its app has a DSN (`SENTRY_DSN` in `error-reports.ts`) and it's a
-release; `OTTER_MAIL_ERROR_REPORTS=1` lets a development build (`pnpm dev:fake`,
+release; `OTTER_ERROR_REPORTS=1` lets a development build (`pnpm dev:fake`,
 `pnpm dev:desktop`) report too. A local relay never does.
 
 ## Setup

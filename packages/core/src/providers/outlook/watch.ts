@@ -7,7 +7,7 @@
  * subscriptions last at most three days. A device that can't subscribe polls.
  */
 
-import type { OutlookWatchResponse } from "@otter-mail/contracts/relay";
+import type { OutlookWatchResponse } from "@otter/contracts/relay";
 
 import { logger } from "../../logger.js";
 import * as mailStore from "../../services/mail-store.js";

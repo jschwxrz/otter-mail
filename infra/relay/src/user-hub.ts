@@ -6,7 +6,7 @@
  */
 
 import { DurableObject } from "cloudflare:workers";
-import type { RelayEvent } from "@otter-mail/contracts/relay";
+import type { RelayEvent } from "@otter/contracts/relay";
 import * as apns from "./apns.ts";
 import * as push from "./push.ts";
 import { connection, NotificationFailure } from "./notification-connections.ts";

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { OtterAccountState, OtterDevice } from "@otter-mail/contracts";
+import type { OtterAccountState, OtterDevice } from "@otter/contracts";
 import { LaptopIcon } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
@@ -55,7 +55,7 @@ function useOtterSignIn() {
         });
       })
       .catch((err: unknown) => {
-        toast.error("Couldn't sign in to Otter Mail", { description: errorText(err) });
+        toast.error("Couldn't sign in to Otter", { description: errorText(err) });
       })
       .finally(() => setPending(null));
   };
@@ -180,7 +180,7 @@ function SignedInPane({ state }: { state: OtterAccountState }) {
       <SettingsSection title="Delete account">
         <SettingsRow
           {...searchableSetting("delete-otter-account")}
-          description="Removes your account and its list of mailboxes from Otter Mail's servers, and signs out every device. Your mail and the mailboxes on each device stay."
+          description="Removes your account and its list of mailboxes from Otter's servers, and signs out every device. Your mail and the mailboxes on each device stay."
           control={
             <Btn size="sm" variant="destructive" onClick={() => setConfirmDelete(true)}>
               Delete…
@@ -203,8 +203,8 @@ function SignedInPane({ state }: { state: OtterAccountState }) {
         }
       >
         <Text variant="small">
-          Otter Mail's servers forget {user.email} and its list of mailboxes, and every device signs
-          out. Nothing is deleted from Gmail, and this device keeps its mailboxes and mail.
+          Otter's servers forget {user.email} and its list of mailboxes, and every device signs out.
+          Nothing is deleted from Gmail, and this device keeps its mailboxes and mail.
         </Text>
       </Dialog>
     </>
@@ -224,8 +224,8 @@ export function OtterAccountPane() {
         <SettingsGroup>
           <SettingsRow
             id={searchableSetting("otter-account").id}
-            title="Sign in to Otter Mail"
-            description="Your mailboxes on every device you use, and new mail the moment it arrives. Otter Mail's servers only learn your addresses, never your mail."
+            title="Sign in to Otter"
+            description="Your mailboxes on every device you use, and new mail the moment it arrives. Otter's servers only learn your addresses, never your mail."
             control={<SignInControl />}
           />
         </SettingsGroup>
@@ -251,7 +251,7 @@ export function OtterSignInOnboardingLink() {
         </>
       ) : (
         <>
-          Already use Otter Mail?{" "}
+          Already use Otter?{" "}
           <button
             type="button"
             className="cursor-pointer font-medium text-foreground underline-offset-2 hover:underline"

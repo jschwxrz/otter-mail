@@ -1,5 +1,5 @@
 import { useLatest } from "../use-latest";
-import { DEFAULT_SETTINGS } from "@otter-mail/contracts";
+import { DEFAULT_SETTINGS } from "@otter/contracts";
 import { ExtensionCategoryPane } from "../extensions/extensions-pane";
 import { hasIntegrations } from "../extensions/registry";
 import { useCallback, useEffect, useState } from "react";
@@ -208,7 +208,7 @@ function GeneralPane() {
                   />
                 ) : null
               }
-              description={`Open Otter Mail automatically when you log in to your ${osNames.computer}.`}
+              description={`Open Otter automatically when you log in to your ${osNames.computer}.`}
               control={
                 <Switch
                   id="launchAtLogin"
@@ -418,7 +418,7 @@ function SettingsPane({ route }: { route: SettingsRoute }) {
         category="integration"
         item={route.item}
         title="Integrations"
-        description="Services Otter Mail connects to. Turning one off hides it everywhere, on every device with your Otter account."
+        description="Services Otter connects to. Turning one off hides it everywhere, on every device with your Otter account."
       />
     );
   if (route.pane === "features")

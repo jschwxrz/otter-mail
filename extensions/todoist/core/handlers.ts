@@ -1,5 +1,5 @@
-import { runAsTask } from "@otter-mail/core/extension-kit";
-import type { ExtensionContext } from "@otter-mail/core/extension-kit";
+import { runAsTask } from "@otter/core/extension-kit";
+import type { ExtensionContext } from "@otter/core/extension-kit";
 import * as todoist from "./todoist.js";
 
 type Params = Record<string, unknown> | undefined;

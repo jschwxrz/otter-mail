@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
   cn,
   toast,
-} from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckIcon, ChevronDownIcon, GlobeIcon, LockIcon, UsersIcon, XIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";

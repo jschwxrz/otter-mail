@@ -1,5 +1,5 @@
 import { CopyIcon, VideoIcon, XIcon } from "lucide-react";
-import { meetingProvider, type MeetingProvider, type MeetingService } from "@otter-mail/contracts";
+import { meetingProvider, type MeetingProvider, type MeetingService } from "@otter/contracts";
 import { toast } from "../mail/toast";
 import { HintTooltip, IconBtn } from "../mail/ui";
 

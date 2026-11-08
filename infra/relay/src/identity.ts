@@ -52,7 +52,7 @@ routes.get("/sign-in", (c) => {
     c,
     "Your Otter account",
     html`
-      <p>One account for Otter Mail and Otter Drive. Sign in with Google to continue.</p>
+      <p>One account for Otter and Otter Drive. Sign in with Google to continue.</p>
       ${query.has("deleted") ? html`<p>Your Otter account has been deleted.</p>` : ""}
       <button id="sign-in">Continue with Google</button>
     `,
@@ -70,7 +70,7 @@ routes.get("/consent", (c) => {
     html`
       <p>
         Otter Drive will receive your account ID, name, email address, and profile picture. Your
-        mail stays in Otter Mail.
+        mail stays in Otter.
       </p>
       <form id="consent">
         <button value="accept">Continue</button

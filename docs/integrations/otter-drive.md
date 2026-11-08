@@ -9,9 +9,9 @@ Everyone with access to that drive can see it.
 ## Owned modules
 
 Otter Drive is a built-in extension: the `extensions/otter-drive` package
-(`@otter-mail/extension-otter-drive`).
+(`@otter/extension-otter-drive`).
 
-- `package.json`: its manifest (`otterMail`): a connection, the `drive` workspace
+- `package.json`: its manifest (`otter`): a connection, the `drive` workspace
   (`contributes.workspaces`), on every app: Drive's API answers mail.otterware.app (and the dev
   server on :5833) cross-origin with a bearer token, never cookies. A worktree's dev server on
   another port isn't allowed: run it with `PORT=5833` to try Drive. On localhost, previews from

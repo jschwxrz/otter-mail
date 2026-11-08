@@ -1,0 +1,4 @@
+interface:
+  display_name: "Otter Testing"
+  short_description: "Test the web app on the made-up mailbox in T3's Browser panel"
+  default_prompt: "Use $test-otter to verify the affected flow on the made-up mailbox through T3's Browser panel."

@@ -6,7 +6,7 @@
  * translation answers `needsDownload`, and the banner's Try Again is the click.
  */
 
-import type { LanguageDetection, TranslationResult } from "@otter-mail/core";
+import type { LanguageDetection, TranslationResult } from "@otter/core";
 
 type Availability = "unavailable" | "downloadable" | "downloading" | "available";
 

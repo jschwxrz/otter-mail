@@ -1,11 +1,11 @@
 ---
 name: write-changelog
-description: Write an Otter Mail changelog note (changelog/<version>.md) in the house style after conductor.build/changelog - a few-word title, a one-line lead, a screenshot or two, short bullets. Use only when the user asks for a note, release notes or a changelog entry. The changelog is marketing, not part of releasing - never write, draft, suggest or ask about a note on your own, not even when running a release.
+description: Write an Otter changelog note (changelog/<version>.md) in the house style after conductor.build/changelog - a few-word title, a one-line lead, a screenshot or two, short bullets. Use only when the user asks for a note, release notes or a changelog entry. The changelog is marketing, not part of releasing - never write, draft, suggest or ask about a note on your own, not even when running a release.
 ---
 
 # Write a changelog note
 
-The changelog is how Otter Mail announces itself: marketing and brand as much
+The changelog is how Otter announces itself: marketing and brand as much
 as a record. Notes live in `changelog/<version>.md` at the repository root.
 The website shows them at https://otterware.app/mail/changelog, all on one page,
 newest first, with the versions down the side (each note's anchor is its
@@ -100,7 +100,7 @@ Type what you want and Enter does it: commands you name come first, and mail sea
 
 ## Screenshots
 
-- From the made-up mailbox (`pnpm dev:fake`, see the test-otter-mail skill),
+- From the made-up mailbox (`pnpm dev:fake`, see the test-otter skill),
   never real mail, at a 1600x1000 viewport. Dark is the default; light is fine
   when the feature is about appearance.
 - Crop to the feature when the whole window isn't the point.
@@ -109,7 +109,7 @@ Type what you want and Enter does it: commands you name come first, and mail sea
 
 ## Check it
 
-- `pnpm --filter @otter-mail/shared test`: every note parses and every image it
+- `pnpm --filter @otter/shared test`: every note parses and every image it
   shows exists.
 - The page itself: copy the note and its images into a checkout of the website
   (`changelog/mail/`), then `pnpm dev` there and open `/mail/changelog/`.

@@ -1,4 +1,4 @@
-import { type ExtensionCategory } from "@otter-mail/contracts/extensions";
+import { type ExtensionCategory } from "@otter/contracts/extensions";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, ChevronRightIcon, PuzzleIcon, ShieldIcon } from "lucide-react";

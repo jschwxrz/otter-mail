@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in Otter Mail doesn't work as expected.
+description: Something in Otter doesn't work as expected.
 labels: [bug]
 body:
   - type: textarea
@@ -19,7 +19,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Otter Mail version
+      label: Otter version
       description: Settings → General → Updates.
     validations:
       required: true
@@ -31,5 +31,5 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: Relevant lines from ~/.otter-mail/userdata/logs/main.log. Remove anything private.
+      description: Relevant lines from ~/.otter/userdata/logs/main.log. Remove anything private.
       render: text

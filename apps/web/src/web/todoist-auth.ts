@@ -2,7 +2,7 @@ let popup: Window | null = null;
 export function prepareTodoistPopup(): void {
   popup?.close();
   popup = window.open("about:blank", "otter-todoist-sign-in", "popup,width=600,height=760");
-  if (!popup) throw new Error("Allow popups for Otter Mail, then connect Todoist again.");
+  if (!popup) throw new Error("Allow popups for Otter, then connect Todoist again.");
   popup.document.title = "Connecting Todoist…";
   popup.document.body.textContent = "Opening Todoist sign-in…";
 }

@@ -7,7 +7,7 @@ import {
   useQueryClient,
   type InfiniteData,
 } from "@tanstack/react-query";
-import { landLabelChange } from "@otter-mail/contracts";
+import { landLabelChange } from "@otter/contracts";
 import { toast } from "./toast";
 import {
   mailApi,

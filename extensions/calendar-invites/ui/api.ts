@@ -1,4 +1,4 @@
-import { task } from "@otter-mail/web/extension-kit";
+import { task } from "@otter/web/extension-kit";
 
 export type RsvpResponse = "accepted" | "declined" | "tentative";
 

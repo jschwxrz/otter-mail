@@ -2,7 +2,7 @@
 // TLS runs inside the tunnel; the relay carries ciphertext after any STARTTLS greeting.
 
 import { connect } from "cloudflare:sockets";
-import { TUNNEL_CLOSE } from "@otter-mail/contracts/relay";
+import { TUNNEL_CLOSE } from "@otter/contracts/relay";
 
 const PORTS = new Set([143, 993, 465, 587]);
 

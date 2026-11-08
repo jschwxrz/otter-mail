@@ -1,4 +1,4 @@
-import type { MessageCardProps, MessageDetail, UiExtension } from "@otter-mail/web/extension-kit";
+import type { MessageCardProps, MessageDetail, UiExtension } from "@otter/web/extension-kit";
 
 import { manifest } from "../manifest";
 import type { RsvpResponse } from "./api";

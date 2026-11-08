@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { devices, invalidate, register, remove } from "./push.ts";
 import type { Env } from "./worker.ts";
-import type { PutPushDeviceRequest } from "@otter-mail/contracts/relay";
+import type { PutPushDeviceRequest } from "@otter/contracts/relay";
 
 let db: DatabaseSync;
 let env: Env;

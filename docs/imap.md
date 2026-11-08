@@ -1,6 +1,6 @@
 # IMAP mailboxes
 
-Otter Mail reads Gmail through the Gmail API, and every other mailbox through IMAP (sending over
+Otter reads Gmail through the Gmail API, and every other mailbox through IMAP (sending over
 SMTP). The Otter account itself stays a Google sign-in (better-auth). This is how the
 providers sit side by side; Outlook, the third, is in [outlook.md](outlook.md).
 

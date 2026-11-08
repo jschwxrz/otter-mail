@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { CHAT_LIMITS, chatForSync, type Chat, type ChatSummary } from "@otter-mail/contracts/chats";
+import { CHAT_LIMITS, chatForSync, type Chat, type ChatSummary } from "@otter/contracts/chats";
 
 const relay = {
   chats: new Map<string, Chat & { deletedAt: number | null }>(),

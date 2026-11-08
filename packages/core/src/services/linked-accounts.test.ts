@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import type { ImapSettings } from "@otter-mail/contracts";
-import type { RelayAccount } from "@otter-mail/contracts/relay";
+import type { ImapSettings } from "@otter/contracts";
+import type { RelayAccount } from "@otter/contracts/relay";
 
 vi.mock("electron", () => ({ app: {}, safeStorage: {}, shell: {}, BrowserWindow: {} }));
 

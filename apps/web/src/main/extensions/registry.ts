@@ -1,16 +1,16 @@
-import calendarInvites from "@otter-mail/extension-calendar-invites/ui";
-import claude from "@otter-mail/extension-claude/ui";
-import codex from "@otter-mail/extension-codex/ui";
-import hermes from "@otter-mail/extension-hermes/ui";
-import openclaw from "@otter-mail/extension-openclaw/ui";
-import openrouter from "@otter-mail/extension-openrouter/ui";
-import otterDrive from "@otter-mail/extension-otter-drive/ui";
-import signInCodes from "@otter-mail/extension-sign-in-codes/ui";
-import todoist from "@otter-mail/extension-todoist/ui";
-import translation from "@otter-mail/extension-translation/ui";
+import calendarInvites from "@otter/extension-calendar-invites/ui";
+import claude from "@otter/extension-claude/ui";
+import codex from "@otter/extension-codex/ui";
+import hermes from "@otter/extension-hermes/ui";
+import openclaw from "@otter/extension-openclaw/ui";
+import openrouter from "@otter/extension-openrouter/ui";
+import otterDrive from "@otter/extension-otter-drive/ui";
+import signInCodes from "@otter/extension-sign-in-codes/ui";
+import todoist from "@otter/extension-todoist/ui";
+import translation from "@otter/extension-translation/ui";
 import { useMemo, useSyncExternalStore } from "react";
 
-import { runsOn, type AppPlatform, type ExtensionCategory } from "@otter-mail/contracts/extensions";
+import { runsOn, type AppPlatform, type ExtensionCategory } from "@otter/contracts/extensions";
 
 import type { SettingsPane } from "../mail/api";
 import { setSyncedPreference } from "../synced-preferences";

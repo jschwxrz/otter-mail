@@ -1,4 +1,4 @@
-import type { RelayEvent } from "@otter-mail/contracts/relay";
+import type { RelayEvent } from "@otter/contracts/relay";
 
 import { logger } from "../logger.js";
 import { platform } from "../platform.js";

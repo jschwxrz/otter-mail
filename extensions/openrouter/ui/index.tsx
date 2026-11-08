@@ -1,4 +1,4 @@
-import { AgentIcon, type UiExtension } from "@otter-mail/web/extension-kit";
+import { AgentIcon, type UiExtension } from "@otter/web/extension-kit";
 
 import { manifest } from "../manifest";
 import { OpenRouterSettings } from "./settings";

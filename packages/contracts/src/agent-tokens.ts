@@ -1,5 +1,5 @@
 /**
- * Agent tokens: how an agent Otter Mail doesn't run, on the Mac
+ * Agent tokens: how an agent Otter doesn't run, on the Mac
  * (ConnectedAgent), reaches its tools over the Mac app's MCP server, with
  * `Authorization: Bearer <token>`: every tool, as much as its access allows.
  * A token is made in Settings and shown once; only its SHA-256 hash is kept.

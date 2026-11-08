@@ -1,8 +1,8 @@
 /// <reference lib="webworker" />
 
-import { parseDemoMailboxes } from "@otter-mail/contracts/demo";
-import { addDemoMailboxes, callHandler, startCore, type Platform } from "@otter-mail/core";
-import { serializeError, type ReportTags } from "@otter-mail/shared/error-reports";
+import { parseDemoMailboxes } from "@otter/contracts/demo";
+import { addDemoMailboxes, callHandler, startCore, type Platform } from "@otter/core";
+import { serializeError, type ReportTags } from "@otter/shared/error-reports";
 
 import { webExtensions } from "./extensions";
 import { webPlatform, type Page } from "./platform";

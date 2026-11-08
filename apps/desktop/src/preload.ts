@@ -8,7 +8,7 @@ import {
   type NativeThemeInfo,
   type ThemeSource,
   type UpdateState,
-} from "@otter-mail/contracts";
+} from "@otter/contracts";
 
 import { featuresFor } from "./os/features.js";
 

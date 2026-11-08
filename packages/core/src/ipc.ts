@@ -1,4 +1,4 @@
-import type { ReportTags } from "@otter-mail/shared/error-reports";
+import type { ReportTags } from "@otter/shared/error-reports";
 
 import { SignInCancelledError, SignInTimedOutError } from "./google.js";
 import { logger } from "./logger.js";

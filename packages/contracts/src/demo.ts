@@ -1,7 +1,7 @@
 /**
  * The demo mailboxes `pnpm dev:demo` and `pnpm dev:demo:desktop` open with
  * (docs/development.md): real mailboxes for development, never the user's own.
- * One variable, OTTER_MAIL_DEMO_MAILBOXES, holds them as a JSON list in the
+ * One variable, OTTER_DEMO_MAILBOXES, holds them as a JSON list in the
  * main checkout's ignored `.env.local`; the dev runner adds the local IMAP
  * server's (`pnpm dev:mail`) and hands the list to the app, which adds the
  * ones it doesn't have yet. Development runs only: never in a build.
@@ -9,7 +9,7 @@
 
 import { z } from "zod";
 
-export const DEMO_MAILBOXES_ENV = "OTTER_MAIL_DEMO_MAILBOXES";
+export const DEMO_MAILBOXES_ENV = "OTTER_DEMO_MAILBOXES";
 
 const server = z.object({
   host: z.string().min(1),

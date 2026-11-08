@@ -4,7 +4,7 @@ import type {
   MenuItemConstructorOptions,
 } from "electron";
 
-import type { Translator } from "@otter-mail/core";
+import type { Translator } from "@otter/core";
 
 export type MailApp = { id: string; name: string; path: string };
 export type MailApps = { apps: MailApp[]; defaultId: string | null };

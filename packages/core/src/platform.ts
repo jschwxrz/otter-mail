@@ -1,6 +1,6 @@
 import type { MailAccount } from "./types.js";
-import type { DemoGmailMailbox, DemoOutlookMailbox } from "@otter-mail/contracts/demo";
-import type { SupportError } from "@otter-mail/shared/support";
+import type { DemoGmailMailbox, DemoOutlookMailbox } from "@otter/contracts/demo";
+import type { SupportError } from "@otter/shared/support";
 
 export type SqlValue = string | number | bigint | null | Uint8Array;
 

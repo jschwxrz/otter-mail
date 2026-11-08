@@ -25,7 +25,7 @@ report id when error reports are on ([error-reports.md](error-reports.md)). They
 content, mailbox addresses, credentials, and raw log messages. You can omit the
 diagnostics or edit the final report. The Mac classifies a bounded tail of its
 existing log locally; the web app retains classified backend errors in memory.
-Diagnostics are a separate **Otter Mail diagnostics.json** file, rather than JSON
+Diagnostics are a separate **Otter diagnostics.json** file, rather than JSON
 in the issue description. Choose **View → Download diagnostics**, or **Download**
 beside the diagnostics file in the review screen, and attach it to GitHub's issue
 form. The Mac hands that file to the agent automatically. Diagnostics are only
@@ -41,8 +41,8 @@ The app generates a private support folder with the reviewed report, playbook,
 optional screenshot, and an executable `.command` file. macOS opens that file
 in your terminal. By default it uses macOS's application for `.command` files.
 Choose **Terminal** in the action dropdown to use Ghostty or another installed terminal;
-Otter Mail remembers that choice on this Mac without changing system file associations.
-No Otter Mail CLI or npm package is
+Otter remembers that choice on this Mac without changing system file associations.
+No Otter CLI or npm package is
 installed or required.
 
 The session uses interactive permissions, independently of the in-app chat's
@@ -58,7 +58,7 @@ if you edited the report while it worked, choose **Use agent draft** or **Keep m
 edits**. Only **Continue on GitHub** opens the issue form: connected terminal
 sessions are instructed to return drafts without posting issues or comments.
 
-Its session can continue after Otter Mail closes. Reopening **Send feedback**
+Its session can continue after Otter closes. Reopening **Send feedback**
 resumes the last investigation and loads its draft. **More report options → Show report files** reveals the
 report, diagnostics, and any screenshot in Finder for attachment on GitHub.
 **New report** in that menu starts another report without deleting the investigation files.
@@ -79,8 +79,8 @@ The playbook is [.github/triage/PLAYBOOK.md](../.github/triage/PLAYBOOK.md).
 ## If the app cannot open
 
 Start Claude, Codex, or your usual coding agent yourself and give it the
-[support playbook](https://github.com/otterware-app/otter-mail/blob/main/.github/triage/PLAYBOOK.md)
+[support playbook](https://github.com/otterware-app/otter/blob/main/.github/triage/PLAYBOOK.md)
 and a description of the problem. Tell it your installed version (Finder's Get
-Info for Otter Mail). Automatic diagnostics need a running app; the agent should
+Info for Otter). Automatic diagnostics need a running app; the agent should
 ask before inspecting any additional local files. You can also use the
-[GitHub bug report form](https://github.com/otterware-app/otter-mail/issues/new?template=bug_report.md).
+[GitHub bug report form](https://github.com/otterware-app/otter/issues/new?template=bug_report.md).

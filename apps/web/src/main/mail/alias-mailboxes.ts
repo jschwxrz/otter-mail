@@ -1,4 +1,4 @@
-import { aliasMailboxName, validAliasMailboxes, type AliasMailbox } from "@otter-mail/contracts";
+import { aliasMailboxName, validAliasMailboxes, type AliasMailbox } from "@otter/contracts";
 import { getAccountColor } from "./account-style";
 import { capabilitiesOf } from "./capabilities";
 import type { MailAccount } from "./types";

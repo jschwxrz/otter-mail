@@ -1,5 +1,5 @@
 /**
- * The tools Otter Mail gives the agents it runs: the user's mailboxes and
+ * The tools Otter gives the agents it runs: the user's mailboxes and
  * calendars, whatever provider each one uses, so an agent needs no mail CLI
  * of its own, the app's color themes and the user's views. The shell serves them (the Mac app:
  * an MCP server that Claude and Codex are pointed at, and other agents on the Mac given a token, apps/desktop
@@ -19,7 +19,7 @@ export type { AgentTool, ToolCaller, ToolFiles } from "./tool.js";
 
 const TOOLS: AgentTool[] = [...mailTools, ...calendarTools, ...themeTools, ...viewTools];
 
-export const OTTER_TOOLS_SERVER = "otter-mail";
+export const OTTER_TOOLS_SERVER = "otter";
 
 export function toolTitle(name: string): string | undefined {
   return TOOLS.find((t) => t.name === name)?.title;

@@ -7,7 +7,7 @@
  * builds are encrypted the first time they're read.
  */
 
-import type { Platform } from "@otter-mail/core";
+import type { Platform } from "@otter/core";
 
 const FILE = "secrets.json";
 const SEALED = "aes-gcm:";

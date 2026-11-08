@@ -6,9 +6,9 @@ only when the user explicitly creates an email task (title, entered notes and co
 
 ## Owned modules
 
-Todoist is a built-in extension: the `extensions/todoist` package (`@otter-mail/extension-todoist`).
+Todoist is a built-in extension: the `extensions/todoist` package (`@otter/extension-todoist`).
 
-- `package.json`: its manifest (`otterMail`) and dependencies.
+- `package.json`: its manifest (`otter`) and dependencies.
 - `core/`: `index.ts` activates it (its IPC registration, `handlers.ts`); `todoist.ts`,
   `todoist-auth.ts` and their tests: API, safe mutation retries, PKCE, and token refresh. Mail
   access is limited to validating the chosen email and building its link. There are no scheduled
@@ -62,5 +62,5 @@ Query-cache keys and events are prefixed `todoist`; they are in-memory only. API
 copied into the mail database or synchronized through the relay.
 
 Disconnect/removal does not delete users' tasks or revoke the authorization in Todoist itself.
-Users can revoke Otter Mail from Todoist's integration settings. Existing task links continue to
+Users can revoke Otter from Todoist's integration settings. Existing task links continue to
 open conversations through the normal mail route after the feature is removed.

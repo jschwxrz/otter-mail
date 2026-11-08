@@ -5,7 +5,7 @@
  * or the operation works: never stored, so nothing about stored mailboxes changes.
  */
 
-import type { AccessNeed, ConnectionSummary } from "@otter-mail/contracts";
+import type { AccessNeed, ConnectionSummary } from "@otter/contracts";
 
 import { broadcast } from "../ipc.js";
 import { logger } from "../logger.js";
@@ -22,7 +22,7 @@ const COPY: Record<Operation, Omit<AccessNeed, "operation">> = {
     allow: "Allow calendar access",
   },
   saveSignature: {
-    consequence: "Your signature is saved in Otter Mail, not in Gmail",
+    consequence: "Your signature is saved in Otter, not in Gmail",
     allow: "Allow saving to Gmail",
   },
 };

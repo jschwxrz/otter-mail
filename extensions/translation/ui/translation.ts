@@ -1,5 +1,5 @@
-import { features } from "@otter-mail/web/extension-kit";
-import type { MessageDetail } from "@otter-mail/web/extension-kit";
+import { features } from "@otter/web/extension-kit";
+import type { MessageDetail } from "@otter/web/extension-kit";
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { translationApi, type TranslationStatus } from "./api";

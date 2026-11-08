@@ -1,18 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import type { ChatEvent } from "@otter-mail/core/extension-kit";
+import type { ChatEvent } from "@otter/core/extension-kit";
 
 const fixture = vi.hoisted(() => ({
   claude: [] as unknown[],
   codex: [] as { method: string; params: Record<string, unknown> }[],
 }));
-vi.mock("@otter-mail/core/extension-kit", async () => ({
+vi.mock("@otter/core/extension-kit", async () => ({
   ...(await import("../../../packages/core/src/services/agent/steps.js")),
   ...(await import("../../../packages/core/src/services/agent/text-stream.js")),
   dataUrl: vi.fn(),
 }));
-vi.mock("@otter-mail/desktop/extension-kit", () => ({
+vi.mock("@otter/desktop/extension-kit", () => ({
   AGENT_INSTRUCTIONS: "",
-  MCP_SERVER_NAME: "otter-mail",
+  MCP_SERVER_NAME: "otter",
   agentWorkspace: async () => "/workspace",
   attachmentsDir: async () => "/attachments",
   attachmentPath: (a: { path: string }) => a.path,

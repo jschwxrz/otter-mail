@@ -1,4 +1,4 @@
-import { MICROSOFT_CONSUMER_TENANT } from "@otter-mail/contracts";
+import { MICROSOFT_CONSUMER_TENANT } from "@otter/contracts";
 import { errors, jwtVerify, type JWTPayload, type JWTVerifyGetKey } from "jose";
 
 import { InvalidTokenError } from "./google-jwt.ts";

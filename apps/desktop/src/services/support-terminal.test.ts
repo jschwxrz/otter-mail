@@ -42,7 +42,7 @@ afterEach(async () => {
 
 describe("support terminal preference (macOS)", () => {
   it("follows macOS's file association until a terminal is chosen", async () => {
-    const launcher = path.join(home, "Investigate Otter Mail.command");
+    const launcher = path.join(home, "Investigate Otter.command");
     await openSupportTerminal(home, launcher);
     expect(fixture.calls).toHaveBeenCalledExactlyOnceWith("/usr/bin/open", [launcher]);
     expect((await getSupportTerminals(home)).selectedId).toBeNull();

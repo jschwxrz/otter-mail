@@ -19,7 +19,7 @@ import {
   toast,
   type WorkspaceMainProps,
   type WorkspaceProps,
-} from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArchiveIcon,

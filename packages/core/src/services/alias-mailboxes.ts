@@ -1,4 +1,4 @@
-import { validAliasMailboxes, type AliasMailbox } from "@otter-mail/contracts";
+import { validAliasMailboxes, type AliasMailbox } from "@otter/contracts";
 
 import { broadcast } from "../ipc.js";
 import { getAccount, isAccountId, listAccounts } from "./account-store.js";

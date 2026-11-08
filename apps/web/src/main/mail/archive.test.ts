@@ -1,4 +1,4 @@
-import { GMAIL_CAPABILITIES, IMAP_CAPABILITIES, OUTLOOK_CAPABILITIES } from "@otter-mail/contracts";
+import { GMAIL_CAPABILITIES, IMAP_CAPABILITIES, OUTLOOK_CAPABILITIES } from "@otter/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { summarizeLabelChange } from "./action-summary";

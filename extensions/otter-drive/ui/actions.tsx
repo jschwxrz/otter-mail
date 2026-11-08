@@ -15,7 +15,7 @@ import {
   SelectValue,
   openLink,
   toast,
-} from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,

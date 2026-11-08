@@ -1,4 +1,4 @@
-import type { AgentSettings, RuntimeMode } from "@otter-mail/core/extension-kit";
+import type { AgentSettings, RuntimeMode } from "@otter/core/extension-kit";
 
 export type CodexSettings = AgentSettings & {
   binaryPath: string;

@@ -5,8 +5,8 @@ import {
   SettingsRow,
   SettingsSection,
   TextInput,
-} from "@otter-mail/web/extension-kit";
-import type { ProviderSnapshot } from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
+import type { ProviderSnapshot } from "@otter/web/extension-kit";
 import { useState } from "react";
 import { openRouterApi } from "./api";
 
@@ -43,11 +43,11 @@ export function OpenRouterConnection({ provider }: { provider: ProviderSnapshot 
     <SettingsSection title="OpenRouter connection">
       <SettingsRow
         title="Mail and chat history"
-        description="When you use this agent, your prompts and mail or calendar data returned by its tools are sent to Otter Mail's server, OpenRouter and the selected model provider. Otter Mail keeps chat history until you delete the chat or your Otter account."
+        description="When you use this agent, your prompts and mail or calendar data returned by its tools are sent to Otter's server, OpenRouter and the selected model provider. Otter keeps chat history until you delete the chat or your Otter account."
       />
       <SettingsRow
         title="API key"
-        description="Saved on Otter Mail's server for your account. The agent and its chats are shared across your computers, browsers, and iPhone."
+        description="Saved on Otter's server for your account. The agent and its chats are shared across your computers, browsers, and iPhone."
         control={
           <TextInput
             type="password"

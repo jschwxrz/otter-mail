@@ -2,8 +2,8 @@ import * as net from "node:net";
 import * as tls from "node:tls";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { WebSocketServer } from "ws";
-import type { ByteStream } from "@otter-mail/core";
-import { TUNNEL_CLOSE } from "@otter-mail/contracts/relay";
+import type { ByteStream } from "@otter/core";
+import { TUNNEL_CLOSE } from "@otter/contracts/relay";
 
 import { connectMailSocket } from "./mail-socket";
 

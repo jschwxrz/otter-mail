@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Worktrees use a stable port offset so dev runs can coexist; PORT and OTTER_MAIL_PORT_OFFSET override it.
+// Worktrees use a stable port offset so dev runs can coexist; PORT and OTTER_PORT_OFFSET override it.
 
 import * as NodeChildProcess from "node:child_process";
 import * as NodeCrypto from "node:crypto";
@@ -10,7 +10,11 @@ import * as NodePath from "node:path";
 import * as NodeReadline from "node:readline";
 import { parseArgs, parseEnv } from "node:util";
 
-import { resolveDevHome, resolveLinkedWorktree } from "../apps/desktop/scripts/dev-home.mjs";
+import {
+  otterHome,
+  resolveDevHome,
+  resolveLinkedWorktree,
+} from "../apps/desktop/scripts/dev-home.mjs";
 import {
   DEMO_MAILBOXES_ENV,
   parseDemoMailboxes,
@@ -54,21 +58,21 @@ Ctrl-C stops everything.
 
 Options:
   --home <dir>    Data home of the Mac app. Default: a linked worktree's own
-                  .otter-mail, otherwise ~/.otter-mail/dev (never the installed
-                  app's ~/.otter-mail/userdata); for the demo, its demo/ inside.
+                  .otter, otherwise ~/.otter/dev (never the installed
+                  app's ~/.otter/userdata); for the demo, its demo/ inside.
   --login         Demo runs: sign the demo Gmail mailboxes in to Google (Outlook ones to Microsoft) first
                   (once per machine), saving the sign-ins in .env.local.
   --dry-run       Print the resolved ports and commands, then exit.
   -h, --help      Show this help.
 
 Environment:
-  OTTER_MAIL_HOME         Data home, same as --home.
-  OTTER_MAIL_REMOTE_DEBUGGING_PORT
+  OTTER_HOME         Data home, same as --home.
+  OTTER_REMOTE_DEBUGGING_PORT
                           Chrome DevTools port of the dev app (default: dev server
                           port + 1000; 0 turns it off). Playwright and agents attach
                           here with connectOverCDP.
   PORT                    Exact dev server port.
-  OTTER_MAIL_PORT_OFFSET  Offset added to ${BASE_WEB_PORT} and the relay's ${BASE_RELAY_PORT}
+  OTTER_PORT_OFFSET  Offset added to ${BASE_WEB_PORT} and the relay's ${BASE_RELAY_PORT}
                           (default: hashed from the worktree path in linked
                           worktrees, 0 otherwise). Google sign-in through the
                           local relay only works on ${BASE_RELAY_PORT}.
@@ -83,13 +87,13 @@ export function resolvePortOffset(
   env: NodeJS.ProcessEnv,
   root: string,
 ): { offset: number; source: string } {
-  const raw = env.OTTER_MAIL_PORT_OFFSET?.trim();
+  const raw = env.OTTER_PORT_OFFSET?.trim();
   if (raw) {
     const offset = Number(raw);
     if (!Number.isInteger(offset) || offset < 0 || BASE_WEB_PORT + offset > 65535) {
-      throw new Error(`OTTER_MAIL_PORT_OFFSET must be a non-negative integer; received "${raw}".`);
+      throw new Error(`OTTER_PORT_OFFSET must be a non-negative integer; received "${raw}".`);
     }
-    return { offset, source: `OTTER_MAIL_PORT_OFFSET=${offset}` };
+    return { offset, source: `OTTER_PORT_OFFSET=${offset}` };
   }
   if (resolveLinkedWorktree(root)) return { offset: hashOffset(root), source: `worktree ${root}` };
   return { offset: 0, source: "default port" };
@@ -155,11 +159,9 @@ function envLocalPath(): string {
 
 function googleClient(app: "desktop" | "web", env: Record<string, string | undefined>) {
   if (app === "desktop") {
-    const id = process.env.OTTER_MAIL_GOOGLE_CLIENT_ID ?? env.OTTER_MAIL_GOOGLE_CLIENT_ID;
-    const secret =
-      process.env.OTTER_MAIL_GOOGLE_CLIENT_SECRET ?? env.OTTER_MAIL_GOOGLE_CLIENT_SECRET;
-    if (!id || !secret)
-      throw new Error(".env.local needs OTTER_MAIL_GOOGLE_CLIENT_ID and _SECRET.");
+    const id = process.env.OTTER_GOOGLE_CLIENT_ID ?? env.OTTER_GOOGLE_CLIENT_ID;
+    const secret = process.env.OTTER_GOOGLE_CLIENT_SECRET ?? env.OTTER_GOOGLE_CLIENT_SECRET;
+    if (!id || !secret) throw new Error(".env.local needs OTTER_GOOGLE_CLIENT_ID and _SECRET.");
     return { id, secret };
   }
   const relayDir = NodePath.join(repoRoot, "infra/relay");
@@ -176,8 +178,8 @@ function googleClient(app: "desktop" | "web", env: Record<string, string | undef
 
 function microsoftClient(app: "desktop" | "web", env: Record<string, string | undefined>) {
   if (app === "desktop") {
-    const id = process.env.OTTER_MAIL_MICROSOFT_CLIENT_ID ?? env.OTTER_MAIL_MICROSOFT_CLIENT_ID;
-    if (!id) throw new Error(".env.local needs OTTER_MAIL_MICROSOFT_CLIENT_ID.");
+    const id = process.env.OTTER_MICROSOFT_CLIENT_ID ?? env.OTTER_MICROSOFT_CLIENT_ID;
+    if (!id) throw new Error(".env.local needs OTTER_MICROSOFT_CLIENT_ID.");
     return { id };
   }
   const relayDir = NodePath.join(repoRoot, "infra/relay");
@@ -324,11 +326,8 @@ async function main(): Promise<void> {
   }
 
   const devHome = resolveDevHome({ cwd: repoRoot, explicitHome: values.home });
-  const dataHome =
-    demo && !values.home
-      ? NodePath.join(devHome ?? NodePath.join(NodeOS.homedir(), ".otter-mail"), "demo")
-      : devHome;
-  const configuredDebugPort = process.env.OTTER_MAIL_REMOTE_DEBUGGING_PORT?.trim();
+  const dataHome = demo && !values.home ? NodePath.join(devHome ?? otterHome(), "demo") : devHome;
+  const configuredDebugPort = process.env.OTTER_REMOTE_DEBUGGING_PORT?.trim();
   const debugPort = !desktop
     ? 0
     : configuredDebugPort !== undefined && configuredDebugPort !== ""
@@ -340,9 +339,7 @@ async function main(): Promise<void> {
   if (mode === "dev:fake") console.log("[dev] Made-up mailbox (?reset-demo starts it over)");
   if (relay) console.log(`[dev] Relay: ${relayUrl}`);
   if (desktop) {
-    console.log(
-      `[dev] Data: ${dataHome ? NodePath.join(dataHome, "userdata") : "~/.otter-mail/dev"}`,
-    );
+    console.log(`[dev] Data: ${dataHome ? NodePath.join(dataHome, "userdata") : "~/.otter/dev"}`);
   }
   if (debugPort > 0) console.log(`[dev] DevTools: http://127.0.0.1:${debugPort}`);
   if (values["dry-run"]) {
@@ -374,8 +371,8 @@ async function main(): Promise<void> {
 
   const env: NodeJS.ProcessEnv = {
     ...process.env,
-    OTTER_MAIL_HOME: dataHome,
-    OTTER_MAIL_REMOTE_DEBUGGING_PORT: String(debugPort),
+    OTTER_HOME: dataHome,
+    OTTER_REMOTE_DEBUGGING_PORT: String(debugPort),
     PORT: String(port),
     VITE_DEV_SERVER_URL: devServerUrl,
     ...(relay ? { VITE_RELAY_URL: relayUrl } : {}),

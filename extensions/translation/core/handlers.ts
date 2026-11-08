@@ -5,9 +5,9 @@
  * runs as a task.
  */
 
-import { broadcast, getSettings, updateSettings, runAsTask } from "@otter-mail/core/extension-kit";
-import type { ExtensionContext } from "@otter-mail/core/extension-kit";
-import type { AppSettings } from "@otter-mail/core/extension-kit";
+import { broadcast, getSettings, updateSettings, runAsTask } from "@otter/core/extension-kit";
+import type { ExtensionContext } from "@otter/core/extension-kit";
+import type { AppSettings } from "@otter/core/extension-kit";
 import { detectLanguage, translateSegments } from "./translation.js";
 
 type Params = Record<string, unknown> | undefined;

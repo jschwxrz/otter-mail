@@ -10,7 +10,7 @@ import {
   chatFile,
   chatFilePath,
   MAX_CHAT_FILE_BYTES,
-} from "@otter-mail/core";
+} from "@otter/core";
 
 import { appInfo } from "../../backend-protocol.js";
 

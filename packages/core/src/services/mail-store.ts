@@ -1,4 +1,4 @@
-import { ARCHIVE_LABEL_ID } from "@otter-mail/contracts";
+import { ARCHIVE_LABEL_ID } from "@otter/contracts";
 
 import { platform, type SqlDatabase } from "../platform.js";
 import { ALL_MAIL_LABEL_ID } from "../types.js";

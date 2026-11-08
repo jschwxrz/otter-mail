@@ -41,7 +41,7 @@ from GitHub Releases. Everything in the Mac column works the same, except:
 
 ## Mailboxes & accounts
 
-Settings › Connections lists every account you've connected and what each gives Otter Mail:
+Settings › Connections lists every account you've connected and what each gives Otter:
 Google and Microsoft (Mail · Calendar), IMAP (Mail), then other services (Todoist: Tasks). Add
 account offers each kind.
 
@@ -121,7 +121,7 @@ its folder. Deleting an Outlook folder moves it and its mail to Deleted Items.
 
 ## Extensions
 
-Sign-in codes, Calendar invites, Translation, Todoist, Otter Drive and the agents (the Otter Mail agent, Hermes,
+Sign-in codes, Calendar invites, Translation, Todoist, Otter Drive and the agents (the Otter agent, Hermes,
 OpenClaw, Claude, Codex) are built-in extensions (`extensions/`). Settings lists them by kind,
 under "Extensions": Agents (with chat's own settings above them), Integrations (hidden while it has
 none) and Features, each row with its switch; a service you sign in to (Todoist, Otter Drive) is a connection,
@@ -151,7 +151,7 @@ support search, today, overdue, 7 days, priorities and labels with `&` / `|`.
 | Labels, project sections, shared-project assignees                | ✓            | ✓   | —      |
 | Edit tasks, move projects/sections, reschedule or clear due dates | ✓            | ✓   | —      |
 | Add/remove timed reminders from the task editor                   | ✓            | ✓   | —      |
-| Clickable link back to the email in Otter Mail                    | ✓ (web link) | ✓   | —      |
+| Clickable link back to the email in Otter                         | ✓ (web link) | ✓   | —      |
 | Browse active tasks by project, load more, refresh                | ✓            | ✓   | —      |
 | Today & overdue, Upcoming (7 days), search and Todoist filters    | ✓            | ✓   | —      |
 | Complete tasks (recurring tasks advance to their next occurrence) | ✓            | ✓   | —      |
@@ -282,12 +282,12 @@ Snooze is available in the reader toolbar and a conversation's right-click menu.
 pending actions: cancel a send to restore its
 contents to Drafts, or return a snoozed conversation to Inbox early. A failed or interrupted
 send stays there for review; check Sent before sending again, since delivery may be uncertain.
-So does a send from the composer whose answer never came and that Otter Mail couldn't find in
+So does a send from the composer whose answer never came and that Otter couldn't find in
 Sent ("May have been sent — check Sent before sending again."); its draft stays, and cancelling
 restores nothing twice. On Mac and web, Send sends the composer's saved draft itself (Gmail's
 drafts.send, Outlook's draft, IMAP then deleting its versions), so no draft is left beside the
 sent mail; an Outlook scheduled send is that draft, held by Outlook.
-These are Otter Mail actions, separate from Gmail's own scheduled and snoozed folders.
+These are Otter actions, separate from Gmail's own scheduled and snoozed folders.
 
 ## Search
 
@@ -426,7 +426,7 @@ optional fix PRs. See [support.md](support.md); error reports, [error-reports.md
 | Chat, models, steer / stop, tool approval, history        | ✓                                                                       | ✓                                             | ✓                                                   |
 | Select and copy chat text                                 | ✓                                                                       | ✓                                             | —                                                   |
 | Cite part of a reply, with a comment, in the next message | ✓                                                                       | ✓                                             | —                                                   |
-| Changes after each agent turn, linking to results         | ✓ (Otter Mail tools)                                                    | ✓ (OpenRouter)                                | —                                                   |
+| Changes after each agent turn, linking to results         | ✓ (Otter tools)                                                         | ✓ (OpenRouter)                                | —                                                   |
 | Turn an agent off                                         | ✓                                                                       | ✓ (each)                                      | ✓ (each; their buttons go)                          |
 | Chat about a conversation (pointers, not mail)            | ✓ (also selections, quotes)                                             | ✓                                             | ✓ (a thread)                                        |
 | Attach images and files to a chat                         | ✓                                                                       | ✓                                             | —                                                   |
@@ -444,7 +444,7 @@ optional fix PRs. See [support.md](support.md); error reports, [error-reports.md
 | View tools: make, change and delete views                 | ✓                                                                       | ✓ (OpenRouter)                                | —                                                   |
 | Tools for other agents on the Mac (MCP, token)            | ✓ (Claude Code, Cursor, …)                                              | —                                             | —                                                   |
 
-OpenRouter runs on Otter Mail's server with the AI SDK on Mac, web and iPhone. Connect an
+OpenRouter runs on Otter's server with the AI SDK on Mac, web and iPhone. Connect an
 OpenRouter API key in Settings › Agents while signed in to your Otter account; the key is
 sealed on the server, never synced into preferences or sent back to the apps. Available models
 come from OpenRouter's account-specific catalog and must support tools. Usage draws from
@@ -461,7 +461,7 @@ follow-ups queue on Mac/web; steering is available with Hermes. The iPhone waits
 OpenRouter turn to finish before another question. `pnpm dev:fake` runs the same agent runtime
 on the local Vite server, with a private browser session and server-side key storage.
 
-Claude and Codex get Otter Mail's own tools (an MCP server in the Mac app's backend), so they
+Claude and Codex get Otter's own tools (an MCP server in the Mac app's backend), so they
 need no mail CLI: search, read and sort mail, download attachments, save drafts and send, in
 any mailbox (Gmail, IMAP or Outlook), and list, add, change and answer events in Google Calendar or Outlook's calendar. A tool
 that changes a mailbox asks first unless the chat has full access; drafts don't ask. They can
@@ -474,7 +474,7 @@ key: a setup code from `openclaw qr` (or the gateway token) introduces it once, 
 approves it on the gateway (`openclaw devices approve`), and Settings › Agents walks through
 those steps. It asks for what OpenClaw's own apps hold, `operator.admin` included,
 so the gateway counts what you send as the owner's: the agent uses your paired devices (its
-`nodes` tool: a Mac's shell, screen and computer use) for what you ask in Otter Mail. Each device pairs on its own; the Hermes connection instead follows the Otter
+`nodes` tool: a Mac's shell, screen and computer use) for what you ask in Otter. Each device pairs on its own; the Hermes connection instead follows the Otter
 account. The web app also
 needs its site in the gateway's `gateway.controlUi.allowedOrigins`. Each chat is a gateway
 session, so the gateway's other conversations can be resumed; the gateway's agents are the models
@@ -553,11 +553,11 @@ other sites, so the web app opens links in a new browser tab as before.
 | Native messaging (an extension talking to its Mac app, e.g. 1Password's)   | ✓   | —   | —      |
 
 Extensions install through electron-chrome-web-store (MIT) and run on Electron's extension
-support, plus Otter Mail's own layer for what Chrome has and Electron doesn't
+support, plus Otter's own layer for what Chrome has and Electron doesn't
 (`apps/desktop/src/services/extensions.ts` and its preload): `chrome.action`, the rest of
 `chrome.tabs`, `chrome.windows`, `contextMenus`, `notifications`, `webNavigation`, `commands`,
 `permissions`, native messaging, and simple `downloads` and `privacy`. To connect 1Password to
-its desktop app on Mac, add Otter Mail in 1Password's Settings › Browser › Add Browser. It then
+its desktop app on Mac, add Otter in 1Password's Settings › Browser › Add Browser. It then
 shares the desktop app's unlock, including Touch ID. Camera, microphone, location and
 notifications are refused to pages.
 

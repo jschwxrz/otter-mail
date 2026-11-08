@@ -12,7 +12,7 @@ import {
   useSetProvidersState,
   type AgentSettingsProps,
   type ProviderSnapshot,
-} from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
 import { useEffect, useState } from "react";
 
 import { openClawApi } from "./api";
@@ -132,7 +132,7 @@ export function OpenClawSettings({ provider, update }: AgentSettingsProps) {
           </SettingsRow>
           {SITE_ORIGIN ? (
             <SettingsRow
-              title="2. Allow Otter Mail on the web"
+              title="2. Allow Otter on the web"
               description="Browsers may only connect from sites the gateway allows. This keeps the gateway's own Control UI allowed; add any other sites you allowed before."
             >
               <Command
@@ -230,7 +230,7 @@ export function OpenClawSettings({ provider, update }: AgentSettingsProps) {
         {openclawPairingRequest ? (
           <SettingsRow
             title={`Approve this ${device}`}
-            description={`The gateway is waiting for you to approve this ${device}. Run this on its computer; Otter Mail connects as soon as you do.`}
+            description={`The gateway is waiting for you to approve this ${device}. Run this on its computer; Otter connects as soon as you do.`}
           >
             <Command value={`openclaw devices approve ${openclawPairingRequest}`} />
           </SettingsRow>
@@ -240,7 +240,7 @@ export function OpenClawSettings({ provider, update }: AgentSettingsProps) {
             title="Full access"
             description={
               openclawFullAccess.request
-                ? "The gateway is waiting for you to approve it. Run this on its computer; Otter Mail reconnects with full access once you do."
+                ? "The gateway is waiting for you to approve it. Run this on its computer; Otter reconnects with full access once you do."
                 : `This ${device} was paired with less than OpenClaw's own apps have, so the agent won't use your devices (its nodes tool) for what you ask here, and its questions may not reach you. Allowing it asks the gateway for full access, and you approve it there.`
             }
             control={

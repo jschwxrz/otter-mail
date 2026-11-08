@@ -1,7 +1,7 @@
 // `pnpm dev:demo:desktop --login` (and `pnpm dev:demo --login`): signs the demo
 // Gmail mailboxes in to Google, and the demo Outlook mailboxes in to
 // Microsoft, once, as the app would, and saves each sign-in in .env.local's
-// OTTER_MAIL_DEMO_MAILBOXES for the demo runs to use
+// OTTER_DEMO_MAILBOXES for the demo runs to use
 // (packages/contracts/src/demo.ts). The browser half is the installed-app
 // flow with PKCE and a loopback redirect, like apps/desktop/src/services/gmail-oauth.ts
 // and microsoft-oauth.ts.

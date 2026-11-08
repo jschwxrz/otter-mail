@@ -10,8 +10,8 @@ import {
   Btn,
   IconBtn,
   toast,
-} from "@otter-mail/web/extension-kit";
-import type { TodoistPage, TodoistTask } from "@otter-mail/contracts/todoist";
+} from "@otter/web/extension-kit";
+import type { TodoistPage, TodoistTask } from "@otter/contracts/todoist";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {

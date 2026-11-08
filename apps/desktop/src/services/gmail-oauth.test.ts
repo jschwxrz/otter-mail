@@ -15,15 +15,15 @@ vi.mock("../backend-protocol.js", () => ({ appInfo: () => ({ stateDir: stateDir.
 vi.mock("./credentials-store.js", () => ({
   getCredentials: async () => ({ clientId: "client", clientSecret: "secret" }),
 }));
-vi.mock("@otter-mail/core", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@otter-mail/core")>()),
+vi.mock("@otter/core", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@otter/core")>()),
   accountStore: {
     getAccount: async () => undefined,
     addAccount: async (account: unknown) => void saved.push(account),
   },
 }));
 
-import { GMAIL_ACCESS_MISSING_MESSAGE } from "@otter-mail/core";
+import { GMAIL_ACCESS_MISSING_MESSAGE } from "@otter/core";
 
 import { googleAuth } from "./gmail-oauth.js";
 

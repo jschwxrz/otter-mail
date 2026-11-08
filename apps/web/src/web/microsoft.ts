@@ -7,18 +7,14 @@
  * tokens, so each refresh answers a new sealed one to keep.
  */
 
-import type {
-  MeResponse,
-  OutlookSignInResult,
-  OutlookTokenResponse,
-} from "@otter-mail/contracts/relay";
+import type { MeResponse, OutlookSignInResult, OutlookTokenResponse } from "@otter/contracts/relay";
 import {
   broadcast,
   OUTLOOK_SIGNED_OUT_MESSAGE,
   SignInCancelledError,
   type MicrosoftAuth,
   type Platform,
-} from "@otter-mail/core";
+} from "@otter/core";
 
 import type { Page } from "./platform";
 import { SIGN_IN_CANCELLED } from "./protocol";

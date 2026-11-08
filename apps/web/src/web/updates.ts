@@ -1,5 +1,5 @@
-import type { DesktopBridge, UpdateChannel, UpdateState } from "@otter-mail/contracts";
-import { releaseChannel } from "@otter-mail/shared/release-channel";
+import type { DesktopBridge, UpdateChannel, UpdateState } from "@otter/contracts";
+import { releaseChannel } from "@otter/shared/release-channel";
 
 const CHECK_EVERY_MS = 30 * 60_000;
 

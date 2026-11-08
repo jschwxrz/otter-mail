@@ -1,7 +1,7 @@
 import type { AddressInfo } from "node:net";
 import * as tls from "node:tls";
 import { describe, expect, it } from "vite-plus/test";
-import type { ByteStream } from "@otter-mail/core";
+import type { ByteStream } from "@otter/core";
 
 import { connectMailSocket } from "./mail-socket.ts";
 

@@ -1,4 +1,4 @@
-import type { ExtensionManifest } from "@otter-mail/contracts/extensions";
+import type { ExtensionManifest } from "@otter/contracts/extensions";
 
 import { handle, registeredHandlers, unhandle, type Handler } from "./ipc.js";
 import { logger } from "./logger.js";

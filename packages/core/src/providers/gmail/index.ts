@@ -1,4 +1,4 @@
-import { GMAIL_CAPABILITIES, GMAIL_SETTINGS_PERMISSION } from "@otter-mail/contracts";
+import { GMAIL_CAPABILITIES, GMAIL_SETTINGS_PERMISSION } from "@otter/contracts";
 
 import { SIGNED_OUT_MESSAGE } from "../../google.js";
 import { platform } from "../../platform.js";

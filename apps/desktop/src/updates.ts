@@ -3,8 +3,8 @@ import electronUpdater from "electron-updater";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { UPDATE_STATE_CHANNEL, type UpdateState, type UpdateChannel } from "@otter-mail/contracts";
-import { releaseChannel, versionMatchesChannel } from "@otter-mail/shared/release-channel";
+import { UPDATE_STATE_CHANNEL, type UpdateState, type UpdateChannel } from "@otter/contracts";
+import { releaseChannel, versionMatchesChannel } from "@otter/shared/release-channel";
 
 import { broadcast } from "./ipc.js";
 import { logger } from "./logger.js";
@@ -15,7 +15,7 @@ const { autoUpdater } = electronUpdater;
 
 const STARTUP_DELAY_MS = 15_000;
 const POLL_INTERVAL_MS = 4 * 60 * 60_000;
-const RELEASES_URL = "https://github.com/otterware-app/otter-mail/releases";
+const RELEASES_URL = "https://github.com/otterware-app/otter/releases";
 
 let state: UpdateState = {
   status: "idle",
@@ -35,7 +35,7 @@ function setState(patch: Partial<UpdateState>): UpdateState {
 }
 
 function disabledReason(): string | null {
-  if (process.env.OTTER_MAIL_DISABLE_AUTO_UPDATE === "1") return "Updates are turned off.";
+  if (process.env.OTTER_DISABLE_AUTO_UPDATE === "1") return "Updates are turned off.";
   if (!app.isPackaged) return "Updates only run in packaged builds.";
   if (!fs.existsSync(path.join(process.resourcesPath, "app-update.yml"))) {
     return "This build has no update feed.";
@@ -49,10 +49,9 @@ function isSignatureError(err: Error): boolean {
 
 function describeError(err: Error): string {
   if (isSignatureError(err)) {
-    return "This copy of Otter Mail isn't signed, so macOS won't install updates into it. Download the new version instead.";
+    return "This copy of Otter isn't signed, so macOS won't install updates into it. Download the new version instead.";
   }
-  if (/net::ERR_/.test(err.message))
-    return "Couldn't reach GitHub. Otter Mail will try again later.";
+  if (/net::ERR_/.test(err.message)) return "Couldn't reach GitHub. Otter will try again later.";
   const firstLine = err.message.split("\n")[0] ?? "";
   return firstLine.length > 160 ? `${firstLine.slice(0, 160)}…` : firstLine;
 }

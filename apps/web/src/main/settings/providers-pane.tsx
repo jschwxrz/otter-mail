@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { AgentAccess, ConnectedAgent } from "@otter-mail/contracts/agent-tokens";
+import type { AgentAccess, ConnectedAgent } from "@otter/contracts/agent-tokens";
 import { Field } from "~/components/ui/field";
 import { Text } from "~/components/ui/text";
 import { Toggle, ToggleGroup } from "~/components/ui/toggle-group";
@@ -277,22 +277,22 @@ const AGENT_COMMANDS: { agent: string; text: (url: string, token: string) => str
   {
     agent: "Claude Code",
     text: (url, token) =>
-      `claude mcp add --scope user --transport http otter-mail ${url} --header "Authorization: Bearer ${token}"`,
+      `claude mcp remove --scope user otter-mail >/dev/null 2>&1; claude mcp add --scope user --transport http otter ${url} --header "Authorization: Bearer ${token}"`,
   },
   {
     agent: "Codex",
     text: (url, token) =>
-      `codex mcp remove otter-mail >/dev/null 2>&1; printf '\\n[mcp_servers.otter-mail]\\nurl = "${url}"\\nhttp_headers = { Authorization = "Bearer ${token}" }\\n' >> ~/.codex/config.toml`,
+      `codex mcp remove otter-mail >/dev/null 2>&1; codex mcp remove otter >/dev/null 2>&1; printf '\\n[mcp_servers.otter]\\nurl = "${url}"\\nhttp_headers = { Authorization = "Bearer ${token}" }\\n' >> ~/.codex/config.toml`,
   },
   {
     agent: "Cursor",
     text: (url, token) =>
-      `open 'cursor://anysphere.cursor-deeplink/mcp/install?name=otter-mail&config=${btoa(JSON.stringify({ url, headers: { Authorization: `Bearer ${token}` } }))}'`,
+      `open 'cursor://anysphere.cursor-deeplink/mcp/install?name=otter&config=${btoa(JSON.stringify({ url, headers: { Authorization: `Bearer ${token}` } }))}'`,
   },
 ];
 
 /**
- * Agents on this Mac that Otter Mail doesn't run (Claude Code, Cursor, …) get
+ * Agents on this Mac that Otter doesn't run (Claude Code, Cursor, …) get
  * its tools at the Mac app's MCP server with a token made here, each with as
  * much access as it's given. Nothing asks again: making the token was the
  * user's say.
@@ -310,7 +310,7 @@ function ConnectedAgentsSection() {
   return (
     <AgentTokensSection<ConnectedAgent>
       {...searchableSetting("connected-agents")}
-      description="Claude Code, Codex, Cursor or any agent that speaks MCP can use your mail, calendars and views while Otter Mail is open."
+      description="Claude Code, Codex, Cursor or any agent that speaks MCP can use your mail, calendars and views while Otter is open."
       queryKey="mcp:agents"
       list={mailApi.connectedAgents}
       create={(name) => mailApi.addConnectedAgent(name, access)}

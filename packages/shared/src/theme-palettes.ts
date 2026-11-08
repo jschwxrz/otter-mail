@@ -79,7 +79,7 @@ export type ThemeDefinition = Readonly<{
 }>;
 
 /**
- * The palette Otter Mail wears with no theme installed, captured from the app's
+ * The palette Otter wears with no theme installed, captured from the app's
  * stock tokens (styles.css) so a draft seeded from the default look paints the
  * pixels the user is already seeing. Alpha-bearing tokens are flattened over
  * their real backdrops (canvas, or the sidebar for its rows) because theme
@@ -987,7 +987,7 @@ export function getThemeColorsForAppearance(
 
 export const OTTER_THEME: ThemeDefinition = {
   id: "otter",
-  label: "Otter Mail",
+  label: "Otter",
   appearance: "light",
   colors: OTTER_LIGHT_THEME_COLORS,
   variants: { light: OTTER_LIGHT_THEME_COLORS, dark: OTTER_DARK_THEME_COLORS },

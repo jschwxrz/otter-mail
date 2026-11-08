@@ -1057,7 +1057,7 @@ export function reachOf(
     ...(manifest.content_scripts ?? []).flatMap((script) => script.matches ?? []),
   ];
   if (hosts.some((host) => host === "<all_urls>" || /^\*:\/\/\*\/|^https?:\/\/\*\//.test(host))) {
-    return "It can read and change what's on every site you visit in Otter Mail.";
+    return "It can read and change what's on every site you visit in Otter.";
   }
   const names = [...new Set(hosts.map((host) => host.replace(/^[^:]+:\/\/|\/.*$/g, "")))];
   return names.length > 0

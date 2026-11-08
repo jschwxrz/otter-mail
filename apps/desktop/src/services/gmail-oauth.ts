@@ -3,8 +3,8 @@ import * as fs from "node:fs/promises";
 import * as http from "node:http";
 import * as path from "node:path";
 
-import { GMAIL_MAIL_SCOPE, GMAIL_SCOPES } from "@otter-mail/contracts";
-import type { DemoGmailMailbox } from "@otter-mail/contracts/demo";
+import { GMAIL_MAIL_SCOPE, GMAIL_SCOPES } from "@otter/contracts";
+import type { DemoGmailMailbox } from "@otter/contracts/demo";
 import {
   accountStore,
   broadcast,
@@ -15,9 +15,9 @@ import {
   SignInTimedOutError,
   type MailAccount,
   type GoogleAuth,
-} from "@otter-mail/core";
+} from "@otter/core";
 
-import { signInPage } from "@otter-mail/shared/sign-in-page";
+import { signInPage } from "@otter/shared/sign-in-page";
 
 import { appInfo } from "../backend-protocol.js";
 import { requestMain } from "../main-link.js";
@@ -221,13 +221,13 @@ async function authorizeInBrowser(opts: {
         clearTimeout(timer);
       };
       if (url.searchParams.get("state") !== state) {
-        finish(400, "This sign-in link is stale", "Return to Otter Mail and try again.");
+        finish(400, "This sign-in link is stale", "Return to Otter and try again.");
         reject(new Error("Google sign-in returned an unexpected state."));
       } else if (error) {
         finish(400, "Sign-in cancelled", "You can close this tab.");
         reject(new Error(`Google sign-in failed: ${error}`));
       } else {
-        finish(200, "Signed in", "You can close this tab and return to Otter Mail.");
+        finish(200, "Signed in", "You can close this tab and return to Otter.");
         resolve(receivedCode!);
       }
     });

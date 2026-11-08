@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an improvement to Otter Mail
+about: Suggest an improvement to Otter
 labels: enhancement
 ---
 

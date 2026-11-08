@@ -1,4 +1,4 @@
-import { NavGlyph } from "@otter-mail/web/extension-kit";
+import { NavGlyph } from "@otter/web/extension-kit";
 
 // Otterware production kit: the Drive symbol (kit/apps/drive/svg/otter-drive-symbol.svg), and
 // Navigation 1.4's lighter contours for when Drive isn't the selected mode (kit/react/navigation.js).

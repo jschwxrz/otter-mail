@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Chat, ChatTab } from "@otter-mail/contracts/chats";
+import type { Chat, ChatTab } from "@otter/contracts/chats";
 
 export type ChatShelf = "pinned" | "active" | "snoozed" | "settled";
 

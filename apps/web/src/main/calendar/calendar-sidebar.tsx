@@ -402,7 +402,7 @@ function CalendarRow({
           </HintTooltip>
         </div>
       </ContextMenuTrigger>
-      {/* Notion Calendar's menu, for what Otter Mail does. */}
+      {/* Notion Calendar's menu, for what Otter does. */}
       <ContextMenuContent className="min-w-56">
         <ContextMenuSub label="Color" icon={dot(calendar.color)} detail={named?.name}>
           {CALENDAR_COLORS.map((c) => (

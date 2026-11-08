@@ -15,7 +15,7 @@ export function autostartEntry(executable: string): string {
   return [
     "[Desktop Entry]",
     "Type=Application",
-    "Name=Otter Mail",
+    "Name=Otter",
     `Exec=${quoteExec(executable)}`,
     "Icon=otter-mail",
     "X-GNOME-Autostart-enabled=true",

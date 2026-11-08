@@ -92,3 +92,12 @@ Native apps retain their local caches, credentials and sessions.
 - Run relay tests and the production smoke test after changing push or GitHub trust settings.
 - Check Cloudflare builds from the new GitHub organisation and both native release workflows.
 - Run `pnpm typecheck`, `pnpm lint`, `pnpm fmt`, and test the web and iPhone demo apps.
+
+## Renamed to Otter
+
+On 8 November 2026 the repository was renamed `otterware-app/otter` (same repository ID). GitHub
+redirects `otterware-app/otter-mail`, its releases and their downloads, which is how installed
+apps built before the rename keep updating: never create a repository at the old name. The
+Workload Identity bindings above now name `attribute.repository/otterware-app/otter`, and
+the relay's Workers Builds connection was updated to the new name (same connection, matched
+by repository ID).

@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/electron/utility";
 
-import { DEMO_MAILBOXES_ENV } from "@otter-mail/contracts/demo";
+import { DEMO_MAILBOXES_ENV } from "@otter/contracts/demo";
 import {
   addDemoMailboxes,
   callHandler,
@@ -8,8 +8,8 @@ import {
   registeredHandlers,
   shutdownProviders,
   startCore,
-} from "@otter-mail/core";
-import { errorReportOptions, reportLog, SENTRY_DSN } from "@otter-mail/shared/error-reports";
+} from "@otter/core";
+import { errorReportOptions, reportLog, SENTRY_DSN } from "@otter/shared/error-reports";
 
 import { appInfo, type ToBackend } from "./backend-protocol.js";
 import { desktopExtensions } from "./extensions.js";

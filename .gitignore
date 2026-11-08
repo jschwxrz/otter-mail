@@ -13,6 +13,7 @@ dist-electron/
 release/
 native/*/.build/
 .pnpm-store/
+.otter/
 .otter-mail/
 tmp/
 .claude/skills/synced

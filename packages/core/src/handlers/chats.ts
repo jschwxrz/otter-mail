@@ -1,4 +1,4 @@
-import type { Chat } from "@otter-mail/contracts/chats";
+import type { Chat } from "@otter/contracts/chats";
 
 import { handle } from "../ipc.js";
 import * as chats from "../services/chats.js";

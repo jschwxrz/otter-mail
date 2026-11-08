@@ -3,8 +3,8 @@ import {
   newAgentToken,
   type AgentAccess,
   type ConnectedAgent,
-} from "@otter-mail/contracts/agent-tokens";
-import { readJson, writeJson, type ToolCaller } from "@otter-mail/core";
+} from "@otter/contracts/agent-tokens";
+import { readJson, writeJson, type ToolCaller } from "@otter/core";
 
 import { deviceFiles } from "./local.js";
 

@@ -6,7 +6,7 @@ import {
   cn,
   openLink,
   isModClick,
-} from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarIcon, CheckIcon, ExternalLinkIcon, MapPinIcon } from "lucide-react";

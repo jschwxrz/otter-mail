@@ -1,6 +1,6 @@
 // Overlay pending local labels on server reads until writes settle; even successful writes can have older reads in flight.
 
-import { landLabelChange, type Landing } from "@otter-mail/contracts";
+import { landLabelChange, type Landing } from "@otter/contracts";
 
 import type { MessageSummary } from "../types.js";
 

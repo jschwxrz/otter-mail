@@ -1,4 +1,4 @@
-import type { AgentSettings } from "@otter-mail/core/extension-kit";
+import type { AgentSettings } from "@otter/core/extension-kit";
 
 export type OpenClawSettings = AgentSettings & {
   url: string;

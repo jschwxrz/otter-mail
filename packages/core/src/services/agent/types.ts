@@ -1,4 +1,4 @@
-import type { ChatDelivery } from "@otter-mail/contracts/chats";
+import type { ChatDelivery } from "@otter/contracts/chats";
 export type ProviderKind = string;
 
 export const DEFAULT_AGENT = "openrouter";
@@ -131,7 +131,7 @@ export type ChatEvent =
   /** `id` pairs a step with its result. */
   | { requestId: string; type: "tool"; id?: string; step: ToolStep }
   | { requestId: string; type: "toolResult"; id?: string; output: string }
-  | { requestId: string; type: "change"; change: import("@otter-mail/contracts").ChatChange }
+  | { requestId: string; type: "change"; change: import("@otter/contracts").ChatChange }
   | { requestId: string; type: "approval"; approval: ApprovalRequest }
   | { requestId: string; type: "approvalResolved"; approvalId: string }
   | { requestId: string; type: "question"; question: ChatQuestion }

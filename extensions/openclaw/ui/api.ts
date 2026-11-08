@@ -1,5 +1,5 @@
-import { ipc } from "@otter-mail/web/extension-kit";
-import type { ProvidersState } from "@otter-mail/web/extension-kit";
+import { ipc } from "@otter/web/extension-kit";
+import type { ProvidersState } from "@otter/web/extension-kit";
 
 export const openClawApi = {
   connectOpenClaw: (

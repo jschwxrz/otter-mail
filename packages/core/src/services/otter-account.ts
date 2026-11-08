@@ -1,14 +1,14 @@
 import { createAuthClient } from "better-auth/client";
 
-import type { OtterDevice } from "@otter-mail/contracts";
-import type { MeResponse, RelayUser } from "@otter-mail/contracts/relay";
+import type { OtterDevice } from "@otter/contracts";
+import type { MeResponse, RelayUser } from "@otter/contracts/relay";
 
 import { logger } from "../logger.js";
 import { platform } from "../platform.js";
 
 const SESSION_SECRET = "otter-session";
 
-export const OTTER_SIGNED_OUT_MESSAGE = "Not signed in to Otter Mail.";
+export const OTTER_SIGNED_OUT_MESSAGE = "Not signed in to Otter.";
 
 let session: { token: string | null; user: RelayUser } | null = null;
 const listeners = new Set<() => void>();
@@ -78,7 +78,7 @@ async function request<T>(
       signal: AbortSignal.timeout(20_000),
     });
   } catch (err) {
-    throw new RelayError(0, `Can't reach Otter Mail's servers (${String(err)}).`);
+    throw new RelayError(0, `Can't reach Otter's servers (${String(err)}).`);
   }
   if (!response.ok) {
     const { error } = (await response.json().catch(() => ({}))) as { error?: string };

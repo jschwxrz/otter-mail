@@ -1,4 +1,4 @@
-import { ARCHIVE_LABEL_ID } from "@otter-mail/contracts";
+import { ARCHIVE_LABEL_ID } from "@otter/contracts";
 
 import { toBase64 } from "../../../bytes.js";
 import { providerFor } from "../../../providers/index.js";
@@ -359,7 +359,7 @@ export const mailTools: AgentTool[] = [
     name: "list_accounts",
     title: "List mailboxes",
     description:
-      "The user's mailboxes (Gmail, IMAP, …) in Otter Mail: each one's address, provider, whether it has a calendar, and what its sign-in still needs permission for (tell the user to allow it in Settings › Connections rather than retrying). Every other tool names a mailbox by its address.",
+      "The user's mailboxes (Gmail, IMAP, …) in Otter: each one's address, provider, whether it has a calendar, and what its sign-in still needs permission for (tell the user to allow it in Settings › Connections rather than retrying). Every other tool names a mailbox by its address.",
     input: { type: "object", properties: {} },
     readOnly: true,
     async run() {
@@ -409,7 +409,7 @@ export const mailTools: AgentTool[] = [
     name: "list_threads",
     title: "List conversations",
     description:
-      "The newest conversations in a label (default the inbox), from every mailbox unless one is named. Reads what Otter Mail has on this device, filling in from the server as needed.",
+      "The newest conversations in a label (default the inbox), from every mailbox unless one is named. Reads what Otter has on this device, filling in from the server as needed.",
     input: {
       type: "object",
       properties: {
@@ -775,7 +775,7 @@ export const mailTools: AgentTool[] = [
     name: "save_draft",
     title: "Save a draft",
     description:
-      "Writes a message into the mailbox's Drafts without sending it, for the user to review and send from Otter Mail. The safe way to prepare mail. With draftId, replaces that draft.",
+      "Writes a message into the mailbox's Drafts without sending it, for the user to review and send from Otter. The safe way to prepare mail. With draftId, replaces that draft.",
     input: {
       type: "object",
       properties: {

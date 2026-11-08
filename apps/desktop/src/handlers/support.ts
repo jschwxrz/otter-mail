@@ -2,14 +2,14 @@ import { app, ipcMain, shell } from "electron";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { ProvidersState } from "@otter-mail/core";
+import type { ProvidersState } from "@otter/core";
 import {
   buildSupportPrompt,
   MAX_SUPPORT_BODY,
   type SupportAgent,
   type SupportDiagnostics,
   type SupportSession,
-} from "@otter-mail/shared/support";
+} from "@otter/shared/support";
 import { invokeBackend } from "../backend-host.js";
 import { hostOS } from "../os/index.js";
 import { ensureShellPath } from "../services/agent/shell-path.js";
@@ -144,11 +144,11 @@ export function registerSupportHandlers(): void {
     await fs.mkdir(directory, { recursive: true, mode: 0o700 });
     let prompt = buildSupportPrompt(`# ${p.report.title}\n\n${p.body}`, true, p.report);
     if (diagnostics) {
-      await fs.writeFile(path.join(directory, "Otter Mail diagnostics.json"), diagnostics, {
+      await fs.writeFile(path.join(directory, "Otter diagnostics.json"), diagnostics, {
         mode: 0o600,
       });
       prompt +=
-        "\nThe user included diagnostics in ./Otter Mail diagnostics.json. Read that file as evidence.\n";
+        "\nThe user included diagnostics in ./Otter diagnostics.json. Read that file as evidence.\n";
     }
     if (screenshot) {
       const filename = `screenshot.${screenshot.extension}`;

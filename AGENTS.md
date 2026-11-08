@@ -1,6 +1,6 @@
-# Otter Mail
+# Otter
 
-Otter Mail is a calm, fast Gmail client: an Electron app for macOS and Linux (Debian and
+Otter is a calm, fast Gmail client: an Electron app for macOS and Linux (Debian and
 Ubuntu, a .deb), and the same app in the browser at https://mail.otterware.app. It is laid out
 like Otter Code (our fork of T3 Code): a pnpm monorepo built with Vite+ (`vp`); the desktop app
 ships through GitHub Releases with auto-update.
@@ -31,7 +31,7 @@ when a feature lands or goes.
     browser (`browser.ts`: its session, the Web Store, popups and permissions; `extensions.ts`
     with `src/extensions-preload.ts`: Chrome's extension APIs Electron lacks), the local agents
     (Claude, Codex; Hermes is in core) and the MCP server that gives them, and other agents on
-    the Mac with a token, Otter Mail's tools, default mail app.
+    the Mac with a token, Otter's tools, default mail app.
   - `src/windows/`: the main window, and where its pages load from.
   - `src/updates.ts`: electron-updater against GitHub Releases.
 - `apps/web`: the React renderer, one build for both apps. `index.html` is the main window.
@@ -49,7 +49,7 @@ when a feature lands or goes.
   tab for every open tab (`backend.ts`), and the bridge that stands in for the preload. What only the desktop app has is off in `desktopBridge.features`.
   What the computer is called in copy (Mac / computer) is
   `src/main/os-names.ts`; shortcuts in copy go through `shortcutText("mod+k")` (⌘K, Ctrl+K).
-- `apps/ios`: Otter Mail for iPhone, a native SwiftUI app (iOS 27, Liquid Glass): Linear's layout
+- `apps/ios`: Otter Mail for iPhone (the iPhone app keeps that name: the phone gets an app per job), a native SwiftUI app (iOS 27, Liquid Glass): Linear's layout
   (a glass bar: the mailbox's picture to switch, Inbox, Drafts, Search, ⌃⌄ for every place; the
   agent on its own button), Otter Code's list rows. Its own Swift code, not the TypeScript core: it signs in to Google itself (the "iOS"
   OAuth client, PKCE), talks to Gmail directly, caches on disk, and follows the Otter account
@@ -58,8 +58,8 @@ when a feature lands or goes.
   README.
 - `extensions/`: the built-in extensions, a package each (VS Code's model; contracts'
   `src/extensions.ts`): Sign-in codes, Calendar invites, Translation, Todoist, Otter Drive, and
-  the agents (`openrouter`, the Otter Mail agent; `hermes`, `openclaw`, `claude`, `codex`). Each
-  `package.json` carries its manifest (`otterMail`); its halves are `./core` (`activate(context)`:
+  the agents (`openrouter`, the Otter agent; `hermes`, `openclaw`, `claude`, `codex`). Each
+  `package.json` carries its manifest (`otter`); its halves are `./core` (`activate(context)`:
   handlers, an agent; core's `src/extensions.ts`), `./ui` (what it contributes to the screens'
   slots: cards, actions, commands, settings, an agent's form, a workspace; `apps/web/src/main/extensions`;
   Settings lists them by manifest `category` in Agents, Connections (services you sign in to,
@@ -74,8 +74,8 @@ when a feature lands or goes.
   their list to `startCore`
   (`apps/desktop/src/extensions.ts`, `apps/web/src/web/extensions.ts`), the renderer lists the
   `./ui` halves (`extensions/registry.ts`). Extensions reach the app only through the kits
-  (`@otter-mail/core/extension-kit`, `@otter-mail/web/extension-kit`,
-  `@otter-mail/desktop/extension-kit`; the last two are aliases), which lint enforces. An agent is
+  (`@otter/core/extension-kit`, `@otter/web/extension-kit`,
+  `@otter/desktop/extension-kit`; the last two are aliases), which lint enforces. An agent is
   the strict contribution: core's `ChatProvider` (its settings are its own, under its id) and, in
   the renderer, its icon and settings form; the chat UI is shared.
 - `packages/contracts`: types shared by both sides, including `DesktopBridge`, the
@@ -107,7 +107,7 @@ when a feature lands or goes.
   GitHub Release (workflows copy it there); the app only links there. A note is marketing, written only when the user asks for one (the
   `write-changelog` skill). Format in `packages/shared/src/changelog.ts`.
 - `site/`: https://mail.otterware.app, a Cloudflare Worker: the web app, at `/` and any other
-  page that isn't a file (the app's own routes). Otter Mail's page, privacy policy and terms are
+  page that isn't a file (the app's own routes). Otter's page, privacy policy and terms are
   on https://otterware.app/mail/ (the `website` repository, with every Otterware app's page);
   their old addresses here redirect there.
 - Errors: Sentry, scrubbed, from the desktop app, the web app and the relay
@@ -143,11 +143,11 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
   screen).
 - `pnpm dev:fake`: the web app on a made-up mailbox (a pretend Gmail, no Google or Otter
   account, no relay). Build and test against it rather than the user's real accounts; see the
-  `test-otter-mail` skill (`.agents/skills`).
+  `test-otter` skill (`.agents/skills`).
 - `pnpm dev:demo` and `pnpm dev:demo:desktop`: `pnpm dev` and `pnpm dev:desktop` opening on the
   demo mailboxes, already added: the dedicated `otterware.demo@gmail.com` Google account and the
   local IMAP server's (`pnpm dev:mail`, started for you). For real Gmail, Google OAuth, Contacts,
-  Calendar or IMAP checks. They come from `OTTER_MAIL_DEMO_MAILBOXES` in the main checkout's
+  Calendar or IMAP checks. They come from `OTTER_DEMO_MAILBOXES` in the main checkout's
   ignored `.env.local` (shared with T3 worktrees by symlink); `--login` signs them in to Google
   once per machine. Preserve the demo fixtures and send test mail only to the demo account itself.
   Keep credentials out of logs, commits, screenshots and app bundles. See
@@ -155,7 +155,7 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
 - `pnpm start` runs the built app unpackaged; `pnpm dist:desktop:dmg` builds a DMG in `release/`
   (on a Mac), `pnpm dist:desktop:deb` a .deb (on Linux).
 - Data homes (`apps/desktop/src/paths.ts`, as in T3 Code): the installed app uses
-  `~/.otter-mail/userdata`; dev runs use `~/.otter-mail/dev`, or `<worktree>/.otter-mail` in a
+  `~/.otter/userdata` (`~/.otter-mail/userdata` for installs from before the rename, never moved); dev runs use `~/.otter/dev`, or `<worktree>/.otter` in a
   linked worktree. `pnpm dev:desktop --home <dir>` overrides. Never point dev at the installed app's home.
 - Main-process logs: the terminal, and `logs/main.log` in the state directory.
 

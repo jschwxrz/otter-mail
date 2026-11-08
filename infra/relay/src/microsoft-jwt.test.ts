@@ -1,4 +1,4 @@
-import { MICROSOFT_CONSUMER_TENANT } from "@otter-mail/contracts";
+import { MICROSOFT_CONSUMER_TENANT } from "@otter/contracts";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT, type JWTVerifyGetKey } from "jose";
 import { beforeAll, describe, expect, it } from "vite-plus/test";
 

@@ -57,7 +57,7 @@ export function MailboxPictureRow({
   return (
     <SettingsRow
       {...searchableSetting("mailbox-picture")}
-      description={`Shown in the sidebar and wherever this mailbox appears, instead of its ${account.picture ? "profile picture" : "initial"}. Only used in Otter Mail.`}
+      description={`Shown in the sidebar and wherever this mailbox appears, instead of its ${account.picture ? "profile picture" : "initial"}. Only used in Otter.`}
       className={cn("transition-colors", dropping && "bg-accent-surface")}
       onDragOver={(event) => {
         if (!hasFiles(event)) return;

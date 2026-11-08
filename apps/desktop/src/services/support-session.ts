@@ -8,7 +8,7 @@ import {
   type SupportDraft,
   type SupportReport,
   type SupportSession,
-} from "@otter-mail/shared/support";
+} from "@otter/shared/support";
 
 export function supportDirectory(home: string, id: unknown): string {
   if (typeof id !== "string" || !/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(id))

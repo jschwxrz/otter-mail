@@ -1,4 +1,4 @@
-import { isSupportFailure, supportError, type SupportError } from "@otter-mail/shared/support";
+import { isSupportFailure, supportError, type SupportError } from "@otter/shared/support";
 
 const errors: SupportError[] = [];
 

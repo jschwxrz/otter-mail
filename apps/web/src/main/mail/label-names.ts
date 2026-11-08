@@ -1,9 +1,9 @@
-import type { MailCapabilities } from "@otter-mail/contracts";
+import type { MailCapabilities } from "@otter/contracts";
 import type { MailLabel } from "./types";
 
 export const ALL_MAIL_LABEL_ID = "ALL_MAIL";
 
-export { ARCHIVE_LABEL_ID, SNOOZED_LABEL_ID } from "@otter-mail/contracts";
+export { ARCHIVE_LABEL_ID, SNOOZED_LABEL_ID } from "@otter/contracts";
 
 export const SYSTEM_LABEL_NAMES: Record<string, string> = {
   INBOX: "Inbox",

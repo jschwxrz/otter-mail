@@ -1,4 +1,4 @@
-import { ipc, task } from "@otter-mail/web/extension-kit";
+import { ipc, task } from "@otter/web/extension-kit";
 import type {
   TodoistPage,
   TodoistProject,
@@ -8,7 +8,7 @@ import type {
   TodoistCollaborator,
   TodoistReminder,
   TodoistReminderInput,
-} from "@otter-mail/contracts/todoist";
+} from "@otter/contracts/todoist";
 
 export const todoistApi = {
   todoistStatus: (): Promise<{ connected: boolean }> => ipc("todoist:status"),

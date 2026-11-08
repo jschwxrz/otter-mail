@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import type { ImapSettings, MailServer } from "@otter-mail/contracts";
+import type { ImapSettings, MailServer } from "@otter/contracts";
 import { ChevronRightIcon, CloudIcon, ServerIcon } from "lucide-react";
 import { GmailMark, MicrosoftMark } from "./provider-mark";
 import { Button } from "~/components/ui/button";
@@ -240,7 +240,7 @@ export function ImapAccountDialog({
       size="large"
       description={
         icloud
-          ? "Apple doesn't let other apps use your Apple Account password: make an app-specific password for Otter Mail."
+          ? "Apple doesn't let other apps use your Apple Account password: make an app-specific password for Otter."
           : "Any mailbox that works with IMAP: iCloud, Fastmail, Yahoo, your own domain."
       }
       confirmLabel={add.isPending ? "Signing in…" : "Add mailbox"}
@@ -261,7 +261,7 @@ export function ImapAccountDialog({
               </button>{" "}
               and sign in.
             </li>
-            <li>Sign-In and Security › App-Specific Passwords: add one named Otter Mail.</li>
+            <li>Sign-In and Security › App-Specific Passwords: add one named Otter.</li>
             <li>Paste it below, with your iCloud address.</li>
           </ol>
         ) : null}
@@ -325,8 +325,7 @@ export function ImapAccountDialog({
               <>
                 {discovery?.state === "none" ? (
                   <p className="text-xs text-muted-foreground">
-                    Otter Mail couldn't find this domain's servers. Check these with your mail
-                    provider.
+                    Otter couldn't find this domain's servers. Check these with your mail provider.
                   </p>
                 ) : null}
                 <ServerFields

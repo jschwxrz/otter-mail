@@ -3,7 +3,7 @@ import {
   OTTER_ACCOUNT_STATE_CHANNEL,
   type OtterAccountState,
   type OtterDevice,
-} from "@otter-mail/contracts";
+} from "@otter/contracts";
 
 const invoke = <T>(channel: string, params?: unknown) =>
   window.desktopBridge.invoke<T>(channel, params);

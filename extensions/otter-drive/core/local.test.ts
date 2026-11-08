@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { setPlatform, utf8Encode } from "@otter-mail/core/extension-kit";
+import { setPlatform, utf8Encode } from "@otter/core/extension-kit";
 
 import * as drive from "./drive.js";
 

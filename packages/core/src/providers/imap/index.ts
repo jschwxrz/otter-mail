@@ -1,4 +1,4 @@
-import { IMAP_CAPABILITIES } from "@otter-mail/contracts";
+import { IMAP_CAPABILITIES } from "@otter/contracts";
 
 import { MailProtocolError } from "../../protocols/index.js";
 import { hasImapPassword } from "../../services/imap-passwords.js";

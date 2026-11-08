@@ -88,7 +88,7 @@ describe("desktop entries", () => {
 
 describe("terminals", () => {
   it("passes the launcher as one argument, after each terminal's own flag", () => {
-    const launcher = "/tmp/it's $(here)/investigate-otter-mail.sh";
+    const launcher = "/tmp/it's $(here)/investigate-otter.sh";
     expect(terminalCommand(["gnome-terminal", "--window"], launcher)).toEqual([
       "gnome-terminal",
       "--window",

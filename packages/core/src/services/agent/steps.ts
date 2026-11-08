@@ -85,11 +85,12 @@ function skillStep(name: string): ToolStep {
 }
 
 export function mcpStep(server: string, tool: string, args: unknown): ToolStep {
-  const ours = server.replace(/_/g, "-") === OTTER_TOOLS_SERVER;
+  // Agents set up before the rename to Otter, and their transcripts, call it otter-mail.
+  const ours = [OTTER_TOOLS_SERVER, "otter-mail"].includes(server.replace(/_/g, "-"));
   return {
     kind: "tool",
     title: (ours && toolTitle(tool)) || sentence(tool),
-    source: ours ? "Otter Mail" : titled(server),
+    source: ours ? "Otter" : titled(server),
     ...withDetail(argsDetail(args)),
   };
 }

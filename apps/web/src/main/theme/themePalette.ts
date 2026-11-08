@@ -23,8 +23,8 @@ import {
   type ThemeColors,
   type ThemeDefinition,
   type ThemeVariants,
-} from "@otter-mail/shared/themes";
-import { softenThemeColors } from "@otter-mail/shared/theme-display";
+} from "@otter/shared/themes";
+import { softenThemeColors } from "@otter/shared/theme-display";
 import { setSyncedPreference } from "../synced-preferences";
 
 // Mail: every built-in (Otter Code's stock palette is Mail's "otter" theme, and

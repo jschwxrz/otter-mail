@@ -20,9 +20,9 @@ import {
   type RelayUser,
   type SignInMethod,
   TUNNEL_CLOSE,
-} from "@otter-mail/contracts/relay";
-import type { MailProviderKind } from "@otter-mail/contracts/mail";
-import { CHAT_LIMITS, type Chat, type ListChatsResponse } from "@otter-mail/contracts/chats";
+} from "@otter/contracts/relay";
+import type { MailProviderKind } from "@otter/contracts/mail";
+import { CHAT_LIMITS, type Chat, type ListChatsResponse } from "@otter/contracts/chats";
 
 import { createAuth, googleClientIds, googleKeys, type Auth } from "./auth.ts";
 import * as agentChannels from "./agent-channels.ts";
@@ -41,6 +41,7 @@ import { AgentHub as AgentHubObject } from "./agent-hub.ts";
 import { NotificationMailbox as NotificationMailboxObject } from "./notification-mailbox.ts";
 import * as apns from "./apns.ts";
 import * as tunnel from "./tunnel.ts";
+import { forHost } from "./hosts.ts";
 import { SESSION_HEADER, UserHub as UserHubObject } from "./user-hub.ts";
 
 export const AgentHub = Sentry.instrumentDurableObjectWithSentry(errorReports, AgentHubObject);
@@ -77,6 +78,8 @@ export interface Env {
   GOOGLE_GMAIL_CLIENT_SECRET: string;
   /** Where the web app runs (https://mail.otterware.app): trusted for CORS and redirects. */
   APP_ORIGIN: string;
+  /** Other hosts the relay answers on, with their own web app: see hosts.ts. */
+  RELAY_HOSTS?: string;
   DRIVE_ORIGIN: string;
   COOKIE_DOMAIN?: string;
   PUSH_TOPIC: string;
@@ -165,6 +168,11 @@ const mailbox = z
 
 const app = new Hono<App>();
 
+app.use(async (c, next) => {
+  c.env = forHost(c.env, c.req.url);
+  await next();
+});
+
 app.use("/v1/*", (c, next) =>
   cors({ origin: c.env.APP_ORIGIN, credentials: true, maxAge: 86_400 })(c, next),
 );
@@ -200,11 +208,11 @@ app.onError((err, c) => {
 
 app.notFound((c) => c.json({ error: "Not found." }, 404));
 
-app.get("/", (c) => c.text("Otter Mail relay\n"));
+app.get("/", (c) => c.text("Otter relay\n"));
 
 app.get("/v1/notifications/callback", async (c) => {
   const { state, code, error } = c.req.query();
-  if (!state) return c.text("Start notification setup in Otter Mail.", 400);
+  if (!state) return c.text("Start notification setup in the app.", 400);
   return notificationConnections.callbackResponse(c.env, state, error ? undefined : code);
 });
 

@@ -10,7 +10,7 @@
  * takes the received mail, trashing takes everything.
  */
 
-import { ARCHIVE_LABEL_ID } from "@otter-mail/contracts";
+import { ARCHIVE_LABEL_ID } from "@otter/contracts";
 
 import { getAccount } from "../../services/account-store.js";
 import * as store from "../../services/mail-store.js";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
-import { TextStream } from "@otter-mail/core/extension-kit";
-import type { ChatEvent } from "@otter-mail/core/extension-kit";
+import { TextStream } from "@otter/core/extension-kit";
+import type { ChatEvent } from "@otter/core/extension-kit";
 import { OpenClawText, openClawMessageText } from "./openclaw-stream.js";
 
 function transcript(events: ChatEvent[]): string[] {

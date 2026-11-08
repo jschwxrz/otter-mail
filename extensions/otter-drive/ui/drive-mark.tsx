@@ -1,4 +1,4 @@
-import { cn } from "@otter-mail/web/extension-kit";
+import { cn } from "@otter/web/extension-kit";
 import { UsersIcon } from "lucide-react";
 
 import type { DriveFolder } from "./api";

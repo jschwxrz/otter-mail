@@ -26,7 +26,7 @@ import {
   type SupportReport,
   type SupportSession,
   type SupportTerminals,
-} from "@otter-mail/shared/support";
+} from "@otter/shared/support";
 import {
   Dialog,
   DialogContent,
@@ -275,7 +275,7 @@ export function ReportProblemDialog() {
     title:
       report.title.trim() ||
       report.happened.trim().split(/\r?\n/, 1)[0]?.slice(0, 120) ||
-      "Otter Mail problem",
+      "Otter problem",
   });
   const describedBody = () =>
     buildSupportIssue(report, reportDiagnostics) +
@@ -309,7 +309,7 @@ export function ReportProblemDialog() {
         toast.success("Report copied. Paste it into the GitHub description.");
         url = supportIssueUrl(
           report.title,
-          "Paste the report copied from Otter Mail here.",
+          "Paste the report copied from Otter here.",
           feedbackKind,
         )!;
       }
@@ -331,7 +331,7 @@ export function ReportProblemDialog() {
       if (!reportDiagnostics) return;
       const saved = await mailApi.saveSupportReport(
         JSON.stringify(reportDiagnostics, null, 2),
-        "Otter Mail diagnostics.json",
+        "Otter diagnostics.json",
       );
       if (saved) toast.success("Diagnostics saved. Attach the file on GitHub before submitting.");
     });
@@ -694,8 +694,8 @@ export function ReportProblemDialog() {
                   className="rounded-lg bg-surface-raised/60 p-3 text-xs text-muted-foreground"
                 >
                   <p>
-                    Otter Mail {diagnostics.version} · {diagnostics.mailboxes.length} anonymous
-                    mailboxes · {diagnostics.errors.length} error summaries
+                    Otter {diagnostics.version} · {diagnostics.mailboxes.length} anonymous mailboxes
+                    · {diagnostics.errors.length} error summaries
                   </p>
                   <p className="mt-1">
                     Mail, addresses, credentials, and raw log messages are excluded.

@@ -1,4 +1,4 @@
-import type { DesktopBridge } from "@otter-mail/contracts";
+import type { DesktopBridge } from "@otter/contracts";
 
 declare global {
   const __APP_VERSION__: string;

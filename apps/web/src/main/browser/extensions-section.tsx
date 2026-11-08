@@ -150,7 +150,7 @@ export function ExtensionsSection() {
             </p>
             {!words && !extensions.isPending ? (
               <p className="max-w-80 text-[13px] text-muted-foreground">
-                Find one in the Chrome Web Store and choose Add to Otter Mail.
+                Find one in the Chrome Web Store and choose Add to Otter.
               </p>
             ) : null}
           </div>

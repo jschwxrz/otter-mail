@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
-import { MAX_SUPPORT_BODY, type SupportSession } from "@otter-mail/shared/support";
+import { MAX_SUPPORT_BODY, type SupportSession } from "@otter/shared/support";
 import {
   forgetSupportSession,
   readSupportDraft,

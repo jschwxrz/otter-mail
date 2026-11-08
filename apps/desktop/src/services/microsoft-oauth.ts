@@ -3,8 +3,8 @@ import * as fs from "node:fs/promises";
 import * as http from "node:http";
 import * as path from "node:path";
 
-import { MICROSOFT_AUTHORITY, OUTLOOK_SCOPES } from "@otter-mail/contracts";
-import type { DemoOutlookMailbox } from "@otter-mail/contracts/demo";
+import { MICROSOFT_AUTHORITY, OUTLOOK_SCOPES } from "@otter/contracts";
+import type { DemoOutlookMailbox } from "@otter/contracts/demo";
 import {
   broadcast,
   GRAPH_ME_URL,
@@ -15,9 +15,9 @@ import {
   signInFromMe,
   type MicrosoftAuth,
   type MicrosoftSignIn,
-} from "@otter-mail/core";
+} from "@otter/core";
 
-import { signInPage } from "@otter-mail/shared/sign-in-page";
+import { signInPage } from "@otter/shared/sign-in-page";
 
 import { appInfo } from "../backend-protocol.js";
 import { requestMain } from "../main-link.js";
@@ -29,14 +29,14 @@ const TOKEN_URL = `${MICROSOFT_AUTHORITY}/token`;
 const AUTHORIZE_TIMEOUT_MS = 5 * 60_000;
 
 function clientId(): string {
-  return process.env.OTTER_MAIL_MICROSOFT_CLIENT_ID?.trim() || __MICROSOFT_CLIENT_ID__;
+  return process.env.OTTER_MICROSOFT_CLIENT_ID?.trim() || __MICROSOFT_CLIENT_ID__;
 }
 
 function requireClientId(): string {
   const id = clientId();
   if (!id) {
     throw new Error(
-      "This build has no Microsoft OAuth client. Set OTTER_MAIL_MICROSOFT_CLIENT_ID (see .env.example).",
+      "This build has no Microsoft OAuth client. Set OTTER_MICROSOFT_CLIENT_ID (see .env.example).",
     );
   }
   return id;
@@ -203,7 +203,7 @@ async function authorizeInBrowser(loginHint?: string): Promise<{
         clearTimeout(timer);
       };
       if (url.searchParams.get("state") !== state) {
-        finish(400, "This sign-in link is stale", "Return to Otter Mail and try again.");
+        finish(400, "This sign-in link is stale", "Return to Otter and try again.");
         reject(new Error("Microsoft sign-in returned an unexpected state."));
       } else if (error) {
         finish(400, "Sign-in cancelled", "You can close this tab.");
@@ -213,7 +213,7 @@ async function authorizeInBrowser(loginHint?: string): Promise<{
           reject(new Error(`Microsoft sign-in failed: ${detail}`));
         }
       } else {
-        finish(200, "Signed in", "You can close this tab and return to Otter Mail.");
+        finish(200, "Signed in", "You can close this tab and return to Otter.");
         resolve(receivedCode!);
       }
     });

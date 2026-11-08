@@ -1,6 +1,6 @@
 // Older Gmail grants lack gmail.settings.basic; keep signatures locally until the user grants it.
 
-import { GMAIL_SETTINGS_PERMISSION } from "@otter-mail/contracts";
+import { GMAIL_SETTINGS_PERMISSION } from "@otter/contracts";
 
 import { broadcast } from "../ipc.js";
 import { logger } from "../logger.js";
@@ -8,7 +8,7 @@ import { findProvider, isSignedIn } from "../providers/index.js";
 import { isSingleAddress } from "./outgoing.js";
 import { keepsSendAsOnDevice, listAccounts, updateAccount } from "./account-store.js";
 import { parseAliasMailboxes } from "./alias-mailboxes.js";
-import { validAliasMailboxes } from "@otter-mail/contracts";
+import { validAliasMailboxes } from "@otter/contracts";
 import { preferenceChanged } from "./preferences.js";
 import type { MailAccount } from "../types.js";
 

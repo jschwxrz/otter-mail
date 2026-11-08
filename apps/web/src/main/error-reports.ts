@@ -2,13 +2,13 @@ import * as SentryElectron from "@sentry/electron/renderer";
 import * as Sentry from "@sentry/react";
 import type { Integration } from "@sentry/core";
 
-import type { ErrorReportsConfig } from "@otter-mail/core";
+import type { ErrorReportsConfig } from "@otter/core";
 import {
   ConsentGate,
   errorReportOptions,
   reportEnvironment,
   SENTRY_DSN,
-} from "@otter-mail/shared/error-reports";
+} from "@otter/shared/error-reports";
 
 const desktop = window.desktopBridge.platform !== "web";
 const dsn = desktop ? SENTRY_DSN.desktop : SENTRY_DSN.web;

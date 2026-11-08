@@ -5,7 +5,7 @@ import {
   SettingsSection,
   searchableSetting,
   toast,
-} from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
 import { useCallback, useEffect, useState } from "react";
 
 import { channelApi, type AgentChannel } from "./api";

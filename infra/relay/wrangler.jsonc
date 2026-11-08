@@ -6,6 +6,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "routes": [
+    { "pattern": "relay.otterware.app", "custom_domain": true },
     { "pattern": "relay.mail.otterware.app", "custom_domain": true },
     // Installed clients still use this hostname for API requests and WebSockets.
     { "pattern": "relay.mail.otterware.dev", "custom_domain": true },
@@ -51,6 +52,8 @@
     "GOOGLE_GMAIL_CLIENT_ID": "997327858649-hvcu3vfk5m83q9jid8g17pv6etmc491v.apps.googleusercontent.com",
     // The web app: trusted for CORS and sign-in redirects; shares the session cookie.
     "APP_ORIGIN": "https://mail.otterware.app",
+    // Otter's own host: its sign-ins return to it and to the web app at otter.otterware.app.
+    "RELAY_HOSTS": "{\"https://relay.otterware.app\":{\"app\":\"https://otter.otterware.app\"}}",
     "DRIVE_ORIGIN": "https://drive.otterware.app",
     "COOKIE_DOMAIN": "mail.otterware.app",
     "PUSH_TOPIC": "projects/otterware/topics/gmail-push",

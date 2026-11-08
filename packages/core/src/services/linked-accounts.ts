@@ -1,12 +1,12 @@
 // Compare both account lists with the previous snapshot to distinguish remote additions from local removals.
 
-import type { ImapSettings } from "@otter-mail/contracts";
+import type { ImapSettings } from "@otter/contracts";
 import type {
   AliasPictures,
   ListAccountsResponse,
   PutAccountRequest,
   RelayAccount,
-} from "@otter-mail/contracts/relay";
+} from "@otter/contracts/relay";
 
 import { logger } from "../logger.js";
 import { broadcast } from "../ipc.js";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { MAILBOX_PICTURE_MAX_LENGTH, isMailboxPicture } from "@otter-mail/contracts/relay";
+import { MAILBOX_PICTURE_MAX_LENGTH, isMailboxPicture } from "@otter/contracts/relay";
 
 import {
   PictureError,

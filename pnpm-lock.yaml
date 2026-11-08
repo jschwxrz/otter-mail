@@ -50,40 +50,40 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.1
         version: 1.30.1(@cfworker/json-schema@4.1.1)(zod@4.6.5)
-      '@otter-mail/contracts':
+      '@otter/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@otter-mail/core':
+      '@otter/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@otter-mail/extension-calendar-invites':
+      '@otter/extension-calendar-invites':
         specifier: workspace:*
         version: link:../../extensions/calendar-invites
-      '@otter-mail/extension-claude':
+      '@otter/extension-claude':
         specifier: workspace:*
         version: link:../../extensions/claude
-      '@otter-mail/extension-codex':
+      '@otter/extension-codex':
         specifier: workspace:*
         version: link:../../extensions/codex
-      '@otter-mail/extension-hermes':
+      '@otter/extension-hermes':
         specifier: workspace:*
         version: link:../../extensions/hermes
-      '@otter-mail/extension-openclaw':
+      '@otter/extension-openclaw':
         specifier: workspace:*
         version: link:../../extensions/openclaw
-      '@otter-mail/extension-openrouter':
+      '@otter/extension-openrouter':
         specifier: workspace:*
         version: link:../../extensions/openrouter
-      '@otter-mail/extension-otter-drive':
+      '@otter/extension-otter-drive':
         specifier: workspace:*
         version: link:../../extensions/otter-drive
-      '@otter-mail/extension-todoist':
+      '@otter/extension-todoist':
         specifier: workspace:*
         version: link:../../extensions/todoist
-      '@otter-mail/extension-translation':
+      '@otter/extension-translation':
         specifier: workspace:*
         version: link:../../extensions/translation
-      '@otter-mail/shared':
+      '@otter/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@sentry/electron':
@@ -120,43 +120,43 @@ importers:
       '@base-ui/react':
         specifier: ^1.8.0
         version: 1.8.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@otter-mail/contracts':
+      '@otter/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@otter-mail/core':
+      '@otter/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@otter-mail/extension-calendar-invites':
+      '@otter/extension-calendar-invites':
         specifier: workspace:*
         version: link:../../extensions/calendar-invites
-      '@otter-mail/extension-claude':
+      '@otter/extension-claude':
         specifier: workspace:*
         version: link:../../extensions/claude
-      '@otter-mail/extension-codex':
+      '@otter/extension-codex':
         specifier: workspace:*
         version: link:../../extensions/codex
-      '@otter-mail/extension-hermes':
+      '@otter/extension-hermes':
         specifier: workspace:*
         version: link:../../extensions/hermes
-      '@otter-mail/extension-openclaw':
+      '@otter/extension-openclaw':
         specifier: workspace:*
         version: link:../../extensions/openclaw
-      '@otter-mail/extension-openrouter':
+      '@otter/extension-openrouter':
         specifier: workspace:*
         version: link:../../extensions/openrouter
-      '@otter-mail/extension-otter-drive':
+      '@otter/extension-otter-drive':
         specifier: workspace:*
         version: link:../../extensions/otter-drive
-      '@otter-mail/extension-sign-in-codes':
+      '@otter/extension-sign-in-codes':
         specifier: workspace:*
         version: link:../../extensions/sign-in-codes
-      '@otter-mail/extension-todoist':
+      '@otter/extension-todoist':
         specifier: workspace:*
         version: link:../../extensions/todoist
-      '@otter-mail/extension-translation':
+      '@otter/extension-translation':
         specifier: workspace:*
         version: link:../../extensions/translation
-      '@otter-mail/shared':
+      '@otter/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@radix-ui/colors':
@@ -301,10 +301,10 @@ importers:
 
   extensions/calendar-invites:
     dependencies:
-      '@otter-mail/contracts':
+      '@otter/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@otter-mail/core':
+      '@otter/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@tanstack/react-query':
@@ -332,10 +332,10 @@ importers:
       '@anthropic-ai/claude-agent-sdk':
         specifier: ^0.3.282
         version: 0.3.282(@anthropic-ai/sdk@0.128.0(zod@4.6.5))(@modelcontextprotocol/sdk@1.30.1(@cfworker/json-schema@4.1.1)(zod@4.6.5))(zod@4.6.5)
-      '@otter-mail/contracts':
+      '@otter/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@otter-mail/core':
+      '@otter/core':
         specifier: workspace:*
         version: link:../../packages/core
       react:
@@ -357,10 +357,10 @@ importers:
 
   extensions/codex:
     dependencies:
-      '@otter-mail/contracts':
+      '@otter/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@otter-mail/core':
+      '@otter/core':
         specifier: workspace:*
         version: link:../../packages/core
       react:
@@ -382,10 +382,10 @@ importers:
 
   extensions/hermes:
     dependencies:
-      '@otter-mail/contracts':
+      '@otter/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@otter-mail/core':
+      '@otter/core':
         specifier: workspace:*
         version: link:../../packages/core
       react:
@@ -407,10 +407,10 @@ importers:
       '@openclaw/gateway-client':
         specifier: 2026.9.9
         version: 2026.9.9
-      '@otter-mail/contracts':
+      '@otter/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@otter-mail/core':
+      '@otter/core':
         specifier: workspace:*
         version: link:../../packages/core
       react:
@@ -429,10 +429,10 @@ importers:
 
   extensions/openrouter:
     dependencies:
-      '@otter-mail/contracts':
+      '@otter/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@otter-mail/core':
+      '@otter/core':
         specifier: workspace:*
         version: link:../../packages/core
       react:
@@ -454,10 +454,10 @@ importers:
       '@e965/xlsx':
         specifier: 0.20.3
         version: 0.20.3
-      '@otter-mail/contracts':
+      '@otter/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@otter-mail/core':
+      '@otter/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@tanstack/react-query':
@@ -488,10 +488,10 @@ importers:
 
   extensions/sign-in-codes:
     dependencies:
-      '@otter-mail/contracts':
+      '@otter/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@otter-mail/shared':
+      '@otter/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       lucide-react:
@@ -513,10 +513,10 @@ importers:
 
   extensions/todoist:
     dependencies:
-      '@otter-mail/contracts':
+      '@otter/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@otter-mail/core':
+      '@otter/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@tanstack/react-query':
@@ -544,10 +544,10 @@ importers:
 
   extensions/translation:
     dependencies:
-      '@otter-mail/contracts':
+      '@otter/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@otter-mail/core':
+      '@otter/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@tanstack/react-query':
@@ -578,13 +578,13 @@ importers:
       '@hono/zod-validator':
         specifier: ^0.9.1
         version: 0.9.1(hono@4.13.9)(zod@4.6.5)
-      '@otter-mail/contracts':
+      '@otter/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@otter-mail/core':
+      '@otter/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@otter-mail/shared':
+      '@otter/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@sentry/cloudflare':
@@ -640,10 +640,10 @@ importers:
       '@openrouter/ai-sdk-provider':
         specifier: 3.1.0
         version: 3.1.0(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
-      '@otter-mail/contracts':
+      '@otter/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@otter-mail/shared':
+      '@otter/shared':
         specifier: workspace:*
         version: link:../shared
       ai:

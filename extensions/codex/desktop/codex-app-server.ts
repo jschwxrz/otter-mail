@@ -8,7 +8,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
-import { ensureShellPath, logger } from "@otter-mail/desktop/extension-kit";
+import { ensureShellPath, logger } from "@otter/desktop/extension-kit";
 
 import type { CodexSettings } from "./settings.js";
 
@@ -85,7 +85,7 @@ export class CodexAppServer {
     });
     const server = new CodexAppServer(child);
     const init = await server.request<{ userAgent?: string }>("initialize", {
-      clientInfo: { name: "otter_mail", title: "Otter Mail", version: "1.0.0" },
+      clientInfo: { name: "otter", title: "Otter", version: "1.0.0" },
       capabilities: { experimentalApi: true },
     });
     server.version = init.userAgent?.match(/\/([^\s]+)/)?.[1] ?? null;

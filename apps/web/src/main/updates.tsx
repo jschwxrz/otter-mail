@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { UpdateState, UpdateChannel } from "@otter-mail/contracts";
-import { changelogUrl } from "@otter-mail/shared/changelog";
+import type { UpdateState, UpdateChannel } from "@otter/contracts";
+import { changelogUrl } from "@otter/shared/changelog";
 import { openLink } from "./browser/store";
 
 import { ArrowDownCircleIcon, SparklesIcon, XIcon } from "lucide-react";
@@ -45,13 +45,13 @@ export function UpdateNotifier() {
     if (!state || !manualCheck.current) return;
     if (state.status === "up-to-date") {
       manualCheck.current = false;
-      toast.success("Otter Mail is up to date", { description: `Version ${state.currentVersion}` });
+      toast.success("Otter is up to date", { description: `Version ${state.currentVersion}` });
     } else if (state.status === "disabled" || state.status === "error") {
       manualCheck.current = false;
       toast.error("Couldn't check for updates", { description: state.message ?? undefined });
     } else if (state.status === "downloading" || state.status === "downloaded") {
       manualCheck.current = false;
-      toast.info(`Otter Mail ${state.availableVersion} is on its way`, {
+      toast.info(`Otter ${state.availableVersion} is on its way`, {
         description: "It's downloading; the sidebar offers a restart when it's ready.",
       });
     }
@@ -76,33 +76,32 @@ export function updateNow(): void {
     });
   };
   const step = (s: UpdateState) => {
-    if (s.manualDownloadUrl)
-      return fail(`Otter Mail ${s.availableVersion} can't install itself`, s);
+    if (s.manualDownloadUrl) return fail(`Otter ${s.availableVersion} can't install itself`, s);
     switch (s.status) {
       case "available":
         void updates.download();
         return;
       case "downloading":
-        toast.update(id, "loading", `Downloading Otter Mail ${s.availableVersion}`, {
+        toast.update(id, "loading", `Downloading Otter ${s.availableVersion}`, {
           description: `${s.downloadPercent ?? 0}% · restarts when it's done`,
           timeout: 0,
         });
         return;
       case "downloaded":
         off();
-        toast.update(id, "loading", `${restart()}ing into Otter Mail ${s.availableVersion}…`, {
+        toast.update(id, "loading", `${restart()}ing into Otter ${s.availableVersion}…`, {
           timeout: 0,
         });
         void updates.install();
         return;
       case "up-to-date":
         off();
-        toast.update(id, "success", "Otter Mail is up to date", {
+        toast.update(id, "success", "Otter is up to date", {
           description: `Version ${s.currentVersion}`,
         });
         return;
       case "error":
-        return fail("Couldn't update Otter Mail", s);
+        return fail("Couldn't update Otter", s);
       case "disabled":
         return fail("Updates are unavailable", s);
     }
@@ -138,10 +137,10 @@ export function UpdateCard() {
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-medium text-foreground">
             {state.status === "downloaded"
-              ? `Otter Mail ${version} is ready`
+              ? `Otter ${version} is ready`
               : failed
                 ? `Couldn't update to ${version}`
-                : `Downloading Otter Mail ${version}`}
+                : `Downloading Otter ${version}`}
           </p>
           <p className="text-2xs text-muted-foreground">
             {state.status === "downloaded"
@@ -284,7 +283,7 @@ export function UpdatesSection() {
   return (
     <SettingsSection {...searchableSetting("updates")}>
       <SettingsRow
-        title={`Otter Mail ${state.currentVersion}`}
+        title={`Otter ${state.currentVersion}`}
         description={statusLine(state)}
         control={control}
       />

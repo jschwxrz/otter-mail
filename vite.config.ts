@@ -48,8 +48,8 @@ export default defineConfig({
             {
               paths: [
                 {
-                  name: "@otter-mail/core",
-                  message: "Import from @otter-mail/core/extension-kit.",
+                  name: "@otter/core",
+                  message: "Import from @otter/core/extension-kit.",
                 },
               ],
               patterns: [
@@ -58,13 +58,13 @@ export default defineConfig({
                     "~/*",
                     "**/apps/**",
                     "**/packages/**",
-                    "@otter-mail/web/*",
-                    "!@otter-mail/web/extension-kit",
-                    "@otter-mail/desktop/*",
-                    "!@otter-mail/desktop/extension-kit",
+                    "@otter/web/*",
+                    "!@otter/web/extension-kit",
+                    "@otter/desktop/*",
+                    "!@otter/desktop/extension-kit",
                   ],
                   message:
-                    "Extensions use the app through @otter-mail/core/extension-kit, @otter-mail/web/extension-kit or @otter-mail/desktop/extension-kit.",
+                    "Extensions use the app through @otter/core/extension-kit, @otter/web/extension-kit or @otter/desktop/extension-kit.",
                 },
               ],
             },

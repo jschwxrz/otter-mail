@@ -50,5 +50,5 @@ export const macTerminals: HostOS["terminals"] = {
     const args = terminalId ? ["-b", terminalId, launcher] : [launcher];
     await exec("/usr/bin/open", args, { timeout: 5_000 });
   },
-  launcher: { fileName: "Investigate Otter Mail.command", shebang: "#!/bin/zsh -l" },
+  launcher: { fileName: "Investigate Otter.command", shebang: "#!/bin/zsh -l" },
 };

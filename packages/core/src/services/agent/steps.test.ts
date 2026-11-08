@@ -3,13 +3,14 @@ import { describe, expect, it } from "vite-plus/test";
 import { claudeStep, codexStep, hermesStep, openClawStep } from "./steps.ts";
 
 describe("tool steps", () => {
-  it("names Otter Mail's tools by their titles, whichever agent calls them", () => {
+  it("names Otter's tools by their titles, whichever agent calls them", () => {
     const expected = {
       kind: "tool",
       title: "Search mail",
-      source: "Otter Mail",
+      source: "Otter",
       detail: '{"query":"from:unid.be"}',
     };
+    expect(claudeStep("mcp__otter__search_mail", { query: "from:unid.be" })).toEqual(expected);
     expect(claudeStep("mcp__otter-mail__search_mail", { query: "from:unid.be" })).toEqual(expected);
     expect(
       codexStep({

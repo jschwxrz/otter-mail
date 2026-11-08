@@ -14,7 +14,7 @@ import {
   sha256Hex,
   toBase64,
   utf8Encode,
-} from "@otter-mail/core/extension-kit";
+} from "@otter/core/extension-kit";
 
 import * as local from "./local.js";
 
@@ -320,8 +320,8 @@ function refusal(list: DriveFolder[], auth: Session, folderId: string | undefine
   const hidden = new Set(auth.hidden ?? []);
   const folder = folderId ? list.find((f) => f.id === folderId) : undefined;
   if (folder)
-    return hidden.has(driveOf(list, folder).id) ? "That drive is turned off in Otter Mail." : null;
-  return hidden.has(SHARED) ? "Shared with me is turned off in Otter Mail." : null;
+    return hidden.has(driveOf(list, folder).id) ? "That drive is turned off in Otter." : null;
+  return hidden.has(SHARED) ? "Shared with me is turned off in Otter." : null;
 }
 
 /**
@@ -689,7 +689,7 @@ async function publishFile(
 ): Promise<DriveArtifact> {
   if (file.bytes.length > MAX_UPLOAD) throw new Error(`${file.path} is over 100 MB.`);
   const title = meta.title.trim().slice(0, 200) || file.path;
-  const label = "Saved from Otter Mail";
+  const label = "Saved from Otter";
   const created = await request<{ data: { id: string } }>(
     "/api/v1/artifacts",
     {
@@ -967,7 +967,7 @@ export async function saveEdit(
     folder,
     id,
     { path, contentType, bytes },
-    "Edited in Otter Mail",
+    "Edited in Otter",
     source.count,
     current.fileCount > 1 ? source.version : undefined,
   );

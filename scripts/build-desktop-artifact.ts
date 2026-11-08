@@ -11,10 +11,10 @@ import { SENTRY_PROJECTS, uploadSourcemaps } from "./upload-sourcemaps.ts";
 import { isNightlyVersion } from "../packages/shared/src/release-channel.ts";
 
 const APP_ID = "dev.otterware.mail";
-const PRODUCT_NAME = "Otter Mail";
+const PRODUCT_NAME = "Otter";
 const LINUX_NAME = "otter-mail";
 const MAINTAINER = "Christophe Kafrouni <chris.kafrouni@gmail.com>";
-const DEFAULT_UPDATE_REPOSITORY = "otterware-app/otter-mail";
+const DEFAULT_UPDATE_REPOSITORY = "otterware-app/otter";
 
 const desktopDir = NodePath.join(repoRoot, "apps", "desktop");
 const webDir = NodePath.join(repoRoot, "apps", "web");
@@ -43,10 +43,10 @@ Options:
   -h, --help                Show this help.
 
 Environment:
-  OTTER_MAIL_UPDATE_REPOSITORY  owner/repo for the GitHub update feed
+  OTTER_UPDATE_REPOSITORY  owner/repo for the GitHub update feed
                                 (falls back to GITHUB_REPOSITORY, then
                                 ${DEFAULT_UPDATE_REPOSITORY}).
-  OTTER_MAIL_UPDATE_URL         Update feed URL instead of GitHub Releases, for
+  OTTER_UPDATE_URL         Update feed URL instead of GitHub Releases, for
                                 testing the updater against a local server.
 `;
 
@@ -140,10 +140,10 @@ export function resolvePublishConfig(version: string, env: NodeJS.ProcessEnv) {
   if (version.includes("-") && !nightly) return undefined;
   // Testing the updater against a local feed (a folder of release artifacts
   // served over http) instead of GitHub Releases.
-  const url = env.OTTER_MAIL_UPDATE_URL?.trim();
+  const url = env.OTTER_UPDATE_URL?.trim();
   if (url) return { provider: "generic", url, channel: nightly ? "nightly" : "latest" };
   const repository =
-    env.OTTER_MAIL_UPDATE_REPOSITORY?.trim() ||
+    env.OTTER_UPDATE_REPOSITORY?.trim() ||
     env.GITHUB_REPOSITORY?.trim() ||
     DEFAULT_UPDATE_REPOSITORY;
   const [owner, repo, ...rest] = repository.split("/");
@@ -179,7 +179,7 @@ const ENTITLEMENTS = `<?xml version="1.0" encoding="UTF-8"?>
  * On Linux the product name is the install directory (/opt/otter-mail): a
  * space there breaks xdg-utils, which reads the .desktop file's Exec line
  * (xdg-mime, xdg-open) and would take the app for missing. People still see
- * "Otter Mail": the .desktop entry's Name, and the app names itself (paths.ts).
+ * "Otter": the .desktop entry's Name, and the app names itself (paths.ts).
  */
 const productName = (platform: "mac" | "linux") => (platform === "mac" ? PRODUCT_NAME : LINUX_NAME);
 
@@ -198,7 +198,7 @@ export function createBuildConfig(options: {
     appId: APP_ID,
     productName: productName(options.platform),
     electronVersion: options.electronVersion,
-    artifactName: "Otter-Mail-${version}-${arch}.${ext}",
+    artifactName: "Otter-${version}-${arch}.${ext}",
     electronLanguages: ["en-US"],
     npmRebuild: false,
     nodeGypRebuild: false,
@@ -357,20 +357,20 @@ function main(): void {
     NodePath.join(desktopDir, "package.json"),
   );
   log(
-    `Otter Mail ${options.version} for ${options.platform}/${options.target} (arch=${options.arch}, ` +
+    `Otter ${options.version} for ${options.platform}/${options.target} (arch=${options.arch}, ` +
       `update feed=${resolvePublishConfig(options.version, process.env) ? "yes" : "none"}, signed=${options.signed})`,
   );
 
   if (!options.skipBuild) {
     run(vpBin, ["build"], {
       cwd: webDir,
-      env: { ...process.env, OTTER_MAIL_VERSION: options.version },
+      env: { ...process.env, OTTER_VERSION: options.version },
       label: "(apps/web) vp build",
     });
     run(vpBin, ["pack"], {
       cwd: desktopDir,
-      env: { ...process.env, OTTER_MAIL_VERSION: options.version },
-      label: `(apps/desktop) OTTER_MAIL_VERSION=${options.version} vp pack`,
+      env: { ...process.env, OTTER_VERSION: options.version },
+      label: `(apps/desktop) OTTER_VERSION=${options.version} vp pack`,
     });
     // Before staging: it writes the debug ids that pair the bundles with their maps.
     uploadSourcemaps(SENTRY_PROJECTS.desktop, [

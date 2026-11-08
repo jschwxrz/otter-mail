@@ -3,7 +3,7 @@
  * meaning Gmail (accounts stored before IMAP).
  */
 
-import type { MailCapabilities, MailProviderKind } from "@otter-mail/contracts";
+import type { MailCapabilities, MailProviderKind } from "@otter/contracts";
 
 import { imapHostOf, providerKindOf } from "../services/account-store.js";
 import type { MailAccount } from "../types.js";

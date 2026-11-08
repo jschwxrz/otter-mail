@@ -1,4 +1,4 @@
-import { parseDemoMailboxes, type DemoMailbox } from "@otter-mail/contracts/demo";
+import { parseDemoMailboxes, type DemoMailbox } from "@otter/contracts/demo";
 
 import { broadcast } from "../ipc.js";
 import { logger } from "../logger.js";

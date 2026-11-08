@@ -8,8 +8,8 @@ import {
   futureTime,
 } from "../services/mail-schedule.js";
 
-import { GMAIL_CAPABILITIES, landLabelChange, type Landing } from "@otter-mail/contracts";
-import { ALIAS_PICTURES_MAX, isMailboxPicture } from "@otter-mail/contracts/relay";
+import { GMAIL_CAPABILITIES, landLabelChange, type Landing } from "@otter/contracts";
+import { ALIAS_PICTURES_MAX, isMailboxPicture } from "@otter/contracts/relay";
 
 import { fromBase64 } from "../bytes.js";
 import { SignInCancelledError } from "../google.js";

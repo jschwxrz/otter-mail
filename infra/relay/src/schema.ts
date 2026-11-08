@@ -16,9 +16,9 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
-import type { ImapSettings, MailProviderKind } from "@otter-mail/contracts/mail";
-import type { AliasPictures } from "@otter-mail/contracts/relay";
-import type { Chat, ChatProvider, ChatTab } from "@otter-mail/contracts/chats";
+import type { ImapSettings, MailProviderKind } from "@otter/contracts/mail";
+import type { AliasPictures } from "@otter/contracts/relay";
+import type { Chat, ChatProvider, ChatTab } from "@otter/contracts/chats";
 
 const createdAt = () =>
   integer({ mode: "timestamp_ms" })

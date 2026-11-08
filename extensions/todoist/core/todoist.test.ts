@@ -1,5 +1,5 @@
-import { handle, setPlatform, registeredHandlers } from "@otter-mail/core/extension-kit";
-import type { Platform } from "@otter-mail/core/extension-kit";
+import { handle, setPlatform, registeredHandlers } from "@otter/core/extension-kit";
+import type { Platform } from "@otter/core/extension-kit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { registerTodoistHandlers } from "./handlers.js";
 import {
@@ -162,7 +162,7 @@ describe("Todoist projects and tasks", () => {
       args: {
         content: "Follow up",
         description:
-          "My notes\n\n[Open conversation in Otter Mail](https://mail.otterware.app/me%40example.com/INBOX/message-1)",
+          "My notes\n\n[Open conversation in Otter](https://mail.otterware.app/me%40example.com/INBOX/message-1)",
         project_id: "work",
         due: { string: "every Monday" },
         priority: 4,

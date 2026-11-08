@@ -5,8 +5,8 @@
  * never stored here; the platform's Google sign-in keeps them.
  */
 
-import type { AliasMailbox, MailProviderKind } from "@otter-mail/contracts";
-import type { AliasPictures } from "@otter-mail/contracts/relay";
+import type { AliasMailbox, MailProviderKind } from "@otter/contracts";
+import type { AliasPictures } from "@otter/contracts/relay";
 
 import { readJson, writeJson } from "../json-file.js";
 import type { MailAccount } from "../types.js";

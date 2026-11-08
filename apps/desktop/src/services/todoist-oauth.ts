@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { signInPage } from "@otter-mail/shared/sign-in-page";
+import { signInPage } from "@otter/shared/sign-in-page";
 
 import { requestMain } from "../main-link.js";
 
@@ -30,7 +30,7 @@ export async function todoistSignIn(
       .end(
         signInPage({
           title: "Connected to Todoist",
-          detail: "You can close this window and return to Otter Mail.",
+          detail: "You can close this window and return to Otter.",
           ok: true,
         }),
       );

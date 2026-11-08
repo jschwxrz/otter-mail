@@ -6,7 +6,7 @@
     "types": ["vite/client"],
     "paths": {
       "~/*": ["./src/*"],
-      "@otter-mail/web/extension-kit": ["./src/main/extensions/kit.ts"]
+      "@otter/web/extension-kit": ["./src/main/extensions/kit.ts"]
     }
   },
   "include": ["src", "vite.config.ts", "../../extensions/*/ui"]

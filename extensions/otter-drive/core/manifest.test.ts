@@ -1,4 +1,4 @@
-import { extensionManifest } from "@otter-mail/core/extension-kit";
+import { extensionManifest } from "@otter/core/extension-kit";
 import { describe, expect, it } from "vite-plus/test";
 
 import { manifest } from "../manifest.ts";
@@ -21,7 +21,7 @@ describe("workspaces in the manifest", () => {
     for (const id of ["calendar", "chats", "settings", "Drive", "my-drive"])
       expect(() =>
         extensionManifest({
-          otterMail: { ...base, contributes: { workspaces: [{ id, title: "T" }] } },
+          otter: { ...base, contributes: { workspaces: [{ id, title: "T" }] } },
         }),
       ).toThrow(/workspace/);
   });

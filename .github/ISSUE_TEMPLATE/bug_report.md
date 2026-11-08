@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a problem with Otter Mail
+about: Report a problem with Otter
 labels: bug
 ---
 
@@ -16,7 +16,7 @@ Mac, web, or iPhone.
 
 ### Environment
 
-Otter Mail version, OS/browser, and Gmail or IMAP.
+Otter version, OS/browser, and Gmail or IMAP.
 
 ### Evidence
 

@@ -1,4 +1,4 @@
-import { IMAP_CAPABILITIES } from "@otter-mail/contracts";
+import { IMAP_CAPABILITIES } from "@otter/contracts";
 import { describe, expect, it } from "vite-plus/test";
 import { arrangeMailboxes, moveMailbox } from "../mailboxes";
 import { aliasMailboxesOf, signatureFor, withAliasMailbox } from "./alias-mailboxes";

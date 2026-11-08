@@ -1,4 +1,4 @@
-import type { BridgeFeatures } from "@otter-mail/contracts";
+import type { BridgeFeatures } from "@otter/contracts";
 
 const everywhere = {
   historyButtons: true,

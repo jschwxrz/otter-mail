@@ -65,7 +65,7 @@ function main(): void {
       version: { type: "string" },
       build: { type: "string" },
       ref: { type: "string", default: "HEAD" },
-      repository: { type: "string", default: "otterware-app/otter-mail" },
+      repository: { type: "string", default: "otterware-app/otter" },
     },
   });
   for (const name of ["SENTRY_AUTH_TOKEN", "SENTRY_ORG"]) {

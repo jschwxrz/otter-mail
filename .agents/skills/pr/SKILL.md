@@ -1,6 +1,6 @@
 ---
 name: pr
-description: Open or update an Otter Mail pull request the house way - a branch off main, the checks, the template filled in, and for anything a user can see, screenshots or a recording attached with `gh --attach`. Use whenever you create a PR, push a change for review, or are asked to add pictures to one.
+description: Open or update an Otter pull request the house way - a branch off main, the checks, the template filled in, and for anything a user can see, screenshots or a recording attached with `gh --attach`. Use whenever you create a PR, push a change for review, or are asked to add pictures to one.
 ---
 
 # Open a pull request
@@ -23,7 +23,7 @@ was tested and how, and what wasn't. Name changes that reach users who never use
 A PR that changes the UI or how the app behaves carries screenshots, or a short recording for
 motion and interaction. Without them it isn't ready for review.
 
-- **Capture** on the made-up mailbox (`pnpm dev:fake`, the `test-otter-mail` skill) at a
+- **Capture** on the made-up mailbox (`pnpm dev:fake`, the `test-otter` skill) at a
   1600x1000 viewport, light and dark. When it needs real Gmail, Outlook or IMAP, use the demo
   mailboxes (`pnpm dev:demo`); never a real account. iPhone changes: the simulator
   (`pnpm dev:ios`), light and dark.

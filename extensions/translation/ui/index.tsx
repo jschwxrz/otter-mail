@@ -7,7 +7,7 @@ import {
   type ConversationInput,
   type MessageBodyInput,
   type UiExtension,
-} from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
 import { LanguagesIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 

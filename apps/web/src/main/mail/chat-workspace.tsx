@@ -16,7 +16,7 @@ import {
   PlusIcon,
   TriangleAlertIcon,
 } from "lucide-react";
-import { chatTabId, type ChatTabRef } from "@otter-mail/contracts/chats";
+import { chatTabId, type ChatTabRef } from "@otter/contracts/chats";
 
 import { BrowserPages } from "../browser/browser-view";
 import {

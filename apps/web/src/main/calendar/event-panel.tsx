@@ -21,7 +21,7 @@ import {
   UsersIcon,
   XIcon,
 } from "lucide-react";
-import { meetingProvider, type MeetingService } from "@otter-mail/contracts";
+import { meetingProvider, type MeetingService } from "@otter/contracts";
 import { getAccountDisplayName } from "../mail/account-style";
 import {
   DropdownMenu,

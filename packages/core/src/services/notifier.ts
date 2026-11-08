@@ -13,12 +13,9 @@
  * offered to copy (its Copy & trash button: the mail goes once the code is used).
  */
 
-import { aliasMailboxName, validAliasMailboxes } from "@otter-mail/contracts";
+import { aliasMailboxName, validAliasMailboxes } from "@otter/contracts";
 
-import {
-  findVerificationCode,
-  mentionsVerificationCode,
-} from "@otter-mail/shared/verification-code";
+import { findVerificationCode, mentionsVerificationCode } from "@otter/shared/verification-code";
 import { logger } from "../logger.js";
 import { platform } from "../platform.js";
 import { providerFor } from "../providers/index.js";

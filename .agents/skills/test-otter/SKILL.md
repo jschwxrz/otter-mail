@@ -1,9 +1,9 @@
 ---
-name: test-otter-mail
-description: Test Otter Mail's UI and behavior in T3's built-in Browser panel against the seeded made-up mailbox (`pnpm dev:fake`), with no Google, Gmail or Otter account. Use for browser verification of any change to the renderer (apps/web) or the mail backend (packages/core).
+name: test-otter
+description: Test Otter's UI and behavior in T3's built-in Browser panel against the seeded made-up mailbox (`pnpm dev:fake`), with no Google, Gmail or Otter account. Use for browser verification of any change to the renderer (apps/web) or the mail backend (packages/core).
 ---
 
-# Test Otter Mail on the made-up mailbox
+# Test Otter on the made-up mailbox
 
 Use T3's built-in Browser panel (the `preview_*` tools) for verification. If
 its tools are absent or the panel reports unavailable, explain the blocker and

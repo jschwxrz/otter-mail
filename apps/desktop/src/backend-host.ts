@@ -14,7 +14,7 @@ import { createHash } from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
-import type { AppSettings } from "@otter-mail/core";
+import type { AppSettings } from "@otter/core";
 
 import {
   appInfoEnv,
@@ -49,7 +49,7 @@ const send = (message: ToBackend) => backend?.postMessage(message);
 
 export function startBackend(): Promise<void> {
   const child = utilityProcess.fork(path.join(__dirname, "backend.cjs"), [], {
-    serviceName: "Otter Mail Backend",
+    serviceName: "Otter Backend",
     env: {
       ...process.env,
       ...appInfoEnv({
@@ -283,7 +283,7 @@ function sanitizeFilename(name: string): string {
 
 export async function tempFile(name: string, bytes: Uint8Array): Promise<string> {
   const key = createHash("sha256").update(bytes).digest("hex").slice(0, 16);
-  const file = path.join(app.getPath("temp"), "otter-mail-files", key, sanitizeFilename(name));
+  const file = path.join(app.getPath("temp"), "otter-files", key, sanitizeFilename(name));
   const existing = await fs.stat(file).catch(() => null);
   if (!existing || existing.size !== bytes.length) {
     await fs.mkdir(path.dirname(file), { recursive: true });

@@ -1,4 +1,4 @@
-import type { ChatContextKind, ChatContextMeta } from "@otter-mail/contracts/chats";
+import type { ChatContextKind, ChatContextMeta } from "@otter/contracts/chats";
 
 import type { ProviderKind } from "./api";
 import { clampTitle } from "./chat-store";
@@ -7,7 +7,7 @@ import type { MessageSummary } from "./types";
 
 /**
  * Pointer-sized mail context for the agent chat. The agent can read the same
- * mailboxes (Claude and Codex through Otter Mail's tools, Hermes and OpenClaw with gog on
+ * mailboxes (Claude and Codex through Otter's tools, Hermes and OpenClaw with gog on
  * its server), so ids are enough — no mail content leaves the app.
  */
 export type AgentContext = {
@@ -65,6 +65,7 @@ export function buildHandoffText(
   context: AgentContext,
   provider: ProviderKind,
 ): string {
+  // A marker, not a name: chats sync to older apps (and the iPhone's Otter Mail), which strip it.
   const lines: string[] = [question.trim(), "", "— context from Otter Mail —"];
   for (const c of context.conversations) {
     if (c.quote) {
@@ -80,7 +81,7 @@ export function buildHandoffText(
   lines.push(
     provider === "hermes" || provider === "openclaw"
       ? "Fetch full content with gog if needed."
-      : "Read them with the otter-mail tools (get_thread) if needed.",
+      : "Read them with the otter tools (get_thread) if needed.",
   );
   return lines.join("\n");
 }
