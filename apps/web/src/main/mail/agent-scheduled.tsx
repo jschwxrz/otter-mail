@@ -1113,7 +1113,7 @@ function TaskEditor({
             </p>
           ) : null}
         </Field>
-        {can?.deliverToOtter ? (
+        {task?.undeliverable ? null : can?.deliverToOtter ? (
           <Field
             orientation="horizontal"
             label="Send results to Otter"

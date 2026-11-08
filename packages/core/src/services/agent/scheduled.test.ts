@@ -105,6 +105,19 @@ describe("a task as the app sends it", () => {
     });
   });
 
+  it("keeps, on an edit, a schedule the app wouldn't let you pick", () => {
+    expect(
+      scheduledTaskInputOf({ name: "x", schedule: { kind: "every", everyMs: 30_000 } }, true)
+        .schedule,
+    ).toEqual({ kind: "every", everyMs: 30_000 });
+    expect(
+      scheduledTaskInputOf(
+        { name: "x", schedule: { kind: "at", at: "2001-01-01T00:00:00Z" } },
+        true,
+      ).schedule,
+    ).toEqual({ kind: "at", at: "2001-01-01T00:00:00.000Z" });
+  });
+
   it("is refused when it can't run", () => {
     const at =
       (schedule: unknown, extra: Record<string, unknown> = {}) =>

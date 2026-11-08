@@ -1005,7 +1005,12 @@ export const hermesProvider: ChatProvider<HermesSettings> = {
         ...(input.prompt !== undefined ? { prompt: input.prompt } : {}),
       };
       if (id) {
-        await jobsRequest(settings, jobPath(id), { method: "PATCH", body });
+        // Hermes works out the next run again whenever it's sent a schedule: only a new one.
+        const { job } = await jobsRequest<{ job: HermesJob }>(settings, jobPath(id));
+        const current = hermesTask(job).schedule;
+        const same = current.kind !== "other" && hermesSchedule(current) === body.schedule;
+        const { schedule: _schedule, ...rest } = body;
+        await jobsRequest(settings, jobPath(id), { method: "PATCH", body: same ? rest : body });
         return id;
       }
       const made = await jobsRequest<{ job?: { id?: string } }>(settings, "", {

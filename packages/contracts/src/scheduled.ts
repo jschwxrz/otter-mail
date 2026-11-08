@@ -36,6 +36,8 @@ export interface ScheduledTask {
   autoPaused?: string;
   /** The version of it shown, so a save doesn't overwrite a change made since. */
   revision?: string;
+  /** Its results can't be sent anywhere (an OpenClaw task in a shared session). */
+  undeliverable?: true;
 }
 
 /** One agent's tasks, or why they couldn't be read. */

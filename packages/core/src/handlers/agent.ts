@@ -60,7 +60,8 @@ function taskIdOf(p: Params): string {
 const MAX_TASK_NAME = 200;
 const MAX_TASK_PROMPT = 5000;
 
-export function scheduledTaskInputOf(raw: unknown): ScheduledTaskInput {
+/** A task as the app sends it; an edit may keep a schedule the app wouldn't let you pick. */
+export function scheduledTaskInputOf(raw: unknown, editing = false): ScheduledTaskInput {
   const p = raw as Params;
   const name = str(p?.name);
   if (!name) throw new Error("Give the task a name.");
@@ -73,10 +74,11 @@ export function scheduledTaskInputOf(raw: unknown): ScheduledTaskInput {
   if (s?.kind === "cron" && str(s.expr)) {
     if (str(s.expr).split(/\s+/).length < 5) throw new Error("That cron expression is incomplete.");
     schedule = { kind: "cron", expr: str(s.expr), ...(str(s.tz) ? { tz: str(s.tz) } : {}) };
-  } else if (s?.kind === "every" && Number(s.everyMs) >= 60_000) {
+  } else if (s?.kind === "every" && Number(s.everyMs) >= (editing ? 1000 : 60_000)) {
     schedule = { kind: "every", everyMs: Math.round(Number(s.everyMs)) };
   } else if (s?.kind === "at" && !Number.isNaN(Date.parse(str(s.at)))) {
-    if (Date.parse(str(s.at)) <= Date.now()) throw new Error("Pick a time in the future.");
+    if (!editing && Date.parse(str(s.at)) <= Date.now())
+      throw new Error("Pick a time in the future.");
     schedule = { kind: "at", at: new Date(str(s.at)).toISOString() };
   } else throw new Error("Choose when it runs.");
   return {
@@ -349,7 +351,7 @@ export function registerAgentHandlers(): void {
     const id = await agent.saveScheduledTask(
       providerOf(p),
       str(p?.id) || null,
-      scheduledTaskInputOf(p?.task),
+      scheduledTaskInputOf(p?.task, Boolean(str(p?.id))),
     );
     return { id };
   });

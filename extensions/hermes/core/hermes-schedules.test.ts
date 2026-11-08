@@ -131,6 +131,7 @@ describe("Hermes's jobs API", () => {
     await schedules.remove(settings, "a1b2c3");
     expect(calls.map((c) => `${c.init.method} ${c.url.pathname}`)).toEqual([
       "POST /api/jobs",
+      "GET /api/jobs/a1b2c3",
       "PATCH /api/jobs/a1b2c3",
       "POST /api/jobs/a1b2c3/pause",
       "POST /api/jobs/a1b2c3/resume",
@@ -143,10 +144,23 @@ describe("Hermes's jobs API", () => {
       prompt: "Go",
       deliver: "local",
     });
-    expect(JSON.parse(String(calls[1].init.body))).toEqual({
+    expect(JSON.parse(String(calls[2].init.body))).toEqual({
       name: "Brief",
       schedule: "0 9 * * *",
       prompt: "Go further",
+    });
+  });
+
+  it("doesn't send an unchanged schedule, which would push its next run back", async () => {
+    const calls = serve(() => Response.json({ job }));
+    await schedules.save(settings, "a1b2c3", {
+      name: "Renamed",
+      prompt: "Summarise my inbox",
+      schedule: { kind: "cron", expr: "0 9 * * 1-5" },
+    });
+    expect(JSON.parse(String(calls[1].init.body))).toEqual({
+      name: "Renamed",
+      prompt: "Summarise my inbox",
     });
   });
 

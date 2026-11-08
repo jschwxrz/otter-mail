@@ -23,6 +23,7 @@ type Job = {
   description?: string | null;
   agentId?: string | null;
   sessionKey?: string | null;
+  sessionTarget?: string;
   enabled: boolean;
   configRevision?: string;
   schedule: Record<string, unknown> & { kind: string };
@@ -167,6 +168,8 @@ export function taskOf(
     ...(managed ? { managedBy: managed } : {}),
     ...(paused ? { autoPaused: paused } : {}),
     ...(job.configRevision ? { revision: job.configRevision } : {}),
+    // The gateway sends only an isolated run's result to a channel.
+    ...(job.sessionTarget && job.sessionTarget !== "isolated" ? { undeliverable: true } : {}),
   };
 }
 
@@ -284,7 +287,9 @@ export async function saveTask(
   }
   if (!sameSchedule(job.schedule, schedule)) {
     patch.schedule =
-      schedule.kind === "cron" && job.schedule.kind === "cron" && job.schedule.staggerMs
+      schedule.kind === "cron" &&
+      job.schedule.kind === "cron" &&
+      typeof job.schedule.staggerMs === "number"
         ? { ...schedule, staggerMs: job.schedule.staggerMs }
         : schedule;
     // A one-off goes once it has run; a repeating task stays.

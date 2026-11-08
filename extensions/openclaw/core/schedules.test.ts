@@ -162,6 +162,11 @@ describe("taskOf", () => {
     expect(task.autoPaused).toBe("Paused by OpenClaw after 3 failed runs in a row");
   });
 
+  it("knows a task in a shared session can't send its results anywhere", () => {
+    expect(taskOf({ ...brief, sessionTarget: "main" } as never, "main").undeliverable).toBe(true);
+    expect(taskOf(brief as never, "main").undeliverable).toBeUndefined();
+  });
+
   it("describes schedules Otter can't edit", () => {
     expect(
       taskOf({ ...brief, schedule: { kind: "on-exit", command: "make" } } as never, "main")
@@ -312,6 +317,16 @@ describe("saveTask", () => {
       schedule: { kind: "cron", expr: "0 9 * * *" },
     });
     expect(later.calls[1].params.patch).toMatchObject({ deleteAfterRun: false });
+  });
+
+  it("keeps a stagger of zero", async () => {
+    const exact = { ...brief, schedule: { ...brief.schedule, staggerMs: 0 } };
+    const { g, calls } = fakeGateway((method) => (method === "cron.get" ? exact : {}));
+    await saveTask(g, "brief", {
+      name: "Morning brief",
+      schedule: { kind: "cron", expr: "0 7 * * 1-5", tz: "Europe/Paris" },
+    });
+    expect(calls[1].params.patch).toMatchObject({ schedule: { staggerMs: 0 } });
   });
 
   it("keeps a cron job's stagger when its time changes", async () => {
