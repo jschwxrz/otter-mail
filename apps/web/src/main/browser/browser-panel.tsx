@@ -7,7 +7,8 @@ import { mostRecentTab } from "../mail/panel-tabs";
 import { PanelControlSlot } from "../mail/top-bar";
 import { HintTooltip, IconBtn } from "../mail/ui";
 import { usePanelTabDrag } from "../mail/use-panel-tab-drag";
-import { BrowserPages, BrowserTabIcon } from "./browser-view";
+import { BrowserTabIcon } from "./browser-view";
+import { PageSlot } from "./page-host";
 import { closeTab, hostOf, newTab, panelTabs, reorderTabs, selectTab, useBrowser } from "./store";
 
 export function BrowserPanel({
@@ -54,7 +55,8 @@ export function BrowserPanel({
   };
   useCommandHandlers({
     "tab.previous": (event) => {
-      if (!(event.target instanceof Node) || !panelRef.current?.contains(event.target))
+      if (!(event.target instanceof Element)) return false;
+      if (!panelRef.current?.contains(event.target) && !event.target.closest("[data-browser-page]"))
         return false;
       return previousTab();
     },
@@ -110,7 +112,11 @@ export function BrowserPanel({
         {/* The pinned panel toggle (home view) sits here. */}
         <PanelControlSlot />
       </div>
-      <BrowserPages tabs={tabs} activeId={activeId} className="rounded-t-xl" />
+      {activeId ? (
+        <PageSlot key={activeId} tabId={activeId} className="rounded-t-xl" />
+      ) : (
+        <div className="min-h-0 flex-1" />
+      )}
     </div>
   );
 }
