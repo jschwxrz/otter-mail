@@ -654,10 +654,8 @@ const isDelivery = (row: Record<string, unknown>) => String(runOf(row)).startsWi
 const withoutInspectLink = (text: string) =>
   text.replace(/\n+Inspect: https?:\/\/\S+\/cron\/\S+\s*$/, "");
 
-/** The session where the Otter channel plugin (extensions/openclaw/gateway) keeps what an agent delivered to Otter. */
-const INBOX = /^agent:([^:]+):otter:inbox$/;
-/** How far back a device that has no chat for an agent's Otter session yet shows what it delivered. */
-const INBOX_BACKLOG_MS = 24 * 60 * 60 * 1000;
+/** How far back a device that has no chat yet for a session the gateway delivered to shows what it delivered. */
+const DELIVERED_BACKLOG_MS = 24 * 60 * 60 * 1000;
 const DELIVERY_WRITTEN_MS = 3000;
 /** How long a watched chat's changes settle before it's caught up on. */
 const CHANGE_SETTLE_MS = 1000;
@@ -1245,7 +1243,7 @@ function announce(
   }: { title?: string; deliveredAt?: number; delivery?: AgentRun["delivery"] } = {},
 ): void {
   const watched = watching?.sessions.has(sessionKey);
-  if (!watching || (!watched && !INBOX.test(sessionKey) && !pointed.has(sessionKey))) return;
+  if (!watching || (!watched && !pointed.has(sessionKey))) return;
   if (announced.has(runId) || sent.has(runId)) return;
   for (const turn of turns.values())
     if (turn.sessionKey === sessionKey && (!turn.ending || ownsRun(turn, runId))) return;
@@ -1361,10 +1359,9 @@ async function catchUpSessions(g: Gateway): Promise<void> {
   for (const row of sessions ?? []) {
     const key = String(row.key);
     const watched = watching?.sessions.get(key);
-    const inbox = INBOX.exec(key);
-    if (watched === undefined && !inbox && !delivered.has(key)) continue;
+    if (watched === undefined && !delivered.has(key)) continue;
     const since =
-      watched === undefined ? Date.now() - INBOX_BACKLOG_MS : fresh.has(key) ? 0 : watched;
+      watched === undefined ? Date.now() - DELIVERED_BACKLOG_MS : fresh.has(key) ? 0 : watched;
     const active = (row.activeRunIds as string[] | undefined) ?? [];
     const activity = Number(row.lastActivityAt ?? row.updatedAt) || 0;
     if (active.length === 0 && activity <= since) continue;
@@ -1381,13 +1378,11 @@ async function catchUpSessions(g: Gateway): Promise<void> {
       const title =
         watched !== undefined
           ? undefined
-          : inbox
-            ? names?.get(inbox[1])
-            : (delivery?.kind === "automation" && delivery.name
-                ? `${delivery.name} · ${shortDate(at ?? Date.now())}`
-                : undefined) ||
-              sessionTitle(row) ||
-              names?.get(agentOf(key));
+          : (delivery?.kind === "automation" && delivery.name
+              ? `${delivery.name} · ${shortDate(at ?? Date.now())}`
+              : undefined) ||
+            sessionTitle(row) ||
+            names?.get(agentOf(key));
       announce(key, id, { title, deliveredAt: at, delivery });
     }
   }

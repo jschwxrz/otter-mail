@@ -1108,8 +1108,12 @@ async function followAgentRun(run: AgentRun): Promise<void> {
       [convo.id]: { requestId: run.requestId, convoId: convo.id, provider: run.provider },
     },
   }));
+  // Something new from the agent (an automation still running, say) brings a settled or snoozed chat back.
+  const now = Date.now();
+  const away = current.settledAt != null || (current.snoozedUntil ?? 0) > now;
   patchConversation(convo.id, (c) => ({
     ...c,
+    ...(away && { settledAt: null, snoozedUntil: null, returnedAt: now, updatedAt: now }),
     turns: [
       ...c.turns,
       {
@@ -1117,7 +1121,7 @@ async function followAgentRun(run: AgentRun): Promise<void> {
         role: "assistant",
         text: "",
         items: [],
-        startedAt: run.deliveredAt ?? Date.now(),
+        startedAt: run.deliveredAt ?? now,
         ...(run.delivery && { delivered: run.delivery }),
       },
     ],
