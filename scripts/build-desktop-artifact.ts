@@ -212,13 +212,17 @@ export function createBuildConfig(options: {
       { name: PRODUCT_NAME, schemes: ["ottermail"] },
     ],
     mac: {
-      // The bundle and its executable keep their name from before the rename to Otter; the
-      // menus and About say productName (CFBundleName). When an update's
-      // executable name differs, Squirrel renames the bundle, then launches its relaunch
+      // The bundle and its executable keep their name from before the rename to Otter. When an
+      // update's executable name differs, Squirrel renames the bundle, then launches its relaunch
       // helper from the old path and fails: the app quits to update and never reopens. That
-      // Squirrel is the installed app's, so no later build can fix it.
+      // Squirrel is the installed app's, so no later build can fix it. The Dock, Finder and
+      // Spotlight still say Otter: a localized display name (InfoPlist.strings), which macOS
+      // shows while the file name matches CFBundleDisplayName. The menus use CFBundleName.
       executableName: MAC_BUNDLE_NAME,
-      extraResources: [{ from: "bin/translator", to: "bin/translator" }],
+      extraResources: [
+        { from: "bin/translator", to: "bin/translator" },
+        { from: "resources/InfoPlist.strings", to: "en.lproj/InfoPlist.strings" },
+      ],
       target: options.target === "dmg" ? ["dmg", "zip"] : ["zip"],
       category: "public.app-category.productivity",
       icon: `${icon}.icns`,
@@ -227,6 +231,8 @@ export function createBuildConfig(options: {
       extendInfo: {
         LSApplicationCategoryType: "public.app-category.productivity",
         NSUserNotificationAlertStyle: "banner",
+        CFBundleDisplayName: MAC_BUNDLE_NAME,
+        LSHasLocalizedDisplayName: true,
       },
       ...(options.signed
         ? {

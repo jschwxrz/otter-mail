@@ -65,6 +65,10 @@ test("packaged icons follow the build, with no user icon collection or cross-cha
       const icon = version === nightly ? "icon-nightly" : "icon";
       assert.equal((config.mac as { icon: string }).icon, `${icon}.icns`);
       assert.equal((config.mac as { executableName: string }).executableName, "Otter Mail");
+      assert.equal(
+        (config.mac as { extendInfo: Record<string, unknown> }).extendInfo.CFBundleDisplayName,
+        "Otter Mail",
+      );
       assert.equal((config.linux as { icon: string }).icon, `${icon}.png`);
       assert.deepEqual(config.extraResources, [
         { from: `resources/${icon}.png`, to: `${icon}.png` },
