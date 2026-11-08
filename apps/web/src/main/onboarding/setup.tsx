@@ -304,12 +304,12 @@ const PILLARS: { icon: ReactNode; title: string; body: string }[] = [
   {
     icon: <AgentIcon />,
     title: "Your agents, right here",
-    body: "Bring Claude Code, Codex, OpenClaw or Hermes, and hand them the conversation in front of you.",
+    body: "Bring your own agents, and hand them the conversation in front of you.",
   },
   {
     icon: <LayersIcon />,
     title: "Every mailbox and calendar",
-    body: "Gmail, Outlook and IMAP side by side, their calendars beside them, views across all of them.",
+    body: "Gmail, Outlook and IMAP side by side, Google and Outlook calendars beside them.",
   },
 ];
 
