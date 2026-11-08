@@ -11,6 +11,12 @@
  * fire-and-forget; their events stream as `agent:chatEvent`.
  */
 
+import type {
+  AgentScheduledTasks,
+  ChannelTarget,
+  ScheduledTaskInput,
+  TaskRun,
+} from "@otter/contracts/scheduled";
 import { registeredAgents } from "../../extensions.js";
 import { broadcast } from "../../ipc.js";
 import { logger } from "../../logger.js";
@@ -444,6 +450,91 @@ export async function readFile(kind: ProviderKind, sessionId: string, href: stri
       `${found.displayName} hasn't made this file available. Ask it to attach the image directly.`,
     );
   return found.readFile(await agentSettings(kind), sessionId, href);
+}
+
+function scheduler(kind: ProviderKind) {
+  const found = provider(kind);
+  if (!found.schedules) throw new Error(`${found.displayName} doesn't run scheduled tasks.`);
+  return found.schedules;
+}
+
+/** Every enabled agent's scheduled tasks; one that can't be reached says so without hiding the rest. */
+export async function listScheduledTasks(): Promise<AgentScheduledTasks[]> {
+  const all = await allSettings();
+  const agents = [...registeredAgents().values()].filter(
+    (agent) => agent.schedules && (all.agents[agent.kind] ?? agent.defaults).enabled,
+  );
+  const listed = await Promise.all(
+    agents.map(async (agent): Promise<AgentScheduledTasks | null> => {
+      const settings = all.agents[agent.kind] ?? agent.defaults;
+      try {
+        const found = await agent.schedules!.list(settings);
+        return found && { provider: agent.kind, ...found };
+      } catch (error) {
+        return {
+          provider: agent.kind,
+          tasks: [],
+          error: error instanceof Error ? error.message : String(error),
+          channels: [],
+          can: {
+            create: false,
+            deliverToOtter: false,
+            webhooks: false,
+            history: false,
+            timeZones: false,
+          },
+        };
+      }
+    }),
+  );
+  return listed.filter((agent) => agent !== null);
+}
+
+export async function saveScheduledTask(
+  kind: ProviderKind,
+  id: string | null,
+  input: ScheduledTaskInput,
+): Promise<string> {
+  return scheduler(kind).save(await agentSettings(kind), id, input);
+}
+
+export async function setScheduledTaskEnabled(kind: ProviderKind, id: string, enabled: boolean) {
+  await scheduler(kind).setEnabled(await agentSettings(kind), id, enabled);
+}
+
+export async function runScheduledTask(kind: ProviderKind, id: string): Promise<void> {
+  await scheduler(kind).runNow(await agentSettings(kind), id);
+}
+
+export async function deleteScheduledTask(kind: ProviderKind, id: string): Promise<void> {
+  await scheduler(kind).remove(await agentSettings(kind), id);
+}
+
+export async function scheduledTaskRuns(
+  kind: ProviderKind,
+  id: string,
+  limit: number,
+): Promise<TaskRun[]> {
+  const found = scheduler(kind);
+  return found.runs ? found.runs(await agentSettings(kind), id, limit) : [];
+}
+
+export async function scheduledTargets(
+  kind: ProviderKind,
+  agent: string,
+  channel: string,
+): Promise<ChannelTarget[]> {
+  const found = scheduler(kind);
+  return found.targets ? found.targets(await agentSettings(kind), agent, channel) : [];
+}
+
+export async function scheduledRunTranscript(
+  kind: ProviderKind,
+  id: string,
+  runId: string,
+): Promise<ChatSessionMessage[]> {
+  const found = scheduler(kind);
+  return found.runTranscript ? found.runTranscript(await agentSettings(kind), id, runId) : [];
 }
 
 export function shutdownProviders(): void {

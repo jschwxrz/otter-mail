@@ -33,6 +33,7 @@ import { BrowserPanel } from "./browser/browser-panel";
 import { ChatBar } from "./mail/chat-bar";
 import { ChatWindow } from "./mail/chat-window";
 import { ChatWorkspace, type ChatPanelControl } from "./mail/chat-workspace";
+import { SCHEDULED_TASKS, ScheduledTasksView } from "./mail/agent-scheduled";
 import { CALENDAR_MODES, CalendarView, calendarAccounts } from "./calendar/calendar-view";
 import type { CalendarMode } from "./calendar/dates";
 import { newChat, showChat, useChatEvents, useChats } from "./mail/chat-store";
@@ -393,7 +394,9 @@ function MailHome() {
   const selectedLabelId = mailLoc?.label ?? "INBOX";
   // A workspace's item (a document) is its own, never a message the mail would load.
   const inWorkspace = workspaceOf(selectedAccountId) !== undefined;
-  const selectedMessageId = inWorkspace ? null : (mailLoc?.messageId ?? null);
+  // Agents' only item is a scheduled task (/agents/scheduled/<task>), never a message.
+  const selectedMessageId =
+    inWorkspace || selectedAccountId === CHATS_SPACE ? null : (mailLoc?.messageId ?? null);
   const workspaceItem = inWorkspace ? (mailLoc?.messageId ?? null) : null;
   const readerAccountId = mailLoc?.account ?? null;
   const focusedMessageId = mailLoc?.focusId ?? null;
@@ -802,7 +805,7 @@ function MailHome() {
   const chatsLabel = isChats ? selectedLabelId : null;
   useEffect(() => {
     if (chatsLabel === NEW_CHAT) showNewChat.current();
-    else if (chatsLabel) showChat(chatsLabel);
+    else if (chatsLabel && chatsLabel !== SCHEDULED_TASKS) showChat(chatsLabel);
   }, [chatsLabel, showNewChat]);
   const startNewChat = () => {
     if (isChats && !settingsRoute) {
@@ -1778,7 +1781,15 @@ function MailHome() {
                         onMode={(mode) => go({ label: mode }, true)}
                       />
                     ) : isChats ? (
-                      selectedLabelId !== NEW_CHAT ? (
+                      selectedLabelId === SCHEDULED_TASKS ? (
+                        <ScheduledTasksView
+                          taskKey={mailLoc?.messageId ?? null}
+                          onOpenTask={(key) => go({ messageId: key })}
+                          titleLeading={sidebarOpen ? null : titlebarInset}
+                          titleTrailing={titleTrailing}
+                          onSelectChat={(id) => go({ label: id }, true)}
+                        />
+                      ) : selectedLabelId !== NEW_CHAT ? (
                         <ChatWorkspace
                           key={selectedLabelId}
                           chatId={selectedLabelId}

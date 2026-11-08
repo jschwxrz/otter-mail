@@ -85,6 +85,7 @@ export type {
   ProviderModel,
   ProviderModelOption,
   ProviderSettings,
+  ScheduleSupport,
   Skill,
   WatchedSession,
 } from "./services/agent/types.js";

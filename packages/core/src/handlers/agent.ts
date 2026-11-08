@@ -1,4 +1,5 @@
 import type { AgentChannel } from "@otter/contracts/relay";
+import type { ResultsTo, ScheduledTaskInput } from "@otter/contracts/scheduled";
 import { handle } from "../ipc.js";
 import { platform } from "../platform.js";
 import { relayRequest } from "../services/otter-account.js";
@@ -48,6 +49,66 @@ function attachmentsOf(raw: unknown): ChatAttachment[] {
       path: a.path,
       kind: a.kind,
     }));
+}
+
+function taskIdOf(p: Params): string {
+  const id = str(p?.id);
+  if (!id) throw new Error("A task id is required.");
+  return id;
+}
+
+const MAX_TASK_NAME = 200;
+const MAX_TASK_PROMPT = 5000;
+
+function resultsToOf(raw: unknown): ResultsTo {
+  const r = raw as Params;
+  if (r?.kind === "new-chat" || r?.kind === "off") return { kind: r.kind };
+  if (r?.kind === "channel") {
+    const channel = str(r.channel);
+    const to = str(r.to);
+    if (!channel) throw new Error("Choose where its results go.");
+    if (!to) throw new Error("Say who on it gets the results.");
+    const accountId = str(r.accountId);
+    return { kind: "channel", channel, to, ...(accountId ? { accountId } : {}) };
+  }
+  if (r?.kind === "webhook") {
+    const url = str(r.url);
+    if (!/^https?:\/\//i.test(url) || !URL.canParse(url))
+      throw new Error("A webhook needs an http(s) address.");
+    return { kind: "webhook", url };
+  }
+  throw new Error("Choose where its results go.");
+}
+
+/** A task as the app sends it; an edit may keep a schedule the app wouldn't let you pick. */
+export function scheduledTaskInputOf(raw: unknown, editing = false): ScheduledTaskInput {
+  const p = raw as Params;
+  const name = str(p?.name);
+  if (!name) throw new Error("Give the task a name.");
+  if (name.length > MAX_TASK_NAME) throw new Error("That name is too long.");
+  const prompt = typeof p?.prompt === "string" ? p.prompt.trim() : undefined;
+  if (prompt !== undefined && !prompt) throw new Error("Say what the agent should do.");
+  if (prompt && prompt.length > MAX_TASK_PROMPT) throw new Error("That's too long for a task.");
+  const s = p?.schedule as Params;
+  let schedule: ScheduledTaskInput["schedule"];
+  if (s?.kind === "cron" && str(s.expr)) {
+    if (str(s.expr).split(/\s+/).length < 5) throw new Error("That cron expression is incomplete.");
+    schedule = { kind: "cron", expr: str(s.expr), ...(str(s.tz) ? { tz: str(s.tz) } : {}) };
+  } else if (s?.kind === "every" && Number(s.everyMs) >= (editing ? 1000 : 60_000)) {
+    schedule = { kind: "every", everyMs: Math.round(Number(s.everyMs)) };
+  } else if (s?.kind === "at" && !Number.isNaN(Date.parse(str(s.at)))) {
+    if (!editing && Date.parse(str(s.at)) <= Date.now())
+      throw new Error("Pick a time in the future.");
+    schedule = { kind: "at", at: new Date(str(s.at)).toISOString() };
+  } else throw new Error("Choose when it runs.");
+  return {
+    name,
+    ...(prompt !== undefined ? { prompt } : {}),
+    schedule,
+    ...(str(p?.agent) ? { agent: str(p?.agent) } : {}),
+    ...(p?.resultsTo !== undefined ? { resultsTo: resultsToOf(p.resultsTo) } : {}),
+    ...(str(p?.revision) ? { revision: str(p?.revision) } : {}),
+  };
 }
 
 export function registerAgentHandlers(): void {
@@ -301,6 +362,56 @@ export function registerAgentHandlers(): void {
       files,
     });
     return { ok: true };
+  });
+
+  handle("agent:scheduled", async () => agent.listScheduledTasks());
+
+  handle("agent:saveScheduled", async (params: unknown) => {
+    const p = params as Params;
+    const id = await agent.saveScheduledTask(
+      providerOf(p),
+      str(p?.id) || null,
+      scheduledTaskInputOf(p?.task, Boolean(str(p?.id))),
+    );
+    return { id };
+  });
+
+  handle("agent:setScheduledEnabled", async (params: unknown) => {
+    const p = params as Params;
+    await agent.setScheduledTaskEnabled(providerOf(p), taskIdOf(p), p?.enabled === true);
+    return { ok: true };
+  });
+
+  handle("agent:runScheduled", async (params: unknown) => {
+    const p = params as Params;
+    await agent.runScheduledTask(providerOf(p), taskIdOf(p));
+    return { ok: true };
+  });
+
+  handle("agent:deleteScheduled", async (params: unknown) => {
+    const p = params as Params;
+    await agent.deleteScheduledTask(providerOf(p), taskIdOf(p));
+    return { ok: true };
+  });
+
+  handle("agent:scheduledRuns", async (params: unknown) => {
+    const p = params as Params;
+    const limit = Math.min(Math.max(Number(p?.limit) || 20, 1), 100);
+    return agent.scheduledTaskRuns(providerOf(p), taskIdOf(p), limit);
+  });
+
+  handle("agent:scheduledTargets", async (params: unknown) => {
+    const p = params as Params;
+    const channel = str(p?.channel);
+    if (!channel) return [];
+    return agent.scheduledTargets(providerOf(p), str(p?.agent), channel);
+  });
+
+  handle("agent:scheduledRunTranscript", async (params: unknown) => {
+    const p = params as Params;
+    const runId = str(p?.runId);
+    if (!runId) throw new Error("A run id is required.");
+    return agent.scheduledRunTranscript(providerOf(p), taskIdOf(p), runId);
   });
 
   handle("agent:deleteSession", async (params: unknown) => {

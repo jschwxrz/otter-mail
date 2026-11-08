@@ -36,7 +36,7 @@ export interface ChatSentAttachment {
  * the job exists), or a message the agent sent you itself.
  */
 export type ChatDelivery =
-  | { kind: "automation"; name?: string; schedule?: string }
+  | { kind: "automation"; jobId?: string; name?: string; schedule?: string }
   | { kind: "message"; from?: string };
 
 export interface ChatTurn {

@@ -1,4 +1,10 @@
 import type { ChatDelivery } from "@otter/contracts/chats";
+import type {
+  AgentScheduledTasks,
+  ChannelTarget,
+  ScheduledTaskInput,
+  TaskRun,
+} from "@otter/contracts/scheduled";
 export type ProviderKind = string;
 
 export const DEFAULT_AGENT = "openrouter";
@@ -255,6 +261,21 @@ export type BrowserEvents = {
 
 export type BrowserViewRequest = { width: number; height: number; except?: string };
 
+/** The tasks an agent runs on its own schedule (OpenClaw's automations, Hermes's jobs). */
+export interface ScheduleSupport<S> {
+  /** Null when the agent isn't set up on this device: it isn't listed. */
+  list(settings: S): Promise<Omit<AgentScheduledTasks, "provider"> | null>;
+  /** A new task when `id` is null. Its id. */
+  save(settings: S, id: string | null, input: ScheduledTaskInput): Promise<string>;
+  setEnabled(settings: S, id: string, enabled: boolean): Promise<void>;
+  runNow(settings: S, id: string): Promise<void>;
+  remove(settings: S, id: string): Promise<void>;
+  runs?(settings: S, id: string, limit: number): Promise<TaskRun[]>;
+  runTranscript?(settings: S, id: string, runId: string): Promise<ChatSessionMessage[]>;
+  /** Who results could go to on one of its channels, for its agent `agent`. */
+  targets?(settings: S, agent: string, channel: string): Promise<ChannelTarget[]>;
+}
+
 export interface ChatProvider<S extends AgentSettings = AgentSettings> {
   readonly kind: ProviderKind;
   readonly displayName: string;
@@ -349,6 +370,7 @@ export interface ChatProvider<S extends AgentSettings = AgentSettings> {
     upload: { targetId: string; profile?: string; files: { name: string; data: string }[] },
   ): Promise<void>;
   deleteSession(settings: S, sessionId: string): Promise<void>;
+  readonly schedules?: ScheduleSupport<S>;
   shutdown(): void;
 }
 

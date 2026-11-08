@@ -41,6 +41,17 @@ import {
   type GatewayBrowserDeviceIdentity,
 } from "@openclaw/gateway-client/browser";
 import { OpenClawText, openClawMessageText as textOf } from "./openclaw-stream.js";
+import {
+  channelTargets,
+  listTasks,
+  removeTask,
+  runRows,
+  runTask,
+  saveTask,
+  setTaskEnabled,
+  taskRuns,
+  type CronGateway,
+} from "./schedules.js";
 
 const CONNECT_TIMEOUT_MS = 8_000;
 /**
@@ -1555,7 +1566,7 @@ async function deliveryOf(
   }
   const jobId = (row.openclawAutomation as { jobId?: unknown } | undefined)?.jobId;
   const job = typeof jobId === "string" ? await jobOf(g, jobId) : null;
-  return { kind: "automation", ...job };
+  return { kind: "automation", ...(typeof jobId === "string" ? { jobId } : {}), ...job };
 }
 
 /** When a delivery (`delivery:<row id>`) was written; nothing for a run. */
@@ -1633,6 +1644,25 @@ async function sendAsOwner(
     }
   }
   return g.client.request<{ runId?: string }>("chat.send", send);
+}
+
+const CONNECT_PROBLEMS: Record<string, string> = {
+  not_configured: "Connect your gateway in Settings → OpenClaw.",
+  pairing_required: "Approve this device on your gateway, in Settings → OpenClaw.",
+  origin_not_allowed: "Your gateway doesn't accept Otter yet: see Settings → OpenClaw.",
+  unauthorized: "Your gateway didn't accept Otter's token: reconnect in Settings → OpenClaw.",
+  unreachable: "Can't reach your gateway.",
+};
+
+async function cronGateway(settings: OpenClawSettings): Promise<CronGateway> {
+  const g = await gateway(settings).catch((error: unknown) => {
+    throw new Error(CONNECT_PROBLEMS[connectError(error)] ?? CONNECT_PROBLEMS.unreachable);
+  });
+  return {
+    request: (method, params) => g.client.request(method, params),
+    scopes: g.scopes,
+    otterChannel: g.methods.includes(OTTER_SEND),
+  };
 }
 
 export const openClawProvider: ChatProvider<OpenClawSettings> = {
@@ -2097,6 +2127,27 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
   async deleteSession(settings, sessionId) {
     const g = await gateway(settings);
     await g.client.request("sessions.delete", { key: sessionId });
+  },
+
+  schedules: {
+    async list(settings) {
+      if (!settings.url || !(await hasOpenClawCredentials())) return null;
+      const g = await cronGateway(settings);
+      const { defaultId } = await listAgents(await gateway(settings)).catch(() => ({
+        defaultId: "main",
+      }));
+      return listTasks(g, defaultId);
+    },
+    save: async (settings, id, input) => saveTask(await cronGateway(settings), id, input),
+    setEnabled: async (settings, id, enabled) =>
+      setTaskEnabled(await cronGateway(settings), id, enabled),
+    runNow: async (settings, id) => runTask(await cronGateway(settings), id),
+    remove: async (settings, id) => removeTask(await cronGateway(settings), id),
+    runs: async (settings, id, limit) => taskRuns(await cronGateway(settings), id, limit),
+    runTranscript: async (settings, id, runId) =>
+      transcript(await runRows(await cronGateway(settings), id, runId)),
+    targets: async (settings, agent, channel) =>
+      channelTargets(await cronGateway(settings), agent, channel),
   },
 
   watch(settings, sessions, started, read) {
