@@ -469,6 +469,7 @@ function appendExchange(
         attachments: msg.sent,
         citations: msg.citations?.map(({ text, comment }) => ({ text, comment })),
         intent,
+        startedAt: Date.now(),
       },
       {
         id: `a-${requestKey}`,
