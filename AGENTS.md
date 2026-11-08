@@ -1,9 +1,17 @@
 # Otter
 
-Otter is a calm, fast Gmail client: an Electron app for macOS and Linux (Debian and
+Otter is your daily work, with your agents: mail, calendar, files and tasks in one calm app,
+and the user's own agents working across them. An Electron app for macOS and Linux (Debian and
 Ubuntu, a .deb), and the same app in the browser at https://otter.otterware.app. It is laid out
 like Otter Code (our fork of T3 Code): a pnpm monorepo built with Vite+ (`vp`); the desktop app
 ships through GitHub Releases with auto-update.
+
+In product copy (the app, the README, otterware.app) the words are: **modules** (Mail,
+Calendar, Drive, Tasks; Code soon), **plugins** (what `extensions/` are: features, UI and agent
+tools for a module, bringing its connectors), **connectors** (Gmail, Outlook, IMAP, Google
+Calendar, Todoist, Otter Drive, an OpenClaw gateway, Hermes), the user's **agents** over all of
+it, and **Scheduled** for what agents run on a schedule. Never "Otter Mail" for this app (the
+iPhone app keeps that name), "products", or "automations".
 
 What each app supports (Mac, Linux, web, iPhone; Gmail vs IMAP vs Outlook): `docs/features.md`. Keep it current
 when a feature lands or goes.

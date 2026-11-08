@@ -303,13 +303,13 @@ const PILLARS: { icon: ReactNode; title: string; body: string }[] = [
   },
   {
     icon: <AgentIcon />,
-    title: "An agent beside your mail",
-    body: "Ask about a conversation, have it find that one email, or let it draft the reply.",
+    title: "Your agents, right here",
+    body: "Bring Claude Code, Codex, OpenClaw or Hermes, and hand them the conversation in front of you.",
   },
   {
     icon: <LayersIcon />,
-    title: "Every mailbox in one place",
-    body: "Gmail and IMAP side by side, with views that cut across all of them.",
+    title: "Every mailbox and calendar",
+    body: "Gmail, Outlook and IMAP side by side, their calendars beside them, views across all of them.",
   },
 ];
 
@@ -323,7 +323,7 @@ function WelcomeStep({ onStart }: { onStart: () => void }) {
       />
       <StepHeader
         title="Welcome to Otter"
-        description="Calm, fast email for Gmail and any IMAP mailbox. A minute of setup and you're in."
+        description="Your daily work, with your agents: mail, calendar and more in one calm app. A minute of setup and you're in."
       />
       <div className="grid w-full grid-cols-2 gap-3">
         {PILLARS.map((p) => (
