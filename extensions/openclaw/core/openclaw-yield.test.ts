@@ -697,6 +697,168 @@ describe("what an agent delivers to Otter", () => {
     );
   });
 
+  const numbered = (seq: number, m: Record<string, unknown>) => ({
+    ...m,
+    __openclaw: { ...(m.__openclaw as object), seq },
+  });
+
+  it("reads a chat from where it was last read, and still shows a delivery missed before your next message", async () => {
+    const now = Date.now();
+    const reads: [string, string][] = [];
+    gateway((method) => {
+      if (method === "sessions.list") return { sessions: [{ key: "s", updatedAt: now }] };
+      if (method === "chat.history")
+        return {
+          sessionId: "t-1",
+          messages: [
+            numbered(4, sent),
+            numbered(5, row("req-1", [{ type: "text", text: "Scheduled." }])),
+            // The check-in was missed; you've written in the chat since.
+            numbered(6, delivered("d-checkin", "Did you sort out the contract?", now - 5000)),
+            numbered(7, { ...sent, __openclaw: { idempotencyKey: "req-2:user" } }),
+            numbered(8, row("req-2", [{ type: "text", text: "It ran at 10:00." }])),
+          ],
+        };
+      return undefined;
+    });
+    const started: AgentRun[] = [];
+    openClawProvider.watch!(
+      settings,
+      [{ id: "s", since: now, cursor: "t-1:5" }],
+      (run) => started.push(run),
+      (key, cursor) => reads.push([key, cursor]),
+    );
+    await vi.waitFor(() =>
+      expect(started).toEqual([
+        {
+          sessionId: "s",
+          requestId: "run:delivery:d-checkin",
+          deliveredAt: now - 5000,
+          delivery: { kind: "automation" },
+        },
+      ]),
+    );
+    expect(reads).toEqual([["s", "t-1:8"]]);
+  });
+
+  it("reads all of a chat whose session was reset since", async () => {
+    const now = Date.now();
+    const reads: [string, string][] = [];
+    gateway((method) => {
+      if (method === "sessions.list") return { sessions: [{ key: "s", updatedAt: now }] };
+      if (method === "chat.history")
+        return {
+          sessionId: "t-2",
+          messages: [
+            numbered(1, delivered("d-after", "Your brief.", now - 1000)),
+            numbered(2, sent),
+            numbered(3, row("req-1", [{ type: "text", text: "Thanks." }])),
+          ],
+        };
+      return undefined;
+    });
+    const started: AgentRun[] = [];
+    openClawProvider.watch!(
+      settings,
+      [{ id: "s", since: now - 60_000, cursor: "t-1:40" }],
+      (run) => started.push(run),
+      (key, cursor) => reads.push([key, cursor]),
+    );
+    await vi.waitFor(() => expect(reads).toEqual([["s", "t-2:3"]]));
+    await vi.waitFor(() =>
+      expect(started.map((run) => run.requestId)).toEqual(["run:delivery:d-after"]),
+    );
+  });
+
+  it("catches a chat with no cursor yet up on what it missed today, before your later messages", async () => {
+    const now = Date.now();
+    const reads: [string, string][] = [];
+    gateway((method) => {
+      if (method === "sessions.list") return { sessions: [{ key: "s", updatedAt: now }] };
+      if (method === "chat.history")
+        return {
+          sessionId: "t-1",
+          messages: [
+            numbered(1, delivered("d-old", "Last week's brief.", now - 3 * 24 * 60 * 60 * 1000)),
+            numbered(2, delivered("d-today", "This morning's check-in.", now - 3 * 60 * 60 * 1000)),
+            numbered(3, sent),
+            numbered(4, row("req-1", [{ type: "text", text: "Done." }])),
+          ],
+        };
+      return undefined;
+    });
+    const started: AgentRun[] = [];
+    openClawProvider.watch!(
+      settings,
+      [{ id: "s", since: now - 1000 }],
+      (run) => started.push(run),
+      (key, cursor) => reads.push([key, cursor]),
+    );
+    await vi.waitFor(() => expect(reads).toEqual([["s", "t-1:4"]]));
+    await vi.waitFor(() =>
+      expect(started.map((run) => run.requestId)).toEqual(["run:delivery:d-today"]),
+    );
+  });
+
+  it("still shows what was delivered while a turn of yours was going in the chat", async () => {
+    const now = Date.now();
+    gateway((method, params) => {
+      if (method === "sessions.list") return { sessions: [{ key: "s", updatedAt: now }] };
+      if (method === "chat.history" && (params as { limit?: number }).limit === 200)
+        return {
+          sessionId: "t-1",
+          messages: [
+            numbered(1, sent),
+            numbered(2, delivered("d-during", "Your 10:00 check-in.", now - 1000)),
+          ],
+        };
+      return undefined;
+    });
+    const { events, ended } = send();
+    await vi.waitFor(() =>
+      expect(fixture.request).toHaveBeenCalledWith("chat.send", expect.anything()),
+    );
+    const started: AgentRun[] = [];
+    openClawProvider.watch!(settings, [{ id: "s", since: now, cursor: "t-1:0" }], (run) =>
+      started.push(run),
+    );
+    await vi.waitFor(() =>
+      expect(started.map((run) => run.requestId)).toEqual(["run:delivery:d-during"]),
+    );
+    expect(settled(events)).toBe(false);
+    event("chat", { runId: "req-1", state: "final" });
+    await ended;
+  });
+
+  it("doesn't read a chat again that hasn't changed, nor show twice what it read", async () => {
+    const now = Date.now();
+    const reads: [string, string][] = [];
+    gateway((method) => {
+      if (method === "sessions.list") return { sessions: [{ key: "s", updatedAt: now }] };
+      if (method === "chat.history")
+        return {
+          sessionId: "t-1",
+          messages: [numbered(9, delivered("d-once", "Once.", now - 1000))],
+        };
+      return undefined;
+    });
+    const started: AgentRun[] = [];
+    openClawProvider.watch!(
+      settings,
+      [{ id: "s", since: now - 60_000, cursor: "t-1:8" }],
+      (run) => started.push(run),
+      (key, cursor) => reads.push([key, cursor]),
+    );
+    await vi.waitFor(() => expect(started).toHaveLength(1));
+    const histories = () =>
+      fixture.request.mock.calls.filter(([method]) => method === "chat.history").length;
+    const before = histories();
+    event("sessions.changed", {});
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    expect(histories()).toBe(before);
+    expect(started).toHaveLength(1);
+  });
+
   it("is caught up on in a watched chat when the gateway says it changed, with no pointer", async () => {
     const now = Date.now();
     let messages: unknown[] = [sent, row("req-1", [{ type: "text", text: "Scheduled." }])];

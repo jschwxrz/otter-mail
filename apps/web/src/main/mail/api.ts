@@ -625,7 +625,7 @@ export const mailApi = {
   /** Watches these chats' sessions for runs the agent starts itself; they arrive as `agent:runStarted`. */
   agentWatch: (
     provider: ProviderKind,
-    sessions: { id: string; since: number }[],
+    sessions: { id: string; since: number; cursor?: string }[],
   ): Promise<{ ok: boolean }> => ipc("agent:watch", { provider, sessions }),
 
   agentStageAttachments: (

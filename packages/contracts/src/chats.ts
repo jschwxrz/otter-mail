@@ -91,6 +91,8 @@ export interface Chat {
   returnedAt?: number | null;
   tabs: ChatTab[];
   turns: ChatTurn[];
+  /** Where its turns are read up to in the agent's session, on agents that number what they write. */
+  cursor?: string | null;
 }
 
 /** A chat listed for one of its messages: `chats:search`. */
