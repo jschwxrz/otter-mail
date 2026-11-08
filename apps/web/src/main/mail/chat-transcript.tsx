@@ -22,6 +22,7 @@ import type { ContextKind, ContextMeta } from "./chat-context";
 import { findTokenRanges, messageTokens } from "@otter/shared/chat-search";
 import { useChats, type ChatTurn } from "./chat-store";
 import { ChatMarkdown } from "./chat-markdown";
+import { messageTime } from "./chat-time";
 import { ChatChanges } from "./chat-changes";
 import { SentAttachments } from "./chat-attachments";
 import { IntentMarker } from "./chat-queue";
@@ -244,6 +245,17 @@ function ErrorRow({ message, providerName }: { message: string; providerName: st
   );
 }
 
+function MessageTime({ at }: { at: number | undefined }) {
+  if (!at) return null;
+  return (
+    <HintTooltip label={new Date(at).toLocaleString([], { dateStyle: "full", timeStyle: "short" })}>
+      <span className="px-1 text-xs text-muted-foreground tabular-nums opacity-0 transition-opacity group-hover:opacity-100">
+        {messageTime(at)}
+      </span>
+    </HintTooltip>
+  );
+}
+
 function CopyMessageButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   useEffect(() => {
@@ -366,7 +378,10 @@ export function ChatTranscript({
               ))}
               {turn.text}
             </div>
-            {turn.text ? <CopyMessageButton text={turn.text} /> : null}
+            <div className="flex items-center">
+              <MessageTime at={turn.startedAt} />
+              {turn.text ? <CopyMessageButton text={turn.text} /> : null}
+            </div>
           </div>
         </MessageScroller.Item>
       );
@@ -408,7 +423,8 @@ export function ChatTranscript({
                 <ChatMarkdown text={answer} onOpenFile={onOpenFile} loadImage={loadImage} />
               </div>
               {!live ? (
-                <div className="mt-1 flex">
+                <div className="mt-1 flex items-center">
+                  <MessageTime at={turn.finishedAt ?? turn.startedAt} />
                   <CopyMessageButton text={answer} />
                   {onFork && !streaming ? (
                     <HintTooltip label="Fork conversation">
