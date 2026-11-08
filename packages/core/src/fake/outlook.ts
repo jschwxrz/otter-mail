@@ -1,8 +1,8 @@
 /**
- * Demo mode's Outlook (`pnpm dev:fake`): a pretend Microsoft Graph in the
- * backend's Worker, beside the pretend Gmail (gmail.ts).
+ * The made-up Outlook (index.ts): a pretend Microsoft Graph in the backend,
+ * beside the pretend Gmail (gmail.ts).
  *
- * `installFakeOutlook` wraps the Worker's fetch: calls to Graph are answered
+ * `installFakeOutlook` wraps the backend's fetch: calls to Graph are answered
  * from the seeded mailbox (@otter/shared/demo-mailboxes'
  * DEMO_OUTLOOK_ACCOUNT), which lives in the demo's own files and changes as
  * the app moves, flags, categorizes, drafts and sends. Every change takes the
@@ -11,14 +11,10 @@
  * changed since. `demoMicrosoftAuth` signs the mailbox in.
  */
 
-import {
-  accountStore,
-  fromBase64,
-  toBase64,
-  type MailAccount,
-  type MicrosoftAuth,
-  type Platform,
-} from "@otter/core";
+import * as accountStore from "../services/account-store.js";
+import { fromBase64, toBase64 } from "../bytes.js";
+import type { MicrosoftAuth, Platform } from "../platform.js";
+import type { MailAccount } from "../types.js";
 
 import {
   DEMO_OUTLOOK_ACCOUNT,
@@ -26,14 +22,14 @@ import {
   type OutlookSeedFolder,
 } from "@otter/shared/demo-mailboxes";
 
-import { parseMime } from "./gmail";
-import { busyWeek } from "./calendar";
+import { parseMime } from "./gmail.js";
+import { busyWeek } from "./calendar.js";
 
 const GRAPH_HOST = "graph.microsoft.com";
 const GRAPH = `https://${GRAPH_HOST}/v1.0`;
 const TOKEN_PREFIX = "outlook-demo:";
 const STATE_FILE = "demo-outlook.json";
-const STATE_VERSION = 2;
+const STATE_VERSION = 3;
 /** Every answer waits this long, so the app sees a network, not a function call. */
 const LATENCY_MS = 30;
 /** Graph's page when the request doesn't say: small, so paging gets exercised. */
@@ -124,7 +120,7 @@ type State = {
 };
 
 function newId(box: Mailbox, kind: string): string {
-  return `AAMkADdlbW8${kind}${(box.nextId++).toString(36).padStart(6, "0")}AAA`;
+  return `AAkALgAAAAAA${kind}${(box.nextId++).toString(36).padStart(6, "0")}AAA`;
 }
 
 const recipient = (person: Person): Recipient => ({

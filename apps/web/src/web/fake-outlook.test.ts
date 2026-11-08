@@ -30,7 +30,7 @@ const offline = async () =>
 async function install() {
   vi.resetModules();
   vi.stubGlobal("fetch", offline);
-  const fake = await import("./outlook");
+  const fake = await import("@otter/core/fake");
   await fake.installFakeOutlook(memoryFiles());
   return fake;
 }
@@ -278,7 +278,7 @@ async function boot() {
   };
   vi.spyOn(console, "log").mockImplementation(() => {});
   // After resetModules: the extensions must share this test's fresh core.
-  const { webExtensions } = await import("../extensions");
+  const { webExtensions } = await import("./extensions");
   await core.startCore(platform, webExtensions);
   const invoke = <T>(channel: string, params?: unknown) =>
     core.registeredHandlers().get(channel)!(params) as Promise<T>;
