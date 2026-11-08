@@ -163,7 +163,7 @@ describe("taskOf", () => {
       },
       { slack: "Slack" },
     );
-    expect(task.deliveryProblem).toBe("Channel is required");
+    expect(task.deliveryProblem).toBe("Channel is required.");
     expect(
       taskOf({ ...brief, delivery: { mode: "announce" } } as never, "main", {
         label: "announce -> last",
@@ -171,6 +171,23 @@ describe("taskOf", () => {
           "last -> no route, will be blocked: Channel is required when multiple channels are configured: telegram, otter. Pass --channel <channel> to choose one.",
       }).deliveryProblem,
     ).toMatch(/more than one channel/);
+    expect(
+      taskOf({ ...brief, delivery: { mode: "announce", channel: "telegram" } } as never, "main", {
+        label: "announce -> telegram",
+        detail:
+          'Delivering to Telegram requires target <chatId> Configure a channel and delivery target, or use delivery:{mode:"none"} for no automatic delivery.',
+      }).deliveryProblem,
+    ).toBe("Delivering to Telegram requires target <chatId>.");
+    expect(
+      taskOf(
+        { ...brief, delivery: { mode: "announce", channel: "telegram", to: "x" } } as never,
+        "main",
+        {
+          label: "announce -> telegram:x",
+          detail: 'Unknown target "x" for Telegram. Configure a channel and delivery target.',
+        },
+      ).deliveryProblem,
+    ).toBe('Unknown target "x" for Telegram.');
     expect(task.failureAlerts).toBe("Slack channel:COPS");
     expect(
       taskOf(

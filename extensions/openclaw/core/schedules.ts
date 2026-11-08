@@ -153,12 +153,18 @@ export function deliveryOf(job: Job, labels: ChannelLabels = {}, preview?: Previ
 /** Why the gateway says a result won't arrive, if it does. */
 function deliveryProblem(preview?: Preview): string | undefined {
   const detail = preview?.detail;
-  if (!detail || !/will be blocked|requires review|unavailable|unresolved/.test(detail))
-    return undefined;
+  const failed =
+    /will be blocked|requires review|unavailable|unresolved|Unknown target|Configure a channel and delivery target/;
+  if (!detail || !failed.test(detail)) return undefined;
   if (/multiple channels are configured/.test(detail))
     return "OpenClaw has more than one channel, so it can't tell where to send these: choose one.";
-  const reason = detail.replace(/^.*?will be blocked:\s*/, "");
-  return /^[^.]*\.?/.exec(reason)?.[0] ?? reason;
+  // The gateway's own advice ("Configure a channel… or use delivery:{mode:"none"}") is for its CLI.
+  const reason = detail
+    .replace(/^.*?will be blocked:\s*/, "")
+    .split(/\s*Configure a channel and delivery target/)[0]
+    .trim();
+  const first = /^[^.]*\.?/.exec(reason)?.[0] ?? reason;
+  return first.endsWith(".") ? first : `${first}.`;
 }
 
 /** A route as people say it: "Slack channel:C0123", "a webhook (hooks.example.com)". */

@@ -911,7 +911,8 @@ function destinationOf(task: ScheduledTask | null, agent?: AgentScheduledTasks):
   if (d.kind === "none") return { ...none, pick: "off" };
   if (d.kind === "otter" && d.chat === "new") return { ...none, pick: "new-chat" };
   if (d.kind === "webhook") return { ...none, pick: "webhook", url: d.url };
-  if (d.kind === "channel" && agent?.channels.some((c) => c.id === d.channel))
+  // A channel left to resolve its own recipient keeps going there until you name one.
+  if (d.kind === "channel" && d.to && agent?.channels.some((c) => c.id === d.channel))
     return { ...none, pick: `channel:${d.channel}`, to: d.to ?? "", account: d.accountId ?? "" };
   return { ...none, pick: "keep" };
 }
