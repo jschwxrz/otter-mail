@@ -1318,6 +1318,14 @@ describe("chats", () => {
         ref: { kind: "thread", accountId: "me@example.com", id: "t1" },
         addedAt: 1_500,
       },
+      {
+        id: "file:/tmp/venues.md",
+        title: "venues.md",
+        ref: { kind: "file", href: "/tmp/venues.md" },
+        addedAt: 1_600,
+        made: true,
+        closedAt: 1_700,
+      },
     ],
     turns: [
       { id: "u-1", role: "user", text: "Find a venue" },

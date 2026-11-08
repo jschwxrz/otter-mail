@@ -263,7 +263,12 @@ function merged(remote: Chat, local: Chat | undefined): Chat {
       })),
     };
   });
-  return { ...remote, turns: [...(at > 0 ? local.turns.slice(0, at) : []), ...turns] };
+  return {
+    ...remote,
+    // Where this device has read the chat's session up to is its own: the relay doesn't keep it.
+    ...(local.cursor && { cursor: local.cursor }),
+    turns: [...(at > 0 ? local.turns.slice(0, at) : []), ...turns],
+  };
 }
 
 export async function pullChats(): Promise<void> {

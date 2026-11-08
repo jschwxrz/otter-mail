@@ -8,14 +8,7 @@ import {
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useShallow } from "zustand/react/shallow";
-import {
-  FileIcon,
-  FilePenLineIcon,
-  GlobeIcon,
-  MailIcon,
-  PlusIcon,
-  TriangleAlertIcon,
-} from "lucide-react";
+import { PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { chatTabId, type ChatTabRef } from "@otter/contracts/chats";
 
 import { BrowserPages } from "../browser/browser-view";
@@ -35,6 +28,7 @@ import { useMailChatContext } from "./chat-context";
 import {
   closeChatTab,
   isBlank,
+  isOpenTab,
   newChat,
   openChatTab,
   reorderChatTabs,
@@ -44,6 +38,7 @@ import {
   type ChatTab,
 } from "./chat-store";
 import { AgentBrowser, AgentBrowserTabIcon } from "./agent-browser";
+import { ChatContextButton, TAB_ICONS } from "./chat-context-panel";
 import { ChatTitle } from "./chat-title";
 import { ChatView } from "./chat-view";
 import { DitherBackdrop } from "./dither-backdrop";
@@ -57,7 +52,6 @@ import { HintTooltip, cn } from "./ui";
 
 export type ChatPanelControl = { toggle: () => void; newPage: () => void };
 
-const TAB_ICONS = { thread: MailIcon, draft: FilePenLineIcon, page: GlobeIcon, file: FileIcon };
 /** The agent's browser, live: a tab of this device's, not one the chat keeps. */
 const LIVE_TAB = "agent-browser";
 
@@ -137,7 +131,9 @@ export function ChatWorkspace({
   const convo = useChats((s) => s.conversations.find((c) => c.id === chatId));
   const activeTab = useChats((s) => s.activeTabs[chatId]);
   const { selectedKind } = useChatProvider(undefined);
-  const tabs = (convo?.tabs ?? []).filter((t) => features.browser || t.ref.kind !== "page");
+  const tabs = (convo?.tabs ?? []).filter(
+    (t) => isOpenTab(t) && (features.browser || t.ref.kind !== "page"),
+  );
   const chatAgent = useChatProvider(convo);
   const [browserSteps, browserDone] = useChats(
     useShallow((s) => {
@@ -352,6 +348,18 @@ export function ChatWorkspace({
             <>
               <AgentAvatar kind={convo.provider} agent={openClawAgentId(convo.sessionId)} />
               <ChatTitle chat={convo} className="text-sm font-medium text-foreground" />
+              <span className="flex-1" />
+              <ChatContextButton
+                convo={convo}
+                onOpen={(tab) => {
+                  if (tab.ref.kind === "page" && !features.browser) {
+                    window.open(tab.ref.url, "_blank", "noopener");
+                    return;
+                  }
+                  openChatTab(chatId, tab.ref, tab.title);
+                  setPanelHidden(false);
+                }}
+              />
             </>
           )}
           {panelOpen ? null : titleTrailing}

@@ -657,6 +657,8 @@ const chatBody = z.object({
         title: z.string().max(CHAT_LIMITS.title + 1),
         ref: tabRef,
         addedAt: timestamp,
+        made: z.boolean().optional(),
+        closedAt: timestamp.nullish(),
       }),
     )
     .max(CHAT_LIMITS.tabs),

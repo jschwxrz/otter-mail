@@ -70,6 +70,10 @@ export interface ChatTab {
   title: string;
   ref: ChatTabRef;
   addedAt: number;
+  /** What the agent made (a draft, a file, an event), not what it read. */
+  made?: boolean;
+  /** Closed in the panel: still among what the chat used and made, to open again. */
+  closedAt?: number | null;
 }
 
 export interface Chat {

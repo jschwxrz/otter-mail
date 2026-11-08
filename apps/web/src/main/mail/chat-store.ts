@@ -673,27 +673,39 @@ export async function answerQuestion(
   }
 }
 
+/** A tab open in the chat's panel; a closed one is still in the chat's context. */
+export const isOpenTab = (tab: ChatTab) => !tab.closedAt;
+
+/**
+ * Opens a tab in the chat's panel, or brings back one closed there. What the agent opens on its
+ * own (`show: false`) leaves a tab you closed closed.
+ */
 export function openChatTab(
   convoId: string,
   ref: ChatTabRef,
   title: string,
-  { show = true }: { show?: boolean } = {},
+  { show = true, made }: { show?: boolean; made?: boolean } = {},
 ): void {
   const id = chatTabId(ref);
   set((s) => {
     const convo = s.conversations.find((c) => c.id === convoId);
     if (!convo) return s;
-    const conversations = convo.tabs.some((t) => t.id === id)
-      ? s.conversations
-      : s.conversations.map((c) =>
-          c === convo
-            ? {
-                ...c,
-                tabs: [...c.tabs, { id, title: clampTitle(title), ref, addedAt: Date.now() }],
-                updatedAt: Date.now(),
-              }
-            : c,
-        );
+    const existing = convo.tabs.find((t) => t.id === id);
+    if (existing?.closedAt && !show) return s;
+    const tabs = existing
+      ? existing.closedAt || (made && !existing.made)
+        ? convo.tabs.map((t) =>
+            t === existing ? { ...t, closedAt: null, ...(made && { made: true }) } : t,
+          )
+        : convo.tabs
+      : [
+          ...convo.tabs,
+          { id, title: clampTitle(title), ref, addedAt: Date.now(), ...(made && { made: true }) },
+        ];
+    const conversations =
+      tabs === convo.tabs
+        ? s.conversations
+        : s.conversations.map((c) => (c === convo ? { ...c, tabs, updatedAt: Date.now() } : c));
     const activeTabs =
       show || !s.activeTabs[convoId] ? { ...s.activeTabs, [convoId]: id } : s.activeTabs;
     return { conversations, activeTabs };
@@ -707,16 +719,18 @@ export function showChatTab(convoId: string, tabId: string): void {
 export function closeChatTab(convoId: string, tabId: string): void {
   set((s) => {
     const convo = s.conversations.find((c) => c.id === convoId);
-    const at = convo?.tabs.findIndex((t) => t.id === tabId) ?? -1;
+    const open = convo?.tabs.filter(isOpenTab) ?? [];
+    const at = open.findIndex((t) => t.id === tabId);
     if (!convo || at < 0) return s;
-    const tabs = convo.tabs.filter((t) => t.id !== tabId);
+    const rest = open.filter((t) => t.id !== tabId);
     const shown = s.activeTabs[convoId];
     const activeTabs = { ...s.activeTabs };
     if (shown === tabId || !shown) {
-      const next = tabs[at - 1] ?? tabs[at];
+      const next = rest[at - 1] ?? rest[at];
       if (next) activeTabs[convoId] = next.id;
       else delete activeTabs[convoId];
     }
+    const tabs = convo.tabs.map((t) => (t.id === tabId ? { ...t, closedAt: Date.now() } : t));
     return {
       conversations: s.conversations.map((c) =>
         c === convo ? { ...c, tabs, updatedAt: Date.now() } : c,
@@ -740,15 +754,16 @@ export function reorderChatTabs(convoId: string, order: string[]): void {
 const hostOf = (url: string) => URL.parse(url)?.host.replace(/^www\./, "") ?? url;
 const basename = (path: string) => path.split(/[\\/]/).pop() || path;
 
-function changeTab(change: ChatChange): { ref: ChatTabRef; title: string } | null {
+function changeTab(change: ChatChange): { ref: ChatTabRef; title: string; made: boolean } | null {
   const { target } = change;
   if (target.kind === "thread" || target.kind === "draft")
     return {
       ref: { kind: target.kind, accountId: target.accountId, id: target.id },
       title: change.title,
+      made: target.kind === "draft",
     };
   if (target.kind === "event" && target.url && change.action !== "deleted")
-    return { ref: { kind: "page", url: target.url }, title: change.title };
+    return { ref: { kind: "page", url: target.url }, title: change.title, made: true };
   return null;
 }
 
@@ -1207,7 +1222,7 @@ function onChatEvent(raw: unknown): void {
     : undefined;
   if (!event || !s) return;
   const opens: {
-    result: { ref: ChatTabRef; title: string } | null;
+    result: { ref: ChatTabRef; title: string; made: boolean } | null;
     pages: string[];
     files: { title: string; href: string }[];
   } = { result: null, pages: [], files: [] };
@@ -1351,11 +1366,15 @@ function onChatEvent(raw: unknown): void {
       updatedAt: Date.now(),
     };
   });
-  if (opens.result) openChatTab(s.convoId, opens.result.ref, opens.result.title);
+  if (opens.result)
+    openChatTab(s.convoId, opens.result.ref, opens.result.title, { made: opens.result.made });
   for (const url of opens.pages)
     openChatTab(s.convoId, { kind: "page", url }, hostOf(url), { show: false });
   for (const file of opens.files)
-    openChatTab(s.convoId, { kind: "file", href: file.href }, file.title, { show: false });
+    openChatTab(s.convoId, { kind: "file", href: file.href }, file.title, {
+      show: false,
+      made: true,
+    });
   if (event.type === "done" || event.type === "error") {
     set((st) => ({
       conversations: st.conversations.map((c) =>
