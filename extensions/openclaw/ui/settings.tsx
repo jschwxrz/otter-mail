@@ -258,8 +258,8 @@ export function OpenClawSettings({ provider, update }: AgentSettingsProps) {
         ) : null}
         {connected && openclawOwner === false ? (
           <SettingsRow
-            title="Manage every automation"
-            description="A chat can only see and change the automations it made, and the agent doesn't know which Otter chats it can post to. Allowing this lists Otter as one of the gateway's owners (commands.ownerAllowFrom), as you would your own Telegram account, so any chat can manage them all, and lets Otter's plugin tell the agent where it can deliver: this chat, or a new chat each time."
+            title="Manage every scheduled task"
+            description="A chat can only see and change the scheduled tasks it made, and the agent doesn't know which Otter chats it can post to. Allowing this lists Otter as one of the gateway's owners (commands.ownerAllowFrom), as you would your own Telegram account, so any chat can manage them all, and lets Otter's plugin tell the agent where it can deliver: this chat, or a new chat each time."
             control={
               <Btn size="sm" disabled={asking} onClick={() => void allowOwner()}>
                 {asking ? "Allowing…" : "Allow"}
