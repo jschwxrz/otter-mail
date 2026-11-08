@@ -179,6 +179,20 @@ describe("chats", () => {
     expect(step?.kind === "step" && step.output).toBe(long);
   });
 
+  it("keeps where this device has read the chat's session when another device writes", async () => {
+    await chats.saveChat(chat("c9", { cursor: "t-1:42", updatedAt: 100 }));
+    await settle();
+    const synced = relay.chats.get("c9")!;
+    const { cursor: _cursor, ...elsewhere } = synced;
+    relay.chats.set("c9", { ...elsewhere, title: "Renamed elsewhere", updatedAt: 200 });
+
+    await chats.pullChats();
+
+    const here = (await chats.getChat("c9"))!;
+    expect(here.title).toBe("Renamed elsewhere");
+    expect(here.cursor).toBe("t-1:42");
+  });
+
   it("lets the oldest chats go everywhere past the limit", async () => {
     for (let i = 0; i < 500; i++) await chats.saveChat(chat(`old${i}`, { updatedAt: 1000 + i }));
     await chats.saveChat(chat("newest", { updatedAt: 5000 }));
