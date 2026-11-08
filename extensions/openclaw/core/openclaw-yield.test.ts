@@ -938,6 +938,7 @@ describe("what an agent delivers to Otter", () => {
           deliveredAt: now,
           delivery: {
             kind: "automation",
+            jobId: "job-lease",
             name: "Lease reminders",
             schedule: "0 9 * * 1 (Europe/Berlin)",
           },

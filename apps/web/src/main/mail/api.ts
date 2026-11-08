@@ -3,6 +3,7 @@ import type { AliasMailbox, ImapSettings } from "@otter/contracts";
 import type { NotificationConnection } from "@otter/contracts/relay";
 export type { ChatChange } from "@otter/contracts";
 import type { AgentAccess, AgentTokens, ConnectedAgent } from "@otter/contracts/agent-tokens";
+import type { AgentScheduledTasks, ScheduledTaskInput, TaskRun } from "@otter/contracts/scheduled";
 import type {
   ComposeAttachment,
   ContactSuggestion,
@@ -724,6 +725,29 @@ export const mailApi = {
 
   agentDeleteSession: (provider: ProviderKind, sessionId: string): Promise<{ ok: boolean }> =>
     ipc("agent:deleteSession", { provider, sessionId }),
+
+  scheduledTasks: (): Promise<AgentScheduledTasks[]> => ipc("agent:scheduled"),
+  saveScheduledTask: (
+    provider: ProviderKind,
+    id: string | null,
+    task: ScheduledTaskInput,
+  ): Promise<{ id: string }> => ipc("agent:saveScheduled", { provider, id, task }),
+  setScheduledTaskEnabled: (
+    provider: ProviderKind,
+    id: string,
+    enabled: boolean,
+  ): Promise<{ ok: boolean }> => ipc("agent:setScheduledEnabled", { provider, id, enabled }),
+  runScheduledTask: (provider: ProviderKind, id: string): Promise<{ ok: boolean }> =>
+    ipc("agent:runScheduled", { provider, id }),
+  deleteScheduledTask: (provider: ProviderKind, id: string): Promise<{ ok: boolean }> =>
+    ipc("agent:deleteScheduled", { provider, id }),
+  scheduledTaskRuns: (provider: ProviderKind, id: string, limit = 20): Promise<TaskRun[]> =>
+    ipc("agent:scheduledRuns", { provider, id, limit }),
+  scheduledRunTranscript: (
+    provider: ProviderKind,
+    id: string,
+    runId: string,
+  ): Promise<ChatSessionMessage[]> => ipc("agent:scheduledRunTranscript", { provider, id, runId }),
 
   connectedAgents: (): Promise<AgentTokens<ConnectedAgent>> => ipc("mcp:listAgents"),
   addConnectedAgent: (name: string, access: AgentAccess): Promise<string> =>

@@ -29,6 +29,7 @@ import type {
   ProviderModelOption,
   Skill,
 } from "@otter/core/extension-kit";
+import type { ScheduledTask, ScheduledTaskInput } from "@otter/contracts/scheduled";
 import { HERMES_DEFAULTS, type HermesSettings } from "./settings.js";
 
 const IDLE_TIMEOUT_MS = 180_000;
@@ -610,6 +611,114 @@ function dropApprovals(requestId: string): void {
   }
 }
 
+type HermesJob = {
+  id: string;
+  name?: string;
+  prompt?: string;
+  schedule?: { kind?: string; expr?: string; minutes?: number; run_at?: string; display?: string };
+  schedule_display?: string;
+  timezone?: string;
+  enabled?: boolean;
+  state?: string;
+  paused_reason?: string | null;
+  next_run_at?: string | null;
+  last_run_at?: string | null;
+  last_status?: string | null;
+  last_error?: string | null;
+  deliver?: string;
+  no_agent?: boolean;
+  script?: string | null;
+};
+
+const time = (iso: string | null | undefined) => {
+  const at = iso ? Date.parse(iso) : NaN;
+  return Number.isNaN(at) ? undefined : at;
+};
+
+/** A Hermes cron job (GET /api/jobs) as a scheduled task. */
+export function hermesTask(job: HermesJob): ScheduledTask {
+  const s = job.schedule ?? {};
+  const schedule: ScheduledTask["schedule"] =
+    s.kind === "cron" && s.expr
+      ? { kind: "cron", expr: s.expr, ...(job.timezone ? { tz: job.timezone } : {}) }
+      : s.kind === "interval" && s.minutes
+        ? { kind: "every", everyMs: s.minutes * 60_000 }
+        : s.kind === "once" && s.run_at
+          ? { kind: "at", at: s.run_at }
+          : { kind: "other", text: job.schedule_display ?? s.display ?? "On its own schedule" };
+  const enabled = job.enabled !== false && job.state !== "paused";
+  const nextRunAt = enabled ? time(job.next_run_at) : undefined;
+  const lastAt = time(job.last_run_at);
+  const failed = job.last_status === "error" || job.last_status === "failed";
+  const deliver = job.deliver ?? "local";
+  return {
+    provider: "hermes",
+    id: job.id,
+    name: job.name || job.id,
+    ...(job.prompt && !job.no_agent ? { prompt: job.prompt } : {}),
+    schedule,
+    enabled,
+    running: job.state === "running",
+    ...(nextRunAt ? { nextRunAt } : {}),
+    ...(lastAt && job.last_status
+      ? {
+          lastRun: {
+            at: lastAt,
+            status: failed ? "error" : "ok",
+            ...(failed && job.last_error ? { error: job.last_error } : {}),
+          },
+        }
+      : {}),
+    delivery:
+      deliver === "local"
+        ? { kind: "none" }
+        : {
+            kind: "elsewhere",
+            label:
+              deliver === "origin"
+                ? "where it was set up"
+                : deliver.charAt(0).toUpperCase() + deliver.slice(1),
+          },
+  };
+}
+
+/** A schedule in words Hermes parses (`hermes cron`'s): a cron expression, `every 90m`, an ISO time. */
+export function hermesSchedule(schedule: ScheduledTaskInput["schedule"]): string {
+  if (schedule.kind === "cron") return schedule.expr;
+  if (schedule.kind === "every")
+    return `every ${Math.max(1, Math.round(schedule.everyMs / 60_000))}m`;
+  return schedule.at;
+}
+
+async function jobsRequest<T>(
+  settings: HermesSettings,
+  path: string,
+  init: { method?: string; body?: unknown } = {},
+): Promise<T> {
+  const ready = await requireReady(settings).catch(() => {
+    throw new Error("Connect Hermes in Settings → Hermes.");
+  });
+  const response = await fetch(`${ready.root}/api/jobs${path}`, {
+    method: init.method ?? "GET",
+    headers: authHeaders(ready.key, init.body !== undefined),
+    ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      error?: string | { message?: string };
+    } | null;
+    const message = typeof body?.error === "string" ? body.error : body?.error?.message;
+    if (response.status === 404 && path.startsWith("/"))
+      throw new Error("That task is gone from Hermes.");
+    if (response.status === 404 || response.status === 501)
+      throw new Error("This Hermes doesn't run scheduled tasks. Update it to manage them here.");
+    throw new Error(message ?? `Hermes answered ${response.status}.`);
+  }
+  return (await response.json().catch(() => ({}))) as T;
+}
+
+const jobPath = (id: string) => `/${encodeURIComponent(id)}`;
+
 export const hermesProvider: ChatProvider<HermesSettings> = {
   kind: "hermes",
   displayName: "Hermes",
@@ -878,6 +987,44 @@ export const hermesProvider: ChatProvider<HermesSettings> = {
         ...(toolCalls.length > 0 ? { toolCalls } : {}),
       };
     });
+  },
+
+  schedules: {
+    async list(settings) {
+      if (!(await requireReady(settings).catch(() => null))) return null;
+      const { jobs } = await jobsRequest<{ jobs: HermesJob[] }>(settings, "?include_disabled=true");
+      return {
+        tasks: jobs.map(hermesTask),
+        can: { create: true, deliverToOtter: false, history: false, timeZones: false },
+      };
+    },
+    async save(settings, id, input) {
+      const body = {
+        name: input.name,
+        schedule: hermesSchedule(input.schedule),
+        ...(input.prompt !== undefined ? { prompt: input.prompt } : {}),
+      };
+      if (id) {
+        await jobsRequest(settings, jobPath(id), { method: "PATCH", body });
+        return id;
+      }
+      const made = await jobsRequest<{ job?: { id?: string } }>(settings, "", {
+        method: "POST",
+        body: { ...body, deliver: "local" },
+      });
+      return made.job?.id ?? "";
+    },
+    async setEnabled(settings, id, enabled) {
+      await jobsRequest(settings, `${jobPath(id)}/${enabled ? "resume" : "pause"}`, {
+        method: "POST",
+      });
+    },
+    async runNow(settings, id) {
+      await jobsRequest(settings, `${jobPath(id)}/run`, { method: "POST" });
+    },
+    async remove(settings, id) {
+      await jobsRequest(settings, jobPath(id), { method: "DELETE" });
+    },
   },
 
   async deleteSession(settings, sessionId) {

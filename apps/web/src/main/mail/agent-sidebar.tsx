@@ -2,6 +2,7 @@ import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlarmClockIcon,
+  CalendarClockIcon,
   CheckIcon,
   ChevronRightIcon,
   CircleAlertIcon,
@@ -25,6 +26,7 @@ import {
   splitSearchText,
   type SearchRange,
 } from "@otter/shared/chat-search";
+import { SCHEDULED_TASKS, useScheduledTasks } from "./agent-scheduled";
 import { AgentAvatar, openClawAgentId, useAgentProviders } from "./agent-providers";
 import { readableError } from "./add-mailbox";
 import {
@@ -632,6 +634,10 @@ export function AgentSidebar({
             </button>
           </HintTooltip>
         </div>
+        <ScheduledRow
+          selected={chatId === SCHEDULED_TASKS}
+          onSelect={() => onSelect(SCHEDULED_TASKS)}
+        />
       </div>
       <SidebarBody contentClassName="flex flex-col" flushBottom>
         {searching ? (
@@ -699,6 +705,45 @@ function Highlighted({ text, ranges }: { text: string; ranges: readonly SearchRa
     ) : (
       part.text
     ),
+  );
+}
+
+/** Every agent's scheduled tasks, for an app with an agent that runs any. */
+function ScheduledRow({ selected, onSelect }: { selected: boolean; onSelect: () => void }) {
+  const agents = useScheduledTasks().data;
+  if (!agents?.length) return null;
+  const tasks = agents.flatMap((a) => a.tasks);
+  const active = tasks.filter((t) => t.enabled && !t.managedBy).length;
+  const failing =
+    tasks.some((t) => t.enabled && t.lastRun?.status === "error") || agents.some((a) => a.error);
+  return (
+    <div className="px-(--sidebar-content-inset) pb-1">
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-current={selected ? "page" : undefined}
+        className={cn(
+          "flex h-8 w-full min-w-0 cursor-pointer items-center gap-2.5 rounded-lg px-(--sidebar-row-content-inset) text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
+          selected
+            ? "bg-sidebar-row-selected text-sidebar-foreground"
+            : "text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
+        )}
+      >
+        <CalendarClockIcon aria-hidden className="size-4 shrink-0" />
+        <span className="min-w-0 flex-1 truncate">Scheduled</span>
+        {failing ? (
+          <CircleAlertIcon
+            aria-label="One isn't working"
+            className="size-3.5 shrink-0 text-warning-foreground"
+          />
+        ) : null}
+        {active > 0 ? (
+          <span className="shrink-0 text-xs tabular-nums text-sidebar-muted-foreground/70">
+            {active}
+          </span>
+        ) : null}
+      </button>
+    </div>
   );
 }
 

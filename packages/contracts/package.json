@@ -8,6 +8,7 @@
     "./relay": "./src/relay.ts",
     "./agent-tokens": "./src/agent-tokens.ts",
     "./chats": "./src/chats.ts",
+    "./scheduled": "./src/scheduled.ts",
     "./demo": "./src/demo.ts",
     "./mail": "./src/mail.ts",
     "./todoist": "./src/todoist.ts",
