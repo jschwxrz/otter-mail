@@ -11,6 +11,7 @@ import {
   GitForkIcon,
   LayersIcon,
   MailIcon,
+  RotateCcwIcon,
   SendIcon,
   TextQuoteIcon,
   XIcon,
@@ -20,7 +21,8 @@ import { WorkLog } from "./work-log";
 import type { ChatChange } from "../mail/api";
 import type { ContextKind, ContextMeta } from "./chat-context";
 import { findTokenRanges, messageTokens } from "@otter/shared/chat-search";
-import { useChats, type ChatTurn } from "./chat-store";
+import { retryTurn, useChats, type ChatTurn } from "./chat-store";
+import { Button } from "~/components/ui/button";
 import { ChatMarkdown } from "./chat-markdown";
 import { messageTime } from "./chat-time";
 import { ChatChanges } from "./chat-changes";
@@ -234,7 +236,15 @@ function WorkFoldRow({
   );
 }
 
-function ErrorRow({ message, providerName }: { message: string; providerName: string }) {
+function ErrorRow({
+  message,
+  providerName,
+  onRetry,
+}: {
+  message: string;
+  providerName: string;
+  onRetry?: () => void;
+}) {
   return (
     <div className="flex flex-col px-0.5 py-1">
       <div className="flex items-center gap-1.5">
@@ -246,6 +256,14 @@ function ErrorRow({ message, providerName }: { message: string; providerName: st
         </span>
       </div>
       <p className="ms-7 select-text text-sm leading-relaxed text-foreground/80">{message}</p>
+      {onRetry ? (
+        <div className="ms-7 pb-1 pt-1.5">
+          <Button type="button" size="xs" variant="outline" onClick={onRetry}>
+            <RotateCcwIcon aria-hidden />
+            Retry
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -333,6 +351,7 @@ export function ChatTranscript({
   const [expandedFolds, setExpandedFolds] = useState<Set<string>>(() => new Set());
   const { scrollToEnd, scrollToMessage } = useMessageScroller();
   const found = useChats((s) => s.found);
+  const retryable = useChats((s) => s.retries[turns[turns.length - 1]?.id ?? ""] !== undefined);
   const foundHere = found && turns.some((turn) => turn.id === found.turnId) ? found : null;
   // A match can be in the work a reply folds away: open it before the jump below.
   const [unfoldedFor, setUnfoldedFor] = useState<typeof foundHere>(null);
@@ -447,7 +466,13 @@ export function ChatTranscript({
             </div>
           ) : null}
           {isLast && !streaming && detached ? <DetachedRow providerName={providerName} /> : null}
-          {turn.error ? <ErrorRow message={turn.error} providerName={providerName} /> : null}
+          {turn.error ? (
+            <ErrorRow
+              message={turn.error}
+              providerName={providerName}
+              onRetry={isLast && retryable && !streaming ? () => retryTurn(turn.id) : undefined}
+            />
+          ) : null}
           {!live && turn.changes?.length ? (
             <ChatChanges changes={turn.changes} onOpen={onOpenChange} />
           ) : null}

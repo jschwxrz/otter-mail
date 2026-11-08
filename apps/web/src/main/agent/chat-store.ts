@@ -88,6 +88,8 @@ type ChatsState = {
   citations: Record<string, Citation[]>;
   /** The message a chat search opened the chat on, until the next search. */
   found: { turnId: string; query: string } | null;
+  /** Failed answers (by turn id) that sending their message again could fix. */
+  retries: Record<string, Outgoing>;
 };
 
 const ACTIVE_KEY = "gmail:chat-active";
@@ -215,6 +217,20 @@ function withTranscript(
   return [...turns.slice(0, at + 1), ...next];
 }
 
+/** Errors sending the message again won't fix: they need Settings, or were asked for. */
+const FINAL = new Set([
+  "not_configured",
+  "not_installed",
+  "provider_disabled",
+  "unauthorized",
+  "cancelled",
+  "pairing_required",
+  "origin_not_allowed",
+]);
+
+/** What each run in flight was sent, so a failed one can be sent again. */
+const sent = new Map<string, Outgoing>();
+
 function friendlyError(code: string, provider: ProviderKind): string {
   const name = EXTENSIONS.find((e) => e.manifest.id === provider)?.manifest.name ?? provider;
   switch (code) {
@@ -232,7 +248,7 @@ function friendlyError(code: string, provider: ProviderKind): string {
       if (provider === "openrouter") return "Can't reach OpenRouter. Try again in a moment.";
       if (provider === "openclaw") return "Can't reach the OpenClaw gateway.";
       return provider === "codex"
-        ? "Lost the connection to Codex — send again to retry."
+        ? "Lost the connection to Codex."
         : "Can't reach Hermes — are you on Tailscale?";
     case "timeout":
       return `${name} went quiet for too long — the run was stopped.`;
@@ -270,6 +286,7 @@ export const useChats = create<ChatsState>(() => ({
   drafts: readJson<Record<string, string>>(DRAFTS_KEY, {}),
   citations: {},
   found: null,
+  retries: {},
 }));
 
 const { getState: get, setState: set } = useChats;
@@ -430,6 +447,7 @@ function patchConversation(id: string, fn: (c: Conversation) => Conversation): v
 
 function endRun(requestId: string): void {
   const entry = Object.values(get().runs).find((r) => r.requestId === requestId);
+  sent.delete(requestId);
   if (!entry) return;
   set((s) => {
     const runs = { ...s.runs };
@@ -516,8 +534,12 @@ function startTurn(msg: Outgoing, intent?: ChatTurn["intent"]): void {
     skill: msg.skill?.name,
     session: convo.sessionId ?? "new",
   });
+  sent.set(requestId, msg);
   set((s) => ({
     runs: { ...s.runs, [msg.convoId]: { requestId, convoId: msg.convoId, provider: kind } },
+    retries: Object.fromEntries(
+      Object.entries(s.retries).filter(([, m]) => m.convoId !== msg.convoId),
+    ),
   }));
   patchConversation(msg.convoId, (c) => ({
     ...c,
@@ -550,6 +572,7 @@ function startTurn(msg: Outgoing, intent?: ChatTurn["intent"]): void {
         ),
         openRequest: null,
       }));
+      set((s) => ({ retries: { ...s.retries, [`a-${requestId}`]: msg } }));
       endRun(requestId);
     });
 }
@@ -577,6 +600,18 @@ export function sendMessage(msg: Outgoing, followUp: FollowUpBehavior): void {
   if (!get().runs[msg.convoId]) return startTurn(msg);
   if (followUp === "queue" || msg.attachments) set((s) => ({ queue: [...s.queue, msg] }));
   else steer(msg);
+}
+
+/** Sends a failed message again, in place of the failed exchange. */
+export function retryTurn(turnId: string): void {
+  const msg = get().retries[turnId];
+  if (!msg || get().runs[msg.convoId]) return;
+  const requestKey = turnId.slice("a-".length);
+  patchConversation(msg.convoId, (c) => ({
+    ...c,
+    turns: c.turns.filter((t) => t.id !== turnId && t.id !== `u-${requestKey}`),
+  }));
+  startTurn(msg);
 }
 
 export function steerQueued(id: string): void {
@@ -1226,7 +1261,8 @@ function onChatEvent(raw: unknown): void {
     result: { ref: ChatTabRef; title: string; made: boolean } | null;
     pages: string[];
     files: { title: string; href: string }[];
-  } = { result: null, pages: [], files: [] };
+    retry: { turnId: string; msg: Outgoing } | null;
+  } = { result: null, pages: [], files: [], retry: null };
   if (event.type === "approval") {
     set((st) => ({
       approvals: [...st.approvals, { requestId: event.requestId, approval: event.approval }],
@@ -1337,6 +1373,9 @@ function onChatEvent(raw: unknown): void {
       if (step?.kind === "step") items[index] = { ...step, output: event.output };
     } else if (event.type === "error") {
       updated.error = friendlyError(event.message, s.provider);
+      const msg = sent.get(event.requestId);
+      if (msg && updated.id === `a-${event.requestId}` && !FINAL.has(event.message))
+        opens.retry = { turnId: updated.id, msg };
     }
     if (event.type === "done" || event.type === "error") {
       updated.finishedAt = Date.now();
@@ -1376,6 +1415,10 @@ function onChatEvent(raw: unknown): void {
       show: false,
       made: true,
     });
+  if (opens.retry) {
+    const { turnId, msg } = opens.retry;
+    set((st) => ({ retries: { ...st.retries, [turnId]: msg } }));
+  }
   if (event.type === "done" || event.type === "error") {
     set((st) => ({
       conversations: st.conversations.map((c) =>
