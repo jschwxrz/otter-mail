@@ -3,12 +3,14 @@ import {
   accountOf,
   chatOf,
   chatTarget,
+  deliver,
   isNewChat,
   isOwnerConfigured,
   messageOf,
   newChatKey,
   otterTargetsNote,
   pointerOf,
+  startDetached,
   targetOf,
   tell,
 } from "./otter.js";
@@ -153,5 +155,58 @@ describe("the Otter channel plugin", () => {
     });
     expect(await tell(accountOf({ channels: { otter: {} } }), pointer, { fetch })).toBe(false);
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("delivers even when the relay can't be told", async () => {
+    const cfg = { channels: { otter: { relayUrl: "https://relay.test", token: "otter_ch_x" } } };
+    const ctx = { cfg, sessionKey: "agent:main:otter-mail:c-1", to: "chat:new" };
+    const warn = vi.fn();
+    const fetch = vi.fn(async () => new Response(null, { status: 401 }));
+    expect(await deliver(ctx, undefined, { warn, fetch })).toMatchObject({ channel: "otter" });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("401"));
+    const down = vi.fn(async () => {
+      throw new TypeError("fetch failed");
+    });
+    await expect(deliver(ctx, undefined, { warn, fetch: down })).resolves.toBeDefined();
+    const aborted = { ...ctx, signal: AbortSignal.abort() };
+    await expect(deliver(aborted, undefined, { warn, fetch: down })).rejects.toThrow();
+  });
+
+  it("fails a message from Otter that can't start, and runs one that can apart from the request", async () => {
+    const detached = [];
+    const detach = (work) => void detached.push(work());
+    await expect(
+      startDetached(
+        detach,
+        async () => {
+          throw new Error("media refused");
+        },
+        vi.fn(),
+      ),
+    ).rejects.toThrow("media refused");
+
+    let finish;
+    const run = vi.fn(() => new Promise((resolve) => (finish = resolve)));
+    await startDetached(detach, async () => "ctx", run);
+    expect(run).toHaveBeenCalledWith("ctx");
+    finish();
+
+    const warn = vi.fn();
+    await startDetached(
+      detach,
+      async () => "ctx",
+      async () => Promise.reject(new Error("x")),
+      warn,
+    );
+    await Promise.all(detached);
+    expect(warn).toHaveBeenCalledWith(new Error("x"));
+
+    await expect(
+      startDetached(
+        (_work, fail) => fail(new Error("busy")),
+        async () => "ctx",
+        vi.fn(),
+      ),
+    ).rejects.toThrow("busy");
   });
 });

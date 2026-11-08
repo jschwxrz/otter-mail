@@ -3,6 +3,7 @@ import {
   clearOpenClawBootstrapToken,
   clearOpenClawToken,
   logger,
+  platform,
   providersState,
   refreshProvider,
   saveAgentSettings,
@@ -24,6 +25,19 @@ import type { OpenClawSettings } from "./settings.js";
 
 const str = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 
+/** A secure page (and its worker) can't open a plain `ws://` socket, except to this machine. */
+function reachable(url: string): string {
+  if (
+    platform().kind === "web" &&
+    /^ws:\/\//i.test(url) &&
+    !/^ws:\/\/(localhost|127\.0\.0\.1|\[::1\])([:/]|$)/i.test(url)
+  )
+    throw new Error(
+      "The web app can only reach a gateway over wss://. Serve it with Tailscale (step 1) and make a new setup code.",
+    );
+  return url;
+}
+
 async function connect(input: { code: string } | { url: string; token: string }) {
   let url: string;
   if ("code" in input) {
@@ -34,19 +48,19 @@ async function connect(input: { code: string } | { url: string; token: string })
       throw new Error(
         "That setup code has expired. Make a new one with openclaw qr --setup-code-only.",
       );
-    url = code.url;
-    await resetOpenClawConnection();
+    url = reachable(normalizeOpenClawUrl(code.url));
+    await resetOpenClawConnection(url);
     await clearOpenClawToken();
     await setOpenClawBootstrapToken(code.bootstrapToken);
   } else {
-    url = input.url;
-    await resetOpenClawConnection();
+    url = reachable(normalizeOpenClawUrl(input.url));
+    await resetOpenClawConnection(url);
     await clearOpenClawBootstrapToken();
     await setOpenClawToken(input.token);
   }
-  await saveAgentSettings("openclaw", { url: normalizeOpenClawUrl(url) });
+  await saveAgentSettings("openclaw", { url });
   logger.info("agent", "openclaw connecting", {
-    url: normalizeOpenClawUrl(url),
+    url,
     with: "code" in input ? "setup code" : "token",
   });
   void refreshProvider("openclaw");

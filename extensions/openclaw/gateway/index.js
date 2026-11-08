@@ -5,6 +5,7 @@ import {
   defineChannelPluginEntry,
 } from "openclaw/plugin-sdk/channel-core";
 import { toInboundMediaFacts } from "openclaw/plugin-sdk/channel-inbound";
+import { waitUntilAbort } from "openclaw/plugin-sdk/channel-outbound";
 import { runInDetachedAsyncContext } from "openclaw/plugin-sdk/concurrency-runtime";
 import { defineStableChannelIngressIdentity } from "openclaw/plugin-sdk/channel-ingress-runtime";
 import { resolveAgentWorkspaceDir } from "openclaw/plugin-sdk/agent-runtime";
@@ -17,16 +18,16 @@ import {
   accountOf,
   chatOf,
   chatTarget,
+  deliver,
   isNewChat,
   isOwnerConfigured,
   messageOf,
   newChatKey,
   otterTargetsNote,
   OWNER,
-  pointerOf,
+  startDetached,
   targetOf,
   TARGETS_HINT,
-  tell,
 } from "./otter.js";
 
 const owner = defineStableChannelIngressIdentity({
@@ -35,12 +36,8 @@ const owner = defineStableChannelIngressIdentity({
   sensitivity: "pii",
 });
 
-async function deliver(ctx, payload) {
-  const account = accountOf(ctx.cfg);
-  const pointer = pointerOf({ sessionKey: ctx.sessionKey, to: ctx.to, payload });
-  await tell(account, pointer, { signal: ctx.signal });
-  return { channel: "otter", messageId: randomUUID(), timestamp: pointer.at };
-}
+let logger;
+const warn = (message) => logger?.warn?.(message);
 
 export const otterChannel = createChatChannelPlugin({
   base: {
@@ -61,6 +58,9 @@ export const otterChannel = createChatChannelPlugin({
         },
       },
     }),
+    // Nothing to keep connected, but a channel that doesn't stay started reads as stopped, and the
+    // gateway's health monitor restarts it every few minutes.
+    gateway: { startAccount: (ctx) => waitUntilAbort(ctx.abortSignal) },
     messaging: {
       targetResolver: {
         looksLikeId: () => true,
@@ -92,13 +92,13 @@ export const otterChannel = createChatChannelPlugin({
         ? { ok: true, to }
         : { ok: false, error: new Error(`Otter's targets are ${TARGETS_HINT}.`) };
     },
-    sendText: (ctx) => deliver(ctx),
-    sendPayload: (ctx) => deliver(ctx, ctx.payload),
+    sendText: (ctx) => deliver(ctx, undefined, { warn }),
+    sendPayload: (ctx) => deliver(ctx, ctx.payload, { warn }),
   },
 });
 
-/** Runs what you sent from Otter as the channel's owner: an inbound message, as from any chat app. */
-async function receive(api, cfg, message) {
+/** What you sent from Otter as the channel's owner: an inbound message, as from any chat app. */
+async function inboundOf(api, message) {
   const { sessionKey, agentId, text, messageId, files } = message;
   const inbound = api.runtime.channel.inbound;
   const saved = await Promise.all(
@@ -125,7 +125,7 @@ async function receive(api, cfg, message) {
     readStoreAllowFrom: async () => [],
   });
   const to = chatTarget(sessionKey);
-  const ctxPayload = await inbound.buildContext({
+  return inbound.buildContext({
     channelIngress,
     channel: "otter",
     accountId: "default",
@@ -143,7 +143,10 @@ async function receive(api, cfg, message) {
       ),
     }),
   });
-  await inbound.dispatch({
+}
+
+function dispatch(api, cfg, { agentId, sessionKey, messageId }, ctxPayload) {
+  return api.runtime.channel.inbound.dispatch({
     cfg,
     channel: "otter",
     accountId: "default",
@@ -161,6 +164,7 @@ export default defineChannelPluginEntry({
   description: "Send what your agents want you to see to Otter.",
   plugin: otterChannel,
   registerFull(api) {
+    logger = api.logger;
     // What Otter's targets are, for a turn in an Otter chat: the Codex harness leaves channels'
     // message-tool hints out of its instructions, but every harness runs this hook.
     api.on("before_prompt_build", (_event, ctx) =>
@@ -179,11 +183,12 @@ export default defineChannelPluginEntry({
         const message = messageOf(params);
         // The run starts outside the request that carried it (the gateway's context-free root,
         // whatever request loaded this plugin), so it's the channel owner's, not that
-        // connection's, and outlives it.
-        runInDetachedAsyncContext(() =>
-          runDetachedWebhookWork(() => receive(api, cfg, message)).catch((error) =>
-            api.logger?.warn?.(`otter: a message from Otter failed: ${String(error)}`),
-          ),
+        // connection's, and outlives it. What fails before it starts fails the request.
+        await startDetached(
+          (work, fail) => runInDetachedAsyncContext(() => runDetachedWebhookWork(work).catch(fail)),
+          () => inboundOf(api, message),
+          (ctxPayload) => dispatch(api, cfg, message, ctxPayload),
+          (error) => warn(`otter: a message from Otter failed: ${String(error)}`),
         );
         return { runId: message.messageId, status: "started" };
       },

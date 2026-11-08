@@ -1,8 +1,8 @@
-import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, symlink, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vite-plus/test";
-import { readWorkspaceFile } from "./files.js";
+import { MAX_FILE_BYTES, readWorkspaceFile } from "./files.js";
 
 describe("otter.files.get", () => {
   it("reads any file in the workspace whole, and nothing outside it", async () => {
@@ -26,5 +26,13 @@ describe("otter.files.get", () => {
     );
     await expect(readWorkspaceFile(workspace, "missing.pdf")).rejects.toThrow(/not found/);
     await expect(readWorkspaceFile(workspace, "artifacts")).rejects.toThrow(/not found/);
+  });
+
+  it("sends only what fits in one gateway message, base64", async () => {
+    const workspace = await mkdtemp(path.join(tmpdir(), "otter-files-"));
+    await writeFile(path.join(workspace, "big.bin"), "");
+    await truncate(path.join(workspace, "big.bin"), MAX_FILE_BYTES + 1);
+    await expect(readWorkspaceFile(workspace, "big.bin")).rejects.toThrow(/too large/);
+    expect(Math.ceil(MAX_FILE_BYTES / 3) * 4).toBeLessThan(16 * 1024 * 1024);
   });
 });

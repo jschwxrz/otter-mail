@@ -71,10 +71,14 @@ describe("OpenClaw image previews", () => {
       "session",
       "otter-artifact:managed%3Aimage%3A123",
     );
-    expect(fixture.request).toHaveBeenCalledWith("artifacts.download", {
-      sessionKey: "session",
-      artifactId: "managed:image:123",
-    });
+    expect(fixture.request).toHaveBeenCalledWith(
+      "artifacts.download",
+      {
+        sessionKey: "session",
+        artifactId: "managed:image:123",
+      },
+      expect.anything(),
+    );
     expect(file.data).toBe(btoa("pixels"));
   });
 
@@ -107,10 +111,14 @@ describe("OpenClaw image previews", () => {
         : { file: { name: "lease.pdf", content: btoa("%PDF") } },
     );
     const file = await openClawProvider.readFile!(settings, "session", "artifacts/lease.pdf");
-    expect(fixture.request).toHaveBeenLastCalledWith("otter.files.get", {
-      sessionKey: "session",
-      path: "artifacts/lease.pdf",
-    });
+    expect(fixture.request).toHaveBeenLastCalledWith(
+      "otter.files.get",
+      {
+        sessionKey: "session",
+        path: "artifacts/lease.pdf",
+      },
+      expect.anything(),
+    );
     expect(file).toMatchObject({
       name: "lease.pdf",
       mimeType: "application/pdf",

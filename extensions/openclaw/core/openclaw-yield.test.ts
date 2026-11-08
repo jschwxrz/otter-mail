@@ -103,7 +103,11 @@ describe("an OpenClaw turn that hands off with sessions_yield", () => {
     gateway();
     const { events, ended } = send();
     await vi.waitFor(() =>
-      expect(fixture.request).toHaveBeenCalledWith("chat.send", expect.anything()),
+      expect(fixture.request).toHaveBeenCalledWith(
+        "chat.send",
+        expect.anything(),
+        expect.anything(),
+      ),
     );
     say("req-1", "i-1", "Watching the checks.");
     event("agent", {
@@ -145,7 +149,11 @@ describe("an OpenClaw turn that hands off with sessions_yield", () => {
     openClawProvider.watch!(settings, [{ id: "s", since: 0 }], () => {});
     const { events, ended } = send();
     await vi.waitFor(() =>
-      expect(fixture.request).toHaveBeenCalledWith("chat.send", expect.anything()),
+      expect(fixture.request).toHaveBeenCalledWith(
+        "chat.send",
+        expect.anything(),
+        expect.anything(),
+      ),
     );
     event("chat", { runId: "req-1", state: "final", yielded: true });
     event("session.message", {
@@ -166,7 +174,11 @@ describe("an OpenClaw turn that hands off with sessions_yield", () => {
     gateway();
     const { events, ended } = send();
     await vi.waitFor(() =>
-      expect(fixture.request).toHaveBeenCalledWith("chat.send", expect.anything()),
+      expect(fixture.request).toHaveBeenCalledWith(
+        "chat.send",
+        expect.anything(),
+        expect.anything(),
+      ),
     );
     lifecycleStart("other");
     say("other", "i-x", "Not this turn's.");
@@ -179,7 +191,11 @@ describe("an OpenClaw turn that hands off with sessions_yield", () => {
     gateway();
     const { events, ended } = send();
     await vi.waitFor(() =>
-      expect(fixture.request).toHaveBeenCalledWith("chat.send", expect.anything()),
+      expect(fixture.request).toHaveBeenCalledWith(
+        "chat.send",
+        expect.anything(),
+        expect.anything(),
+      ),
     );
     event("chat", { runId: "req-1", state: "final", yielded: true });
     expect(await openClawProvider.steer("req-1", "and the docs?")).toBe(false);
@@ -200,7 +216,11 @@ describe("an OpenClaw turn that hands off with sessions_yield", () => {
     openClawProvider.watch!(settings, [{ id: "s", since: 0 }], () => {});
     const { events, ended } = send();
     await vi.waitFor(() =>
-      expect(fixture.request).toHaveBeenCalledWith("chat.send", expect.anything()),
+      expect(fixture.request).toHaveBeenCalledWith(
+        "chat.send",
+        expect.anything(),
+        expect.anything(),
+      ),
     );
     const steered = openClawProvider.steer("req-1", "and the docs?");
     await vi.waitFor(() => expect(steerKey).not.toBe(""));
@@ -227,7 +247,11 @@ describe("an OpenClaw turn that hands off with sessions_yield", () => {
     openClawProvider.watch!(settings, [{ id: "s", since: 0 }], (run) => started.push(run));
     const { events, ended } = send();
     await vi.waitFor(() =>
-      expect(fixture.request).toHaveBeenCalledWith("chat.send", expect.anything()),
+      expect(fixture.request).toHaveBeenCalledWith(
+        "chat.send",
+        expect.anything(),
+        expect.anything(),
+      ),
     );
     event("chat", { runId: "req-1", state: "final", yielded: true });
     event("session.message", {
@@ -244,7 +268,11 @@ describe("an OpenClaw turn that hands off with sessions_yield", () => {
     gateway();
     const { events, ended } = send();
     await vi.waitFor(() =>
-      expect(fixture.request).toHaveBeenCalledWith("chat.send", expect.anything()),
+      expect(fixture.request).toHaveBeenCalledWith(
+        "chat.send",
+        expect.anything(),
+        expect.anything(),
+      ),
     );
     event("chat", { runId: "req-1", state: "final", yielded: true });
     openClawProvider.cancel("req-1");
@@ -383,7 +411,11 @@ describe("an OpenClaw turn's steps", () => {
     gateway();
     const { events, ended } = send();
     await vi.waitFor(() =>
-      expect(fixture.request).toHaveBeenCalledWith("chat.send", expect.anything()),
+      expect(fixture.request).toHaveBeenCalledWith(
+        "chat.send",
+        expect.anything(),
+        expect.anything(),
+      ),
     );
     const tool = (data: object) => event("agent", { runId: "req-1", stream: "tool", data });
     tool({ phase: "start", name: "exec", toolCallId: "c-1", args: { command: "date" } });
@@ -816,7 +848,11 @@ describe("what an agent delivers to Otter", () => {
     });
     const { events, ended } = send();
     await vi.waitFor(() =>
-      expect(fixture.request).toHaveBeenCalledWith("chat.send", expect.anything()),
+      expect(fixture.request).toHaveBeenCalledWith(
+        "chat.send",
+        expect.anything(),
+        expect.anything(),
+      ),
     );
     const started: AgentRun[] = [];
     openClawProvider.watch!(settings, [{ id: "s", since: now, cursor: "t-1:0" }], (run) =>

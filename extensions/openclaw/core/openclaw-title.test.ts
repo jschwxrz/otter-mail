@@ -60,7 +60,11 @@ function start(answer: (method: string, params: Record<string, unknown>) => unkn
   );
   const end = async () => {
     await vi.waitFor(() =>
-      expect(fixture.request).toHaveBeenCalledWith("chat.send", expect.anything()),
+      expect(fixture.request).toHaveBeenCalledWith(
+        "chat.send",
+        expect.anything(),
+        expect.anything(),
+      ),
     );
     const session = events.find((e) => e.type === "session");
     fixture.onEvent({
@@ -88,10 +92,14 @@ describe("a new OpenClaw chat's title", () => {
         title: "Separate work inboxes",
       }),
     );
-    expect(fixture.request).toHaveBeenCalledWith("sessions.title.prepare", {
-      agentId: "main",
-      message: "Should I split my work into separate inboxes?",
-    });
+    expect(fixture.request).toHaveBeenCalledWith(
+      "sessions.title.prepare",
+      {
+        agentId: "main",
+        message: "Should I split my work into separate inboxes?",
+      },
+      expect.anything(),
+    );
     const session = events.find((e) => e.type === "session");
     await vi.waitFor(() =>
       expect(fixture.request).toHaveBeenCalledWith("sessions.patch", {
@@ -107,7 +115,11 @@ describe("a new OpenClaw chat's title", () => {
       method === "sessions.title.prepare" ? { title: null } : undefined,
     );
     await vi.waitFor(() =>
-      expect(fixture.request).toHaveBeenCalledWith("sessions.title.prepare", expect.anything()),
+      expect(fixture.request).toHaveBeenCalledWith(
+        "sessions.title.prepare",
+        expect.anything(),
+        expect.anything(),
+      ),
     );
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(events.some((e) => e.type === "title")).toBe(false);
@@ -126,7 +138,11 @@ describe("retitling an OpenClaw chat", () => {
       key: "agent:main:otter-mail:c-1",
       label: "Inbox plan",
     });
-    expect(fixture.request).not.toHaveBeenCalledWith("sessions.title.prepare", expect.anything());
+    expect(fixture.request).not.toHaveBeenCalledWith(
+      "sessions.title.prepare",
+      expect.anything(),
+      expect.anything(),
+    );
   });
 
   it("asks the session's agent for a new title from the message", async () => {
@@ -138,10 +154,14 @@ describe("retitling an OpenClaw chat", () => {
         message: "Should I split my work into separate inboxes?",
       }),
     ).resolves.toBe("Separate work inboxes");
-    expect(fixture.request).toHaveBeenCalledWith("sessions.title.prepare", {
-      agentId: "rowan",
-      message: "Should I split my work into separate inboxes?",
-    });
+    expect(fixture.request).toHaveBeenCalledWith(
+      "sessions.title.prepare",
+      {
+        agentId: "rowan",
+        message: "Should I split my work into separate inboxes?",
+      },
+      expect.anything(),
+    );
     expect(fixture.request).toHaveBeenCalledWith("sessions.patch", {
       key: "agent:rowan:otter-mail:c-1",
       label: "Separate work inboxes",

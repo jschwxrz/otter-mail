@@ -74,6 +74,18 @@ const ADMIN = "operator.admin";
 /** Where a job sends its result in Otter: a new chat each time (`chat:new`) or one chat (`chat:<session key>`). */
 const NEW_CHAT = "chat:new";
 
+/** An Otter target as the gateway plugin reads it (`gateway/otter.js`): the chat it names, "new", or nothing. */
+function otterTarget(to: unknown): { chat: string } | "new" | undefined {
+  const target = typeof to === "string" ? to.trim().replace(/^otter:/, "") : "";
+  if (target === NEW_CHAT || target === "owner") return "new";
+  const sessionKey = target.startsWith("chat:") ? target.slice("chat:".length) : "";
+  return sessionKey.startsWith("agent:") && sessionKey.split(":")[1]
+    ? { chat: sessionKey }
+    : undefined;
+}
+
+const NO_OTTER_CHAT = "It names no Otter chat to send to: choose where its results go.";
+
 export const READ_ONLY =
   "Otter can see these but not change them: allow it full access to the gateway in Settings → OpenClaw.";
 
@@ -132,8 +144,12 @@ export function deliveryOf(job: Job, labels: ChannelLabels = {}, preview?: Previ
     return { kind: "none" };
   if (delivery.mode === "webhook") return { kind: "webhook", url: str(delivery.to) ?? "" };
   const channel = str(delivery.channel) ?? "last";
-  if (channel === "otter")
-    return { kind: "otter", chat: delivery.to === NEW_CHAT || !delivery.to ? "new" : "one" };
+  if (channel === "otter") {
+    const target = otterTarget(delivery.to);
+    return target
+      ? { kind: "otter", chat: target === "new" ? "new" : "one" }
+      : { kind: "elsewhere", label: "Otter, with no chat named" };
+  }
   // Where "last" goes now, as the gateway resolves it.
   const resolved =
     channel === "last" ? /^announce -> (?!last\b)(.+)$/.exec(preview?.label ?? "")?.[1] : undefined;
@@ -215,8 +231,8 @@ function autoPaused(job: Job): string | undefined {
 
 /** The Otter chats a job belongs to: the session it was made in, and the chat it posts to. */
 function chatsOf(job: Job): string[] {
-  const to = job.delivery?.channel === "otter" ? str(job.delivery.to) : undefined;
-  const posts = to?.startsWith("chat:") && to !== NEW_CHAT ? to.slice("chat:".length) : undefined;
+  const target = job.delivery?.channel === "otter" ? otterTarget(job.delivery.to) : undefined;
+  const posts = typeof target === "object" ? target.chat : undefined;
   return [...new Set([job.sessionKey, posts].filter((key): key is string => !!key))];
 }
 
@@ -232,7 +248,8 @@ export function taskOf(
   const description = job.description?.replace(/^\[managed-by=[^\]]*\]\s*/, "").trim();
   const prompt = promptOf(job);
   const runs = runsOf(job);
-  const problem = deliveryProblem(preview);
+  const delivery = deliveryOf(job, labels, preview);
+  const problem = delivery.kind === "elsewhere" ? NO_OTTER_CHAT : deliveryProblem(preview);
   const failureAlerts = failureAlertsOf(job, labels);
   const managed = managedBy(job);
   const paused = autoPaused(job);
@@ -263,7 +280,7 @@ export function taskOf(
           },
         }
       : {}),
-    delivery: deliveryOf(job, labels, preview),
+    delivery,
     ...(problem ? { deliveryProblem: problem } : {}),
     ...(failureAlerts ? { failureAlerts } : {}),
     ...(managed ? { managedBy: managed } : {}),

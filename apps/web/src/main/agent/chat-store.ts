@@ -225,11 +225,12 @@ function friendlyError(code: string, provider: ProviderKind): string {
     case "provider_disabled":
       return `${name} is turned off in Settings → Agents.`;
     case "unauthorized":
-      return "The API key was rejected — update it in Settings.";
+      return provider === "openclaw"
+        ? "The OpenClaw gateway refused this device — reconnect it in Settings → OpenClaw."
+        : "The API key was rejected — update it in Settings.";
     case "unreachable":
       if (provider === "openrouter") return "Can't reach OpenRouter. Try again in a moment.";
-      if (provider === "openclaw")
-        return "Can't reach the OpenClaw gateway — are you on Tailscale?";
+      if (provider === "openclaw") return "Can't reach the OpenClaw gateway.";
       return provider === "codex"
         ? "Lost the connection to Codex — send again to retry."
         : "Can't reach Hermes — are you on Tailscale?";

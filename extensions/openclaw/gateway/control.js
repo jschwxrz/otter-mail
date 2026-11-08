@@ -445,9 +445,13 @@ export function createBrowserControl({
       }
       const tab = tabOf(targetId);
       tab.seen = now();
-      tab.lock = { until: now() + CONTROL_TTL_MS, next: 1, waiting: new Map() };
+      const lock = { until: now() + CONTROL_TTL_MS, next: 1, waiting: new Map() };
+      tab.lock = lock;
       // The page's own file picker is offered to you while you hold it.
-      const page = await pageOf(tab, targetId, profile);
+      const page = await pageOf(tab, targetId, profile).catch((error) => {
+        if (tab.lock === lock) unlock(tab);
+        throw error;
+      });
       void page.call("Page.setInterceptFileChooserDialog", { enabled: true }).catch(() => {});
     },
     release(targetId) {
@@ -505,13 +509,13 @@ export function createBrowserControl({
       if (!tab) throw new Error("Take control of this tab first.");
       const chooser = tab.chooser;
       if (!chooser) throw new Error("The page isn't asking for a file.");
-      tab.chooser = null;
       const picked = Array.isArray(files) ? files : [];
       const total = picked.reduce((sum, f) => sum + String(f?.data ?? "").length * 0.75, 0);
       if (total > MAX_UPLOAD_BYTES) throw new Error("Those files are too large (10 MB at most).");
       const dir = path.join(uploads, randomUUID());
       const paths = [];
       if (picked.length > 0) {
+        setTimeout(() => void rm(dir, { recursive: true, force: true }), UPLOADS_KEPT_MS).unref?.();
         for (const [i, file] of picked.entries()) {
           // A folder each, so two files of the same name both reach the page as named.
           const at = path.join(dir, String(i));
@@ -520,13 +524,13 @@ export function createBrowserControl({
           await writeFile(path.join(at, name), Buffer.from(String(file?.data ?? ""), "base64"));
           paths.push(path.join(at, name));
         }
-        setTimeout(() => void rm(dir, { recursive: true, force: true }), UPLOADS_KEPT_MS).unref?.();
       }
       const page = await pageOf(tab, targetId, profile);
       await page.call("DOM.setFileInputFiles", {
         files: paths,
         backendNodeId: chooser.backendNodeId,
       });
+      if (tab.chooser === chooser) tab.chooser = null;
     },
   };
 }
