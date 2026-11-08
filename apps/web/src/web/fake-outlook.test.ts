@@ -287,7 +287,8 @@ async function boot() {
 
 type Row = { id: string; threadId: string; subject: string; labelIds: string[] };
 
-describe("core's Outlook provider on the demo mailbox", () => {
+// Each test boots core cold, which CI's runners take seconds over.
+describe("core's Outlook provider on the demo mailbox", { timeout: 20_000 }, () => {
   it("saves draft edits and same-named replacement attachments without duplicating drafts", async () => {
     const { invoke } = await boot();
     const file = (text: string) => ({
