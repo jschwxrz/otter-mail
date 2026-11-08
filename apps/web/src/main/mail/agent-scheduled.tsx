@@ -32,13 +32,7 @@ import { ChatMarkdown } from "./chat-markdown";
 import { useNow } from "./chat-shelves";
 import { useChats } from "./chat-store";
 import { useLatest } from "../use-latest";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "./menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./menu";
 import {
   agoText,
   durationText,
@@ -465,15 +459,7 @@ function TaskCard({ task, now, onOpen }: { task: ScheduledTask; now: number; onO
   );
 }
 
-function TaskMenu({
-  task,
-  onEdit,
-  onDeleted,
-}: {
-  task: ScheduledTask;
-  onEdit: () => void;
-  onDeleted: () => void;
-}) {
+function TaskMenu({ task, onDeleted }: { task: ScheduledTask; onDeleted: () => void }) {
   const action = useTaskAction();
   const [confirming, setConfirming] = useState(false);
   if (task.managedBy) return null;
@@ -486,14 +472,6 @@ function TaskMenu({
           </IconBtn>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {task.schedule.kind === "other" ? null : (
-            <>
-              <DropdownMenuItem icon={<PencilIcon className="size-4" />} onClick={onEdit}>
-                Edit…
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </>
-          )}
           <DropdownMenuItem
             color="red"
             icon={<Trash2Icon className="size-4" />}
@@ -625,7 +603,7 @@ function TaskPage({
                 }
               />
             </label>
-            <TaskMenu task={task} onEdit={onEdit} onDeleted={onDeleted} />
+            <TaskMenu task={task} onDeleted={onDeleted} />
           </div>
         )}
       </div>
@@ -717,7 +695,12 @@ function RunHistory({ task, now }: { task: ScheduledTask; now: number }) {
       {runs.isLoading ? (
         <p className="py-2 text-sm text-muted-foreground">Loading…</p>
       ) : runs.isError ? (
-        <p className="py-2 text-sm text-destructive-foreground">{readableError(runs.error)}</p>
+        <p className="flex items-center gap-2 py-2 text-sm text-destructive-foreground">
+          {readableError(runs.error)}
+          <Btn size="xs" variant="ghost" onClick={() => void runs.refetch()}>
+            Retry
+          </Btn>
+        </p>
       ) : !runs.data?.length ? (
         <p className="py-2 text-sm text-muted-foreground">It hasn't run yet.</p>
       ) : (

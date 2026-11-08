@@ -699,6 +699,7 @@ async function jobsRequest<T>(
     throw new Error("Connect Hermes in Settings → Hermes.");
   });
   const response = await fetch(`${ready.root}/api/jobs${path}`, {
+    signal: AbortSignal.timeout(JOBS_TIMEOUT_MS),
     method: init.method ?? "GET",
     headers: authHeaders(ready.key, init.body !== undefined),
     ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
@@ -716,6 +717,8 @@ async function jobsRequest<T>(
   }
   return (await response.json().catch(() => ({}))) as T;
 }
+
+const JOBS_TIMEOUT_MS = 10_000;
 
 const jobPath = (id: string) => `/${encodeURIComponent(id)}`;
 

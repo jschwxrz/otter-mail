@@ -35,11 +35,12 @@ function weekdays(field: string): number[] | null {
   const days = new Set<number>();
   for (const part of field.split(",")) {
     const range = /^(\d)-(\d)$/.exec(part);
-    if (range) for (let d = Number(range[1]); d <= Number(range[2]); d++) days.add(d % 7);
-    else if (/^\d$/.test(part)) days.add(Number(part) % 7);
+    if (range && Number(range[1]) <= Number(range[2]) && Number(range[2]) <= 7)
+      for (let d = Number(range[1]); d <= Number(range[2]); d++) days.add(d % 7);
+    else if (/^[0-7]$/.test(part)) days.add(Number(part) % 7);
     else return null;
   }
-  return [...days].sort();
+  return days.size > 0 ? [...days].sort() : null;
 }
 
 /** A cron expression in words, for the common shapes; null for the rest. */

@@ -38,6 +38,8 @@ describe("cronText", () => {
     expect(cronText("0 9-17 * * *")).toBeNull();
     expect(cronText("0 9 * * MON")).toBeNull();
     expect(cronText("0 9 * *")).toBeNull();
+    expect(cronText("0 9 * * 5-1")).toBeNull();
+    expect(cronText("0 9 * * 8")).toBeNull();
   });
 });
 
