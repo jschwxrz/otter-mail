@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from "vite-plus/test";
 
 import worker from "./worker.ts";
 
-const FILES = new Set(["/", "/assets/app.js", "/todoist-callback/"]);
+const FILES = new Set(["/", "/assets/app.js", "/version.json", "/todoist-callback/"]);
 
 /** The nightly Worker's env: the stable one also has NIGHTLY. */
-function serve(url: string, accept?: string, stable = false) {
+function serve(url: string, accept?: string, stable = false, mode?: string) {
   const fetch = vi.fn(async (request: Request) => {
     const file = FILES.has(new URL(request.url).pathname);
     return new Response(file ? "asset" : "not found", { status: file ? 200 : 404 });
@@ -14,6 +14,7 @@ function serve(url: string, accept?: string, stable = false) {
   const env = { ASSETS: { fetch } as unknown as Fetcher, ...(stable && { NIGHTLY: nightly }) };
   const headers = new Headers();
   if (accept) headers.set("accept", accept);
+  if (mode) headers.set("sec-fetch-mode", mode);
   const response = worker.fetch(new Request(url, { headers }), env);
   return { response, fetch };
 }
@@ -32,16 +33,28 @@ describe("site domain migration", () => {
   it.each([
     "https://mail.otterware.app/",
     "https://mail.otterware.app/you@gmail.com/INBOX/18f3a2?account=a@b.c",
-    "https://mail.otterware.app/assets/app.js?version=2",
     "https://mail.otterware.dev/app?view=inbox",
     "https://mail.otterware.dev/missing",
-  ])("sends %s to otter.otterware.app before serving anything", async (url) => {
-    const { response, fetch } = serve(url, html, true);
+  ])("sends the page %s to otter.otterware.app", async (url) => {
+    const { response, fetch } = serve(url, html, true, "navigate");
     const result = await response;
     expect(result.status).toBe(308);
     const { pathname, search } = new URL(url);
     expect(result.headers.get("location")).toBe(`https://otter.otterware.app${pathname}${search}`);
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("treats an HTML GET without Sec-Fetch-Mode as a page", async () => {
+    const result = await serve("https://mail.otterware.app/all/inbox", html, true).response;
+    expect(result.headers.get("location")).toBe("https://otter.otterware.app/all/inbox");
+  });
+
+  it.each([
+    ["/assets/app.js", "*/*", "no-cors"],
+    ["/version.json", "*/*", "cors"],
+  ])("keeps serving %s on the old host to tabs still open there", async (path, accept, mode) => {
+    const { response } = serve(`https://mail.otterware.app${path}`, accept, true, mode);
+    expect((await response).status).toBe(200);
   });
 
   it("sends the old domain's moved pages straight to otterware.app", async () => {

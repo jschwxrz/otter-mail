@@ -11,6 +11,12 @@ function wantsNightly(request: Request): boolean {
   return cookies.split(/;\s*/).includes(`${CHANNEL_COOKIE}=nightly`);
 }
 
+function isNavigation(request: Request): boolean {
+  const mode = request.headers.get("sec-fetch-mode");
+  if (mode) return mode === "navigate";
+  return request.method === "GET" && Boolean(request.headers.get("accept")?.includes("text/html"));
+}
+
 function chooseChannel(url: URL): Response {
   const nightly = url.searchParams.get("channel") === "nightly";
   const cookie = nightly
@@ -48,7 +54,9 @@ export default {
     }
     // Only the stable Worker (the one with NIGHTLY) redirects: until a stable release moves it, it
     // hands nightly browsers on mail.otterware.app to the nightly build, which serves them there.
-    if (env.NIGHTLY && OLD_HOSTS.has(url.hostname))
+    // Only pages move: a tab still open on the old host keeps loading its files and version.json,
+    // so it offers "Reload to update", and the reload lands on the new host.
+    if (env.NIGHTLY && OLD_HOSTS.has(url.hostname) && isNavigation(request))
       return Response.redirect(`${APP}${url.pathname}${url.search}`, 308);
     if (url.pathname === CHANNEL_PATH) return chooseChannel(url);
     // Both channels serve this origin so they share the browser's mail cache and sign-in.
