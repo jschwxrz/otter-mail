@@ -11,7 +11,6 @@ import {
   LaptopIcon,
   ListFilterIcon,
   PinIcon,
-  PlusIcon,
   SearchIcon,
   SquarePenIcon,
   UndoIcon,
@@ -66,7 +65,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../mail/menu";
-import { SidebarBody } from "../mail/sidebar-ui";
+import { NewRow, SIDEBAR_ROW, SidebarBody } from "../mail/sidebar-ui";
 import { TitleInput } from "./chat-title";
 import { toast } from "../mail/toast";
 import { HintTooltip, cn } from "../mail/ui";
@@ -539,8 +538,18 @@ export function AgentSidebar({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 flex-col pt-(--sidebar-content-inset)">
+        <NewRow
+          icon={<SquarePenIcon />}
+          label="New chat"
+          selected={onNewChatPage}
+          onClick={onNewChat}
+        />
+        <ScheduledRow
+          selected={chatId === SCHEDULED_TASKS}
+          onSelect={() => onSelect(SCHEDULED_TASKS)}
+        />
         {/* Otter Code's thread search and project filter: a search of the chats, and which agent's. */}
-        <div className="flex items-center gap-1 px-(--sidebar-content-inset) pb-1">
+        <div className="flex items-center gap-1 px-(--sidebar-content-inset) pt-3 pb-1">
           <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-(--sidebar-row-content-inset) text-sidebar-muted-foreground focus-within:bg-sidebar-row-hover focus-within:text-sidebar-foreground focus-within:ring-1 focus-within:ring-focus-ring focus-within:ring-inset hover:bg-sidebar-row-hover hover:text-sidebar-foreground">
             <SearchIcon aria-hidden className="size-4 shrink-0" />
             <input
@@ -619,25 +628,7 @@ export function AgentSidebar({
                 ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <HintTooltip label="New chat" shortcut="agent.newChat" side="bottom">
-            <button
-              type="button"
-              aria-label="New chat"
-              aria-current={onNewChatPage ? "page" : undefined}
-              onClick={onNewChat}
-              className={cn(
-                HEADER_BUTTON,
-                onNewChatPage && "bg-sidebar-row-selected text-sidebar-foreground",
-              )}
-            >
-              <PlusIcon className="size-4" />
-            </button>
-          </HintTooltip>
         </div>
-        <ScheduledRow
-          selected={chatId === SCHEDULED_TASKS}
-          onSelect={() => onSelect(SCHEDULED_TASKS)}
-        />
       </div>
       <SidebarBody contentClassName="flex flex-col" flushBottom>
         {searching ? (
@@ -717,13 +708,14 @@ function ScheduledRow({ selected, onSelect }: { selected: boolean; onSelect: () 
   const failing =
     tasks.some((t) => t.enabled && t.lastRun?.status === "error") || agents.some((a) => a.error);
   return (
-    <div className="px-(--sidebar-content-inset) pb-1">
+    <div className="flex shrink-0 flex-col px-(--sidebar-content-inset)">
       <button
         type="button"
         onClick={onSelect}
         aria-current={selected ? "page" : undefined}
         className={cn(
-          "flex h-8 w-full min-w-0 cursor-pointer items-center gap-2.5 rounded-lg px-(--sidebar-row-content-inset) text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
+          SIDEBAR_ROW,
+          "px-(--sidebar-row-content-inset)",
           selected
             ? "bg-sidebar-row-selected text-sidebar-foreground"
             : "text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
