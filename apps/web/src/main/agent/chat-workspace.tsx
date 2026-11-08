@@ -12,7 +12,7 @@ import { useShallow } from "zustand/react/shallow";
 import { PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { chatTabId, type ChatTabRef } from "@otter/contracts/chats";
 
-import { BrowserPages } from "../browser/browser-view";
+import { PageSlot } from "../browser/page-host";
 import {
   chatPageId,
   closeChatPage,
@@ -262,7 +262,11 @@ export function ChatWorkspace({
   };
   useCommandHandlers({
     "tab.previous": (event) => {
-      if (!(event.target instanceof Node) || !workspaceRef.current?.contains(event.target))
+      if (!(event.target instanceof Element)) return false;
+      if (
+        !workspaceRef.current?.contains(event.target) &&
+        !event.target.closest("[data-browser-page]")
+      )
         return false;
       return previousTab();
     },
@@ -526,12 +530,8 @@ export function ChatWorkspace({
               ) : shown?.ref.kind === "file" ? (
                 <FileTab key={shown.id} chatId={chatId} href={shown.ref.href} />
               ) : null}
-              {features.browser && pageTabs.length > 0 ? (
-                <BrowserPages
-                  tabs={pageTabs}
-                  activeId={shown?.ref.kind === "page" ? chatPageId(chatId, shown.id) : null}
-                  className={shown?.ref.kind === "page" ? undefined : "absolute! inset-0"}
-                />
+              {features.browser && shown?.ref.kind === "page" ? (
+                <PageSlot key={shown.id} tabId={chatPageId(chatId, shown.id)} />
               ) : null}
             </div>
           </div>

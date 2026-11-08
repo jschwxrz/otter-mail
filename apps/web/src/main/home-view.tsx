@@ -30,6 +30,7 @@ import { MessageReader } from "./mail/message-reader";
 import { NewMessageView } from "./mail/new-message-view";
 import { CommandPalette } from "./mail/command-palette";
 import { BrowserPanel } from "./browser/browser-panel";
+import { PageHost } from "./browser/page-host";
 import { ChatBar } from "./agent/chat-bar";
 import { ChatWindow } from "./agent/chat-window";
 import { ChatWorkspace, type ChatPanelControl } from "./agent/chat-workspace";
@@ -1621,6 +1622,9 @@ function MailHome() {
               chatBarShown ? "pb-8" : "pb-(--workspace-frame-inset)",
             )}
           >
+            {/* Inside the frame's stacking: what floats over a page (the agent's window, resize
+                handles, the cards' edges) stays over it. */}
+            {features.browser ? <PageHost /> : null}
             <div data-mail-workspace="" className="relative flex min-h-0 min-w-0 flex-1">
               {peeking ? (
                 <SidebarPeekCard width={sidebarWidth} onHover={sidebarPeek.hover}>

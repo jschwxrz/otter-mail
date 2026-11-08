@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -55,13 +55,6 @@ type Webview = HTMLElement & {
 
 const PARTITION = "persist:browser";
 
-/**
- * Where a page that isn't showing waits: off to the side, still paintable. A
- * macOS webview hidden outright can come back blank (Otter Code's
- * HostedBrowserWebview), and moving it keeps its size, so nothing reflows.
- */
-const OFFSCREEN: CSSProperties = { transform: "translateX(-100000px)", pointerEvents: "none" };
-
 const SUGGESTED = [
   { name: "Google", url: "https://www.google.com/" },
   { name: "YouTube", url: "https://www.youtube.com/" },
@@ -90,38 +83,7 @@ export function BrowserTabIcon({ tab }: { tab: BrowserTab }) {
   return <GlobeIcon className="size-3.5" />;
 }
 
-export function BrowserPages({
-  tabs,
-  activeId,
-  className,
-}: {
-  tabs: BrowserTab[];
-  activeId: string | null;
-  className?: string;
-}) {
-  const [shown, setShown] = useState<ReadonlySet<string>>(() => new Set());
-  if (activeId && !shown.has(activeId)) setShown(new Set(shown).add(activeId));
-  return (
-    <div
-      className={cn("relative min-h-0 flex-1 overflow-hidden bg-canvas", className)}
-      style={activeId ? undefined : OFFSCREEN}
-    >
-      {tabs.map((tab) =>
-        shown.has(tab.id) ? (
-          <div
-            key={tab.id}
-            className="absolute inset-0 flex flex-col"
-            style={tab.id === activeId ? undefined : OFFSCREEN}
-          >
-            <BrowserPage tab={tab} active={tab.id === activeId} />
-          </div>
-        ) : null,
-      )}
-    </div>
-  );
-}
-
-function BrowserPage({ tab, active }: { tab: BrowserTab; active: boolean }) {
+export function BrowserPage({ tab, active }: { tab: BrowserTab; active: boolean }) {
   const [view, setView] = useState<Webview | null>(null);
   const [pageId, setPageId] = useState<number | null>(null);
   // The address the page opens at; later ones go through loadURL (a new src
@@ -264,7 +226,7 @@ function BrowserPage({ tab, active }: { tab: BrowserTab; active: boolean }) {
         </div>
         <AddressBar
           url={tab.url}
-          focusRequest={addressRequest}
+          focusRequest={active ? addressRequest : 0}
           onNavigate={navigate}
           onSiteDataCleared={() => view?.reload()}
         />
@@ -317,8 +279,12 @@ function AddressBar({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<string | null>(null);
+  // A request made while the page was hidden waits until it shows, and is answered once.
+  const answered = useRef(0);
   useEffect(() => {
-    if (focusRequest) inputRef.current?.focus();
+    if (!focusRequest || focusRequest === answered.current) return;
+    answered.current = focusRequest;
+    inputRef.current?.focus();
   }, [focusRequest]);
   const editing = draft !== null;
   const origin = URL.parse(url)?.origin;
