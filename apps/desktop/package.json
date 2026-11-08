@@ -1,6 +1,6 @@
 {
   "name": "@otter/desktop",
-  "version": "0.13.40",
+  "version": "0.13.41",
   "private": true,
   "description": "Your daily work, with your agents.",
   "type": "module",
