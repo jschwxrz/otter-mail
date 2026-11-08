@@ -141,7 +141,7 @@ function DeliveryRow({ turn }: { turn: ChatTurn }) {
     : null;
   const automation = delivered.kind === "automation";
   const label = automation
-    ? ["Automation", delivered.name, at].filter(Boolean).join(" · ")
+    ? ["Scheduled", delivered.name, at].filter(Boolean).join(" · ")
     : [delivered.from ? `Sent by ${delivered.from}` : "Sent to you", at]
         .filter(Boolean)
         .join(" · ");

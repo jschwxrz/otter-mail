@@ -74,6 +74,22 @@ function fakeGateway(
 }
 
 describe("taskOf", () => {
+  it("belongs to the chat it was made in and the chat it posts to", () => {
+    const made = "agent:main:otter-mail:c-1";
+    const job = (to: string) => ({
+      ...brief,
+      sessionKey: made,
+      delivery: { mode: "announce", channel: "otter", to },
+    });
+    expect(taskOf(job("chat:agent:main:otter-mail:c-2") as never, "main").chats).toEqual([
+      made,
+      "agent:main:otter-mail:c-2",
+    ]);
+    expect(taskOf(job(`chat:${made}`) as never, "main").chats).toEqual([made]);
+    expect(taskOf(job("chat:new") as never, "main").chats).toEqual([made]);
+    expect(taskOf(brief as never, "main").chats).toBeUndefined();
+  });
+
   it("reads a job the way the app shows it", () => {
     expect(taskOf(brief as never, "main")).toEqual({
       provider: "openclaw",
