@@ -63,7 +63,7 @@ data. Unsigned builds download the update but macOS refuses to install it; the f
 signed builds (below).
 
 On Linux, the same with `--platform linux --arch x64`; install the old .deb with
-`sudo apt install ./Otter-Mail-0.9.0-amd64.deb`. "Restart to update" installs the new one with
+`sudo apt install ./Otter-0.9.0-amd64.deb`. "Restart to update" installs the new one with
 dpkg, asking for the admin password (pkexec), and starts it again. Linux builds aren't signed:
 apt checks the update's SHA-512 from the feed.
 

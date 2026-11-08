@@ -222,7 +222,7 @@ async function sendImipReply(
   const keep = new Set(["UID", "SEQUENCE", "DTSTART", "DTEND", "RECURRENCE-ID", "SUMMARY"]);
   const lines = [
     "BEGIN:VCALENDAR",
-    "PRODID:-//Otter Mail//EN",
+    "PRODID:-//Otter//EN",
     "VERSION:2.0",
     "CALSCALE:GREGORIAN",
     "METHOD:REPLY",

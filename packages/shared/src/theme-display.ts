@@ -1,5 +1,5 @@
 /**
- * Themes as Otter Mail paints them. The web app (apps/web's apply-theme.ts)
+ * Themes as Otter paints them. The web app (apps/web's apply-theme.ts)
  * paints only some of a theme's roles, and blends a built-in's structure
  * colors toward the surface they sit on, keeping `keep` of the role, unless
  * the theme is `exact`. Themes of your own are painted exactly as stored, so a

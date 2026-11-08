@@ -35,7 +35,7 @@ export interface MailCapabilities {
   calendar: boolean;
   /** New mail arrives by push through the relay (Gmail, Outlook); otherwise the device watches itself. */
   relayPush: boolean;
-  /** The server holds scheduled mail and sends it on time, with Otter Mail closed (Outlook); otherwise this device sends it. */
+  /** The server holds scheduled mail and sends it on time, with Otter closed (Outlook); otherwise this device sends it. */
   serverScheduledSend?: boolean;
   /**
    * Other addresses it sends from (aliases, a custom domain's): read from the server's settings

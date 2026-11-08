@@ -83,7 +83,7 @@ struct AccountSettings: View {
 
     static func name(_ userAgent: String?) -> String {
         let ua = userAgent ?? ""
-        if let match = ua.firstMatch(of: /^Otter Mail\/\S+ \((.+)\)$/) {
+        if let match = ua.firstMatch(of: /^Otter(?: Mail)?\/\S+ \((.+)\)$/) {
             return String(match.1).removingPercentEncoding ?? String(match.1)
         }
         if ua.contains("Edg/") { return "Edge" }

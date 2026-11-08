@@ -110,7 +110,7 @@ export function connectBackend(page: PageHandlers) {
           if (call.sent) {
             // The previous host went away mid-call: don't risk doing it twice.
             pending.delete(id);
-            call.reject(new Error("Otter Mail reconnected in another tab. Try again."));
+            call.reject(new Error("Otter reconnected in another tab. Try again."));
           } else {
             call.sent = true;
             send({ type: "invoke", tab, id, channel: call.channel, params: call.params });

@@ -9,10 +9,10 @@ import * as NodeURL from "node:url";
 const __dirname = NodePath.dirname(NodeURL.fileURLToPath(import.meta.url));
 export const desktopDir = NodePath.resolve(__dirname, "..");
 
-const APP_DISPLAY_NAME = "Otter Mail (Dev)";
+const APP_DISPLAY_NAME = "Otter (Dev)";
 const APP_BUNDLE_ID = "dev.otterware.mail.dev";
 // Bump when the patching below changes, to force a fresh copy.
-const LAUNCHER_VERSION = 1;
+const LAUNCHER_VERSION = 2;
 const iconPath = NodePath.join(desktopDir, "resources", "icon-dev.icns");
 const runtimeDir = NodePath.join(desktopDir, ".electron-runtime");
 

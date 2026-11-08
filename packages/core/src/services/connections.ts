@@ -22,7 +22,7 @@ const COPY: Record<Operation, Omit<AccessNeed, "operation">> = {
     allow: "Allow calendar access",
   },
   saveSignature: {
-    consequence: "Your signature is saved in Otter Mail, not in Gmail",
+    consequence: "Your signature is saved in Otter, not in Gmail",
     allow: "Allow saving to Gmail",
   },
 };

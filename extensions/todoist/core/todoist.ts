@@ -170,7 +170,7 @@ export async function createTodoistTask(input: unknown): Promise<void> {
     if (!account || !message)
       throw new Error("This email is no longer available. Reopen it and try again.");
     const link = `https://mail.otterware.app/${encodeURIComponent(account.id)}/INBOX/${encodeURIComponent(p.email.messageId)}`;
-    description = `${description}${description ? "\n\n" : ""}[Open conversation in Otter Mail](${link})`;
+    description = `${description}${description ? "\n\n" : ""}[Open conversation in Otter](${link})`;
   }
   await command("item_add", p.requestId, {
     content: p.content,

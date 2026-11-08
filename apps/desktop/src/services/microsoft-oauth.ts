@@ -203,7 +203,7 @@ async function authorizeInBrowser(loginHint?: string): Promise<{
         clearTimeout(timer);
       };
       if (url.searchParams.get("state") !== state) {
-        finish(400, "This sign-in link is stale", "Return to Otter Mail and try again.");
+        finish(400, "This sign-in link is stale", "Return to Otter and try again.");
         reject(new Error("Microsoft sign-in returned an unexpected state."));
       } else if (error) {
         finish(400, "Sign-in cancelled", "You can close this tab.");
@@ -213,7 +213,7 @@ async function authorizeInBrowser(loginHint?: string): Promise<{
           reject(new Error(`Microsoft sign-in failed: ${detail}`));
         }
       } else {
-        finish(200, "Signed in", "You can close this tab and return to Otter Mail.");
+        finish(200, "Signed in", "You can close this tab and return to Otter.");
         resolve(receivedCode!);
       }
     });

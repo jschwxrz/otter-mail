@@ -292,7 +292,7 @@ const AGENT_COMMANDS: { agent: string; text: (url: string, token: string) => str
 ];
 
 /**
- * Agents on this Mac that Otter Mail doesn't run (Claude Code, Cursor, …) get
+ * Agents on this Mac that Otter doesn't run (Claude Code, Cursor, …) get
  * its tools at the Mac app's MCP server with a token made here, each with as
  * much access as it's given. Nothing asks again: making the token was the
  * user's say.
@@ -310,7 +310,7 @@ function ConnectedAgentsSection() {
   return (
     <AgentTokensSection<ConnectedAgent>
       {...searchableSetting("connected-agents")}
-      description="Claude Code, Codex, Cursor or any agent that speaks MCP can use your mail, calendars and views while Otter Mail is open."
+      description="Claude Code, Codex, Cursor or any agent that speaks MCP can use your mail, calendars and views while Otter is open."
       queryKey="mcp:agents"
       list={mailApi.connectedAgents}
       create={(name) => mailApi.addConnectedAgent(name, access)}

@@ -69,7 +69,7 @@ export function imapOptions({ settings, password }: ImapAccess): ImapOptions {
   return {
     ...settings.imap,
     auth: { user: settings.username, pass: password },
-    clientId: { name: "Otter Mail", vendor: "Otterware" },
+    clientId: { name: "Otter", vendor: "Otterware" },
   };
 }
 

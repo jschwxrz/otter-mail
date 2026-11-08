@@ -62,5 +62,5 @@ Query-cache keys and events are prefixed `todoist`; they are in-memory only. API
 copied into the mail database or synchronized through the relay.
 
 Disconnect/removal does not delete users' tasks or revoke the authorization in Todoist itself.
-Users can revoke Otter Mail from Todoist's integration settings. Existing task links continue to
+Users can revoke Otter from Todoist's integration settings. Existing task links continue to
 open conversations through the normal mail route after the feature is removed.

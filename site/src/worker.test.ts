@@ -19,7 +19,7 @@ function serve(url: string, accept?: string) {
 const html = "text/html,application/xhtml+xml,*/*;q=0.8";
 
 describe("site domain migration", () => {
-  it("sends the old domain's home page, the consent screen's, to Otter Mail's page", async () => {
+  it("sends the old domain's home page, the consent screen's, to Otter's page", async () => {
     const { response, fetch } = serve("https://mail.otterware.dev/");
     const result = await response;
     expect(result.status).toBe(301);

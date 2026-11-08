@@ -1,6 +1,6 @@
 # Runbook
 
-How each part of Otter Mail gets from `main` to people, what to check, and what to do when it
+How each part of Otter gets from `main` to people, what to check, and what to do when it
 breaks. The details behind each step are in `docs/release.md`, `infra/relay/README.md` and
 `apps/ios/README.md`.
 

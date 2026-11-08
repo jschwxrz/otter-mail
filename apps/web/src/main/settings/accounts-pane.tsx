@@ -431,8 +431,8 @@ function AccountEditor({ account }: { account: MailAccount }) {
       (saved) => {
         setShown(saved.signature ?? "");
         if (saved.signatureInGmail === false) {
-          toast.info("Signature saved in Otter Mail, not in Gmail", {
-            description: `Sign in to ${account.email} again to let Otter Mail save it in Gmail too.`,
+          toast.info("Signature saved in Otter, not in Gmail", {
+            description: `Sign in to ${account.email} again to let Otter save it in Gmail too.`,
             action: {
               label: "Sign in",
               onClick: () => void signIn.mutateAsync(account.email).catch(() => {}),
@@ -504,7 +504,7 @@ function AccountEditor({ account }: { account: MailAccount }) {
               />
             ) : null
           }
-          description="Shown in the sidebar and account switcher. Only used in Otter Mail."
+          description="Shown in the sidebar and account switcher. Only used in Otter."
           control={
             <DraftInput
               value={displayName}
@@ -601,8 +601,8 @@ function AccountEditor({ account }: { account: MailAccount }) {
         }}
       >
         <Text variant="small">
-          Otter Mail stops syncing {account.email} and deletes its local copy. Nothing is deleted
-          from {mailServerName(account)} — you can add the account again any time.
+          Otter stops syncing {account.email} and deletes its local copy. Nothing is deleted from{" "}
+          {mailServerName(account)} — you can add the account again any time.
         </Text>
       </Dialog>
     </>
@@ -615,7 +615,7 @@ function MailboxAccess({ account }: { account: MailAccount }) {
   return (
     <SettingsSection
       {...searchableSetting("mailbox-access")}
-      description={`What Otter Mail may use from your ${signInName(account)} sign-in.`}
+      description={`What Otter may use from your ${signInName(account)} sign-in.`}
     >
       {connection.resources.map((resource) => {
         const [first, ...more] = resource.needs;
@@ -1034,7 +1034,7 @@ function ConnectionsHub() {
     <SettingsPageContainer
       searchId={searchableSetting("mailboxes").id}
       title="Connections"
-      description="The accounts you've connected and what each gives Otter Mail. Mailboxes turn on or off on every device; drag the tabs in the sidebar to order them."
+      description="The accounts you've connected and what each gives Otter. Mailboxes turn on or off on every device; drag the tabs in the sidebar to order them."
       action={
         <SignInButton
           label="Add account"

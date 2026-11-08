@@ -11,7 +11,7 @@ test("nightlies preview the next stable patch without changing the stable source
   assert.deepEqual(nightlyReleaseMetadata("0.13.9", "20261013", "123", "abcdef1234567890"), {
     version: nightly,
     tag: `v${nightly}`,
-    name: `Otter Mail Nightly ${nightly} (abcdef123456)`,
+    name: `Otter Nightly ${nightly} (abcdef123456)`,
   });
   assert.equal(bumpVersion("ios-v0.8.9", "minor"), "0.9.0");
   for (const [date, run, sha] of [
@@ -112,10 +112,7 @@ test("the iPhone's Sentry release is the one the app reports, with commits since
   assert.equal(previousIosTag(tags, "0.8.4"), undefined);
 
   const [a, b] = ["a".repeat(40), "b".repeat(40)];
-  assert.equal(
-    iosCommitSpec("otterware-app/otter-mail", a, b),
-    `otterware-app/otter-mail@${a}..${b}`,
-  );
+  assert.equal(iosCommitSpec("otterware-app/otter", a, b), `otterware-app/otter@${a}..${b}`);
   assert.throws(() => iosCommitSpec("otter-mail", a, b));
-  assert.throws(() => iosCommitSpec("otterware-app/otter-mail", "HEAD", b));
+  assert.throws(() => iosCommitSpec("otterware-app/otter", "HEAD", b));
 });

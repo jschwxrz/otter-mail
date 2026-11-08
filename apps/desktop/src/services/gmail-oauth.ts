@@ -221,13 +221,13 @@ async function authorizeInBrowser(opts: {
         clearTimeout(timer);
       };
       if (url.searchParams.get("state") !== state) {
-        finish(400, "This sign-in link is stale", "Return to Otter Mail and try again.");
+        finish(400, "This sign-in link is stale", "Return to Otter and try again.");
         reject(new Error("Google sign-in returned an unexpected state."));
       } else if (error) {
         finish(400, "Sign-in cancelled", "You can close this tab.");
         reject(new Error(`Google sign-in failed: ${error}`));
       } else {
-        finish(200, "Signed in", "You can close this tab and return to Otter Mail.");
+        finish(200, "Signed in", "You can close this tab and return to Otter.");
         resolve(receivedCode!);
       }
     });

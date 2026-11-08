@@ -65,6 +65,8 @@ export const linuxOS: HostOS = {
     logger.info("main", "Secrets", { store: safeStorage.getSelectedStorageBackend() });
   },
 
+  renameOldInstall: () => false,
+
   setLaunchAtLogin(enabled) {
     // An unpackaged run would autostart Electron itself.
     if (!app.isPackaged) return;

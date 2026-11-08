@@ -60,7 +60,7 @@ export default defineConfig(({ command }) => ({
     tailwindcss(),
   ],
   define: {
-    __APP_DISPLAY_NAME__: JSON.stringify("Otter Mail"),
+    __APP_DISPLAY_NAME__: JSON.stringify("Otter"),
     __APP_VERSION__: JSON.stringify(process.env.OTTER_MAIL_VERSION?.trim() || pkg.version),
     __DEMO__: JSON.stringify(process.env.VITE_DEMO === "1"),
     __DEV_DEMO__: JSON.stringify(command === "serve" && devDemo),

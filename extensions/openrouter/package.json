@@ -2,7 +2,7 @@
   "name": "@otter-mail/extension-openrouter",
   "version": "0.1.0",
   "private": true,
-  "description": "Otter Mail's own agent, run for your Otter account through OpenRouter.",
+  "description": "Otter's own agent, run for your Otter account through OpenRouter.",
   "type": "module",
   "exports": {
     "./manifest": "./manifest.ts",
@@ -25,9 +25,9 @@
   },
   "otterMail": {
     "id": "openrouter",
-    "name": "Otter Mail agent",
-    "description": "Otter Mail's own agent, run for your Otter account through OpenRouter.",
+    "name": "Otter agent",
+    "description": "Otter's own agent, run for your Otter account through OpenRouter.",
     "category": "agent",
-    "dataUse": "Your messages, and the mail and calendar data its tools read, go to Otter Mail's server, OpenRouter and the model's provider. Chats are kept with your Otter account."
+    "dataUse": "Your messages, and the mail and calendar data its tools read, go to Otter's server, OpenRouter and the model's provider. Chats are kept with your Otter account."
   }
 }

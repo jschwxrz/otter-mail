@@ -49,7 +49,7 @@ const send = (message: ToBackend) => backend?.postMessage(message);
 
 export function startBackend(): Promise<void> {
   const child = utilityProcess.fork(path.join(__dirname, "backend.cjs"), [], {
-    serviceName: "Otter Mail Backend",
+    serviceName: "Otter Backend",
     env: {
       ...process.env,
       ...appInfoEnv({

@@ -1,11 +1,11 @@
 ---
 name: write-changelog
-description: Write an Otter Mail changelog note (changelog/<version>.md) in the house style after conductor.build/changelog - a few-word title, a one-line lead, a screenshot or two, short bullets. Use only when the user asks for a note, release notes or a changelog entry. The changelog is marketing, not part of releasing - never write, draft, suggest or ask about a note on your own, not even when running a release.
+description: Write an Otter changelog note (changelog/<version>.md) in the house style after conductor.build/changelog - a few-word title, a one-line lead, a screenshot or two, short bullets. Use only when the user asks for a note, release notes or a changelog entry. The changelog is marketing, not part of releasing - never write, draft, suggest or ask about a note on your own, not even when running a release.
 ---
 
 # Write a changelog note
 
-The changelog is how Otter Mail announces itself: marketing and brand as much
+The changelog is how Otter announces itself: marketing and brand as much
 as a record. Notes live in `changelog/<version>.md` at the repository root.
 The website shows them at https://otterware.app/mail/changelog, all on one page,
 newest first, with the versions down the side (each note's anchor is its

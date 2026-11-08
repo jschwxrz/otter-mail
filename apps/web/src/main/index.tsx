@@ -29,7 +29,7 @@ if (!window.desktopBridge) {
     const main = document.createElement("main");
     main.style.cssText =
       "font:14px system-ui;display:grid;place-items:center;height:100vh;text-align:center;color:#71717a";
-    main.innerHTML = `<div><p style="font-size:18px">Couldn't sign you in to Otter Mail.</p>
+    main.innerHTML = `<div><p style="font-size:18px">Couldn't sign you in to Otter.</p>
       <p>Try again in a moment: <a href="" style="color:inherit">reload</a>.</p>
       <p style="font-size:12px;opacity:.7"></p></div>`;
     main.querySelector("p:last-child")!.textContent = reason;

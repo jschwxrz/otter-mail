@@ -8,7 +8,7 @@ import { platform } from "../platform.js";
 
 const SESSION_SECRET = "otter-session";
 
-export const OTTER_SIGNED_OUT_MESSAGE = "Not signed in to Otter Mail.";
+export const OTTER_SIGNED_OUT_MESSAGE = "Not signed in to Otter.";
 
 let session: { token: string | null; user: RelayUser } | null = null;
 const listeners = new Set<() => void>();
@@ -78,7 +78,7 @@ async function request<T>(
       signal: AbortSignal.timeout(20_000),
     });
   } catch (err) {
-    throw new RelayError(0, `Can't reach Otter Mail's servers (${String(err)}).`);
+    throw new RelayError(0, `Can't reach Otter's servers (${String(err)}).`);
   }
   if (!response.ok) {
     const { error } = (await response.json().catch(() => ({}))) as { error?: string };
@@ -118,7 +118,7 @@ function createClient() {
       ...(deviceName
         ? {
             headers: {
-              "User-Agent": `Otter Mail/${appVersion} (${encodeURIComponent(deviceName)})`,
+              "User-Agent": `Otter/${appVersion} (${encodeURIComponent(deviceName)})`,
             },
           }
         : {}),
@@ -198,7 +198,7 @@ export async function signOut(): Promise<void> {
 
 function deviceName(userAgent: string | null | undefined): string {
   const ua = userAgent ?? "";
-  const mac = /^Otter Mail\/\S+ \((.+)\)$/.exec(ua)?.[1];
+  const mac = /^Otter(?: Mail)?\/\S+ \((.+)\)$/.exec(ua)?.[1];
   if (mac) {
     try {
       return decodeURIComponent(mac);

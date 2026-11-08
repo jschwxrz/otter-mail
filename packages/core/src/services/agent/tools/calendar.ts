@@ -26,13 +26,13 @@ async function calendarOf<T>(
   work: (calendar: Calendar) => Promise<T>,
 ): Promise<T> {
   const calendar = account.capabilities?.calendar ? providerFor(account.id).calendar : undefined;
-  if (!calendar) throw new Error(`${account.email} has no calendar in Otter Mail.`);
+  if (!calendar) throw new Error(`${account.email} has no calendar in Otter.`);
   try {
     return await work(calendar);
   } catch (error) {
     if (error instanceof NoCalendarAccess)
       throw new Error(
-        `Otter Mail may not use ${account.email}'s calendar yet: the user can allow it by signing in to the mailbox again (Settings → Connections).`,
+        `Otter may not use ${account.email}'s calendar yet: the user can allow it by signing in to the mailbox again (Settings → Connections).`,
         { cause: error },
       );
     throw error;

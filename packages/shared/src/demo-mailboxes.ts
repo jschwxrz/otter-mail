@@ -217,14 +217,14 @@ const personal: SeedAccount = {
     const gardenStart = slot(seededAt, 5, 9);
     return [
       {
-        subject: "Welcome to the Otter Mail demo",
+        subject: "Welcome to the Otter demo",
         labels: ["INBOX", "IMPORTANT", "CATEGORY_PERSONAL"],
         messages: [
           {
-            from: p("Otter Mail", "team@otter.example"),
+            from: p("Otter", "team@otter.example"),
             hoursAgo: 24 * 20,
             starred: true,
-            text: "Hi Robin,\n\nEverything in this mailbox is made up: the people, the mail, the attachments. It lives in your browser only (the demo's own storage), and nothing you do here reaches Gmail.\n\nArchive, star, label, reply, draft, search: it all works against a pretend Gmail, and sync catches up the way it does with the real one.\n\nTo start over, open the app with ?reset-demo at the end of the address.\n\nHave fun,\nThe Otter Mail team",
+            text: "Hi Robin,\n\nEverything in this mailbox is made up: the people, the mail, the attachments. It lives in your browser only (the demo's own storage), and nothing you do here reaches Gmail.\n\nArchive, star, label, reply, draft, search: it all works against a pretend Gmail, and sync catches up the way it does with the real one.\n\nTo start over, open the app with ?reset-demo at the end of the address.\n\nHave fun,\nThe Otter team",
           },
         ],
       },
@@ -394,13 +394,13 @@ const personal: SeedAccount = {
         ],
       },
       {
-        subject: "Re: Otter Mail feedback — keyboard shortcuts",
+        subject: "Re: Otter feedback — keyboard shortcuts",
         labels: ["INBOX", "Projects/Otter"],
         messages: [
           {
             from: jose,
             hoursAgo: 24 * 4,
-            text: 'Hi Robin,\n\nI\'ve been using Otter Mail for a week. Love it. Two things:\n\n1. Could `e` archive and move to the next message rather than back to the list?\n2. Is there a shortcut for "mark as unread"?\n\nJosé',
+            text: 'Hi Robin,\n\nI\'ve been using Otter for a week. Love it. Two things:\n\n1. Could `e` archive and move to the next message rather than back to the list?\n2. Is there a shortcut for "mark as unread"?\n\nJosé',
           },
           {
             to: [jose],
@@ -1267,9 +1267,9 @@ export const DEMO_OUTLOOK_ACCOUNT: OutlookSeedAccount = {
         folder: "inbox",
         conversation: "welcome",
         subject: "Welcome to your Outlook demo mailbox",
-        from: p("Otter Mail", "team@otter.example"),
+        from: p("Otter", "team@otter.example"),
         hoursAgo: 24 * 18,
-        text: "Hi Jordan,\n\nThis mailbox pretends to be Outlook: folders instead of labels, categories, flags and importance, all answered by a made-up Microsoft Graph in your browser. Nothing here reaches Microsoft.\n\nMove mail between folders, flag it, give it categories, reply, draft, search: sync catches up the way it does with the real one.\n\nThe Otter Mail team",
+        text: "Hi Jordan,\n\nThis mailbox pretends to be Outlook: folders instead of labels, categories, flags and importance, all answered by a made-up Microsoft Graph in your browser. Nothing here reaches Microsoft.\n\nMove mail between folders, flag it, give it categories, reply, draft, search: sync catches up the way it does with the real one.\n\nThe Otter team",
       },
       {
         folder: "inbox",

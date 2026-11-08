@@ -78,7 +78,8 @@ A state directory holds the mail cache (`mail-cache.db`), accounts, Google token
 profile in `chromium/` and logs in `logs/main.log`. Delete it to start fresh.
 
 - Each state directory signs in to its accounts separately. Dev runs are named
-  "Otter Mail (Dev)" and use their own Keychain key, so they can't read the installed app's tokens.
+  "Otter (Dev)" and use their own Keychain key ("Otter Mail (Dev) Safe Storage": the app keeps the
+  key it had before the rename, `apps/desktop/src/paths.ts`), so they can't read the installed app's tokens.
 - Nothing is ever copied between homes.
 - Renderer logs are in the DevTools console (View → Toggle Developer Tools).
 

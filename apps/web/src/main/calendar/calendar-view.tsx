@@ -426,7 +426,7 @@ export function CalendarView({
         >
           {calendars.length === 0 ? (
             <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
-              None of your mailboxes has a calendar Otter Mail can open. Gmail and Outlook do.
+              None of your mailboxes has a calendar Otter can open. Gmail and Outlook do.
             </div>
           ) : (
             <div

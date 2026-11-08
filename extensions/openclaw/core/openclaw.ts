@@ -205,7 +205,7 @@ function open(url: string, { token, bootstrapToken }: Credentials): Promise<Gate
     const clientInfo = {
       id: "gateway-client" as const,
       mode: "ui" as const,
-      displayName: `Otter Mail (${p.kind})`,
+      displayName: `Otter (${p.kind})`,
       version: p.appVersion,
       platform: p.kind,
     };
@@ -413,7 +413,7 @@ export async function allowOpenClawOwner(settings: OpenClawSettings): Promise<vo
     }),
     baseHash: hash,
     replacePaths: ["commands.ownerAllowFrom"],
-    note: "Otter Mail: what you send from Otter is the owner's, and the agent knows Otter's chats",
+    note: "Otter: what you send from Otter is the owner's, and the agent knows Otter's chats",
   });
   logger.info("agent", "openclaw owner allowed");
 }

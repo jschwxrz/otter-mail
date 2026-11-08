@@ -77,7 +77,7 @@ const files: ToolFiles = {
       path.includes("\\") ||
       path.split("/").some((part) => part === ".." || part === ".")
     )
-      throw new Error("Choose an attachment in Otter Mail first.");
+      throw new Error("Choose an attachment in Otter first.");
     const bytes = await platform().files.read(path);
     if (!bytes || bytes.length > 50 * 1024 * 1024)
       throw new Error("This attachment is unavailable or exceeds the 50 MB limit.");
@@ -147,7 +147,7 @@ async function readEvents(
 
 export const openRouterProvider: ChatProvider<OpenRouterSettings> = {
   kind: "openrouter",
-  displayName: "Otter Mail agent",
+  displayName: "Otter agent",
   defaults: OPENROUTER_DEFAULTS,
   fields: {
     enabled: "boolean",
@@ -160,7 +160,7 @@ export const openRouterProvider: ChatProvider<OpenRouterSettings> = {
   async checkStatus(settings) {
     const base = {
       kind: "openrouter" as const,
-      displayName: "Otter Mail agent",
+      displayName: "Otter agent",
       installed: true,
       version: null,
       models: [],

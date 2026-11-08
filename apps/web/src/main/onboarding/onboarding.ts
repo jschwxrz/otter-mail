@@ -62,7 +62,7 @@ export function saveStep(step: string): void {
 }
 
 export function offerTour(): void {
-  tourOffer = toast.info("New to Otter Mail?", {
+  tourOffer = toast.info("New to Otter?", {
     description: "A one-minute tour of what it can do.",
     action: { label: "Take the tour", onClick: requestTour },
   });

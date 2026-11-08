@@ -418,7 +418,7 @@ export function CommandPalette({
               title:
                 update.status === "downloaded"
                   ? `Restart to update to ${update.availableVersion}`
-                  : "Update Otter Mail",
+                  : "Update Otter",
               description: `Version ${update.currentVersion}`,
               keywords: "upgrade install restart new version check for updates",
               run: updateNow,

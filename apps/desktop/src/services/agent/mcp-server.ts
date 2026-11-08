@@ -33,7 +33,7 @@ const chats = new Map<string, ToolCaller>();
 
 function mcpServer(caller: ToolCaller, instructions: string | undefined): Server {
   const server = new Server(
-    { name: "Otter Mail", version: appInfo().version },
+    { name: "Otter", version: appInfo().version },
     { capabilities: { tools: {} }, instructions },
   );
   server.setRequestHandler(ListToolsRequestSchema, async () => ({

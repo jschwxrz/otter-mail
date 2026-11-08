@@ -18,7 +18,7 @@ export function signInPage({ title, detail, ok, script, nonce }: SignInPage): st
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>${escapeHtml(title)} · Otter Mail</title>
+<title>${escapeHtml(title)} · Otter</title>
 <style${n}>
 :root{--canvas:#fcfcfc;--foreground:#27272a;--muted:#71717a;--ok:#16a34a;--bad:#dc2626;color-scheme:light dark}
 @media (prefers-color-scheme:dark){:root{--canvas:#0a0a0a;--foreground:#f5f5f5;--muted:#8a8a8a;--ok:#22c55e;--bad:#f87171}}

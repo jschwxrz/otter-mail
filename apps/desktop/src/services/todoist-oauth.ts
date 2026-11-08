@@ -30,7 +30,7 @@ export async function todoistSignIn(
       .end(
         signInPage({
           title: "Connected to Todoist",
-          detail: "You can close this window and return to Otter Mail.",
+          detail: "You can close this window and return to Otter.",
           ok: true,
         }),
       );

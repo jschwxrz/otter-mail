@@ -320,7 +320,7 @@ function DefaultMailRow() {
   }, [refreshForEffect]);
   if (isDefault !== false) return null;
   return (
-    <HintTooltip label="Use Otter Mail for email links">
+    <HintTooltip label="Use Otter for email links">
       <button
         type="button"
         onClick={async () => {

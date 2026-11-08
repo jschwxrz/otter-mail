@@ -90,7 +90,7 @@ export function describeError(err: unknown): string {
     if (err.throttled) return "Outlook is limiting requests right now — retrying shortly";
     if (err.status === 401) return OUTLOOK_SIGNED_OUT_MESSAGE;
     if (err.status === 403) {
-      return "Outlook refused access to this mailbox — sign in to it again to allow Otter Mail";
+      return "Outlook refused access to this mailbox — sign in to it again to allow Otter";
     }
     if (err.status >= 500) return "Outlook is having trouble right now — retrying shortly";
     return err.message.replace(/^Microsoft Graph error: /, "Outlook error ").slice(0, 240);

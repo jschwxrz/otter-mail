@@ -85,7 +85,7 @@ export class CodexAppServer {
     });
     const server = new CodexAppServer(child);
     const init = await server.request<{ userAgent?: string }>("initialize", {
-      clientInfo: { name: "otter_mail", title: "Otter Mail", version: "1.0.0" },
+      clientInfo: { name: "otter_mail", title: "Otter", version: "1.0.0" },
       capabilities: { experimentalApi: true },
     });
     server.version = init.userAgent?.match(/\/([^\s]+)/)?.[1] ?? null;

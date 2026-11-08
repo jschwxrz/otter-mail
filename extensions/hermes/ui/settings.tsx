@@ -93,7 +93,7 @@ export function HermesSettings({ provider, update }: AgentSettingsProps) {
           </SettingsRow>
           {SITE_ORIGIN ? (
             <SettingsRow
-              title="4. Allow Otter Mail on the web"
+              title="4. Allow Otter on the web"
               description="Browsers may only call Hermes from sites it allows. Separate sites with commas, and keep any you allowed before."
             >
               <Command value={`hermes config set API_SERVER_CORS_ORIGINS ${SITE_ORIGIN}`} />

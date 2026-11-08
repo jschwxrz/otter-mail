@@ -56,7 +56,7 @@ function makeCertificates(): void {
     "-x509",
     ...key,
     "-subj",
-    "/CN=Otter Mail dev CA",
+    "/CN=Otter dev CA",
     "-addext",
     "basicConstraints=critical,CA:true",
     "-addext",

@@ -106,7 +106,7 @@ export interface OtterDevice {
 export const OTTER_ACCOUNT_STATE_CHANNEL = "otter:state";
 
 export const GMAIL_SETTINGS_PERMISSION =
-  "Otter Mail needs permission to change this account's Gmail settings. Sign in to it again to allow it.";
+  "Otter needs permission to change this account's Gmail settings. Sign in to it again to allow it.";
 
 export type ChatChange = {
   title: string;

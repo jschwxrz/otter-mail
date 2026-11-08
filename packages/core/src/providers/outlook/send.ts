@@ -197,7 +197,7 @@ async function syncAttachments(
 /**
  * Has Exchange send a draft at `sendAt`: PidTagDeferredSendTime, a MAPI
  * property Graph has no field for. After `/send` Exchange holds the message,
- * locked against edits and moves, and sends it then, with Otter Mail closed.
+ * locked against edits and moves, and sends it then, with Otter closed.
  * It waits in the Outbox, which isn't synced, rather than in Drafts, where it
  * would show as a draft nobody can edit. It keeps its id, then in Sent Items.
  */

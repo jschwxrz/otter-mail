@@ -19,7 +19,7 @@ export function nightlyReleaseMetadata(base: string, date: string, run: string, 
   return {
     version,
     tag: `v${version}`,
-    name: `Otter Mail Nightly ${version} (${sha.slice(0, 12)})`,
+    name: `Otter Nightly ${version} (${sha.slice(0, 12)})`,
   };
 }
 
@@ -37,7 +37,7 @@ type App = "mac" | "ios";
 const APPS: Record<App, { prefix: string; name: string; sourceVersion: () => string }> = {
   mac: {
     prefix: "v",
-    name: "Otter Mail",
+    name: "Otter",
     sourceVersion: () =>
       (
         JSON.parse(

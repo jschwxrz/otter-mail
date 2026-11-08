@@ -174,7 +174,7 @@ describe("diagnostics privacy", () => {
       environment: "macOS",
       schemaVersion: 1,
     } as Parameters<typeof buildSupportIssue>[1]);
-    expect(body).toContain("Otter Mail diagnostics.json");
+    expect(body).toContain("Otter diagnostics.json");
     expect(body).not.toContain('"schemaVersion"');
     expect(body).not.toContain("```json");
     expect(parseSupportDraft("# Specific issue title\r\n\r\nConcise findings.")).toEqual({

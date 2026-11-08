@@ -12,7 +12,7 @@ import { setErrorReportsAllowed, setReportId, startErrorReports } from "./error-
 import { logger, logToFile } from "./logger.js";
 import { hostOS } from "./os/index.js";
 import type { AppMenuItems } from "./os/types.js";
-import { configureAppPaths } from "./paths.js";
+import { configureAppPaths, nameApp } from "./paths.js";
 import { focusedBrowserPage, setupBrowser } from "./services/browser.js";
 import { embedDriveContent } from "./services/drive-content.js";
 import { parseMailtoUrl, setPendingMailto } from "./services/mailto-target.js";
@@ -315,6 +315,8 @@ app.on("will-quit", () => {
 });
 
 void app.whenReady().then(async () => {
+  nameApp();
+  if (hostOS.renameOldInstall()) return app.exit(0);
   logger.info("main", "App ready", {
     version: app.getVersion(),
     packaged: app.isPackaged,

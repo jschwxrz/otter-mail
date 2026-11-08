@@ -1,6 +1,6 @@
 ---
 name: pr
-description: Open or update an Otter Mail pull request the house way - a branch off main, the checks, the template filled in, and for anything a user can see, screenshots or a recording attached with `gh --attach`. Use whenever you create a PR, push a change for review, or are asked to add pictures to one.
+description: Open or update an Otter pull request the house way - a branch off main, the checks, the template filled in, and for anything a user can see, screenshots or a recording attached with `gh --attach`. Use whenever you create a PR, push a change for review, or are asked to add pictures to one.
 ---
 
 # Open a pull request

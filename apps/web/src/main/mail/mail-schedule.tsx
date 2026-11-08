@@ -15,12 +15,12 @@ import { NewRow } from "./sidebar-ui";
 import { toast } from "./toast";
 
 const NOTE =
-  "If this device sleeps or you close Otter Mail, scheduled sends and snoozed emails wait until the app resumes here. A suspended browser tab can also delay them.";
+  "If this device sleeps or you close Otter, scheduled sends and snoozed emails wait until the app resumes here. A suspended browser tab can also delay them.";
 
 const DEVICE_NOTE = (
   <>
     <strong className="font-medium text-foreground">
-      Keep this device awake and online with Otter Mail open.
+      Keep this device awake and online with Otter open.
     </strong>{" "}
     {NOTE}
   </>
@@ -59,9 +59,7 @@ export function TimePicker({
       {open && (
         <TimePickerDialog
           title={title}
-          note={
-            onServer ? "Outlook sends it at that time, even with Otter Mail closed." : undefined
-          }
+          note={onServer ? "Outlook sends it at that time, even with Otter closed." : undefined}
           onChoose={onChoose}
           onClose={() => setOpen(false)}
         />
@@ -226,7 +224,7 @@ export function ScheduledMailButton() {
             <DialogTitle>Scheduled & snoozed</DialogTitle>
             <DialogDescription>
               {entries.length > 0 && entries.every((entry) => entry.onServer)
-                ? "Outlook sends these at their time, even with Otter Mail closed."
+                ? "Outlook sends these at their time, even with Otter closed."
                 : DEVICE_NOTE}
             </DialogDescription>
           </DialogHeader>

@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping with Otter Mail. Setup is in [docs/development.md](docs/development.md).
+Thanks for helping with Otter. Setup is in [docs/development.md](docs/development.md).
 
 - Open an issue first for anything bigger than a bug fix, so we can agree on the approach.
 - Keep pull requests small and focused; one change per PR.

@@ -23,7 +23,7 @@ vi.mock("../os/index.js", () => ({
       list: async () => ({ apps: [], defaultName: "Terminal" }),
       open: async (launcher: string, terminalId: string | null) =>
         fixture.open(launcher, terminalId),
-      launcher: { fileName: "Investigate Otter Mail.command", shebang: "#!/bin/zsh -l" },
+      launcher: { fileName: "Investigate Otter.command", shebang: "#!/bin/zsh -l" },
     },
   },
 }));
@@ -94,15 +94,15 @@ describe("Terminal support handler", () => {
     expect(await fs.readFile(path.join(directory, "report.md"), "utf-8")).toBe(body);
     const prompt = await fs.readFile(path.join(directory, "prompt.md"), "utf-8");
     expect(prompt).toContain(body);
-    expect(prompt).toContain("This session is connected to Otter Mail.");
+    expect(prompt).toContain("This session is connected to Otter.");
     expect(prompt).toContain("Do not submit the issue from Terminal.");
-    expect(prompt).toContain("./Otter Mail diagnostics.json");
+    expect(prompt).toContain("./Otter diagnostics.json");
     expect(prompt).not.toContain('"schemaVersion"');
     expect(
-      JSON.parse(await fs.readFile(path.join(directory, "Otter Mail diagnostics.json"), "utf-8")),
+      JSON.parse(await fs.readFile(path.join(directory, "Otter diagnostics.json"), "utf-8")),
     ).toEqual({ schemaVersion: 1, version: "0.5.13", errors: [] });
     expect(await fs.readFile(path.join(directory, "screenshot.png"))).toEqual(Buffer.from(bytes));
-    const launcher = path.join(directory, "Investigate Otter Mail.command");
+    const launcher = path.join(directory, "Investigate Otter.command");
     expect(await fs.readFile(launcher, "utf-8")).toContain("'--permission-mode' 'default'");
     expect(await fs.readFile(launcher, "utf-8")).not.toContain(body);
     expect((await fs.stat(directory)).mode & 0o777).toBe(0o700);

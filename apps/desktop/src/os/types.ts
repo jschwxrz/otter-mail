@@ -41,6 +41,8 @@ export interface HostOS {
   installsUpdatesOnQuit: boolean;
 
   prepareSecrets(): void;
+  /** Moves an install still named Otter Mail to the new name and relaunches it from there: true if it did. */
+  renameOldInstall(): boolean;
 
   setLaunchAtLogin(enabled: boolean): void;
   setBadge(count: number): void;

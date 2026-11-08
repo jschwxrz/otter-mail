@@ -322,7 +322,7 @@ function WelcomeStep({ onStart }: { onStart: () => void }) {
         className="mb-6 size-20 rounded-[22%] shadow-[0_12px_32px_-12px_rgb(0_0_0/0.5)]"
       />
       <StepHeader
-        title="Welcome to Otter Mail"
+        title="Welcome to Otter"
         description="Calm, fast email for Gmail and any IMAP mailbox. A minute of setup and you're in."
       />
       <div className="grid w-full grid-cols-2 gap-3">
@@ -372,7 +372,7 @@ function MailboxStep({ accounts }: { accounts: MailAccount[] }) {
     <>
       <StepHeader
         title={accounts.length > 0 ? "Your mail is connected" : "Connect your mail"}
-        description="Otter Mail talks to your mail provider directly and keeps a copy on this device. If you use an agent, the mail and calendar data its tools return are shared with that agent."
+        description="Otter talks to your mail provider directly and keeps a copy on this device. If you use an agent, the mail and calendar data its tools return are shared with that agent."
       />
       <div className={cn("grid gap-3", hasOutlook ? "grid-cols-3" : "grid-cols-2")}>
         <ChoiceCard
@@ -684,7 +684,7 @@ function HabitsStep() {
                   isDefaultMail ? (
                     <span className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
                       <CheckIcon className="size-3.5 text-success" />
-                      Otter Mail
+                      Otter
                     </span>
                   ) : (
                     <Btn
@@ -698,7 +698,7 @@ function HabitsStep() {
                           .then(refreshDefaultMail);
                       }}
                     >
-                      Use Otter Mail
+                      Use Otter
                     </Btn>
                   )
                 }

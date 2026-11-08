@@ -88,7 +88,7 @@ function warningFor(rows: Row[], id: string, key: string, when: string | undefin
   }
   const unknown = unknownVariables(when);
   if (unknown.length > 0)
-    return `Otter Mail does not recognize ${unknown.join(", ")}, so it's always false.`;
+    return `Otter does not recognize ${unknown.join(", ")}, so it's always false.`;
   return null;
 }
 

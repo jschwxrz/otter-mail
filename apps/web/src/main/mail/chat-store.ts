@@ -146,8 +146,7 @@ export const isElsewhere = (c: Conversation, device: Device | null) =>
 
 /** Hydrated user turns show the question, not the context block sent with it. */
 function stripHandoff(text: string): string {
-  const cut = text.indexOf("\n\n— context from Otter Mail —");
-  return cut === -1 ? text : text.slice(0, cut);
+  return text.split(/\n\n— context from Otter(?: Mail)? —/)[0];
 }
 
 function turnsFromMessages(messages: ChatSessionMessage[]): ChatTurn[] {

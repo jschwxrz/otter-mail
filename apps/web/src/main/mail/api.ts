@@ -356,7 +356,7 @@ export const mailApi = {
     ipc("otter:connectNotifications", { accountId }),
   disconnectNotifications: (accountId: string): Promise<void> =>
     ipc("otter:disconnectNotifications", { accountId }),
-  saveSupportReport: (contents: string, filename?: "Otter Mail diagnostics.json") =>
+  saveSupportReport: (contents: string, filename?: "Otter diagnostics.json") =>
     task<boolean>("support:saveReport", { contents, filename }),
   listAccounts: (): Promise<MailAccount[]> => ipc("gmail:listAccounts"),
 

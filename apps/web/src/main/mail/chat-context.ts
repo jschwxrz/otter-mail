@@ -7,7 +7,7 @@ import type { MessageSummary } from "./types";
 
 /**
  * Pointer-sized mail context for the agent chat. The agent can read the same
- * mailboxes (Claude and Codex through Otter Mail's tools, Hermes and OpenClaw with gog on
+ * mailboxes (Claude and Codex through Otter's tools, Hermes and OpenClaw with gog on
  * its server), so ids are enough — no mail content leaves the app.
  */
 export type AgentContext = {
@@ -65,7 +65,7 @@ export function buildHandoffText(
   context: AgentContext,
   provider: ProviderKind,
 ): string {
-  const lines: string[] = [question.trim(), "", "— context from Otter Mail —"];
+  const lines: string[] = [question.trim(), "", "— context from Otter —"];
   for (const c of context.conversations) {
     if (c.quote) {
       lines.push(

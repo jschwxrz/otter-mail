@@ -19,7 +19,7 @@ import { ExtensionsSection } from "./extensions-section";
 import { setOpenLinksIn, useBrowser, type OpenLinksIn } from "./store";
 
 const OPEN_LINKS_OPTIONS: { value: OpenLinksIn; label: string }[] = [
-  { value: "app", label: "In Otter Mail" },
+  { value: "app", label: "In Otter" },
   { value: "browser", label: "In your default browser" },
 ];
 
@@ -80,8 +80,7 @@ export function BrowserSettingsPane() {
         }}
       >
         <Text variant="small">
-          You'll be signed out of the sites you use in Otter Mail's browser. Your mail isn't
-          affected.
+          You'll be signed out of the sites you use in Otter's browser. Your mail isn't affected.
         </Text>
       </Dialog>
     </SettingsPageContainer>

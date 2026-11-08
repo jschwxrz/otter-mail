@@ -26,7 +26,7 @@ import {
 
 const RELAY_URL = import.meta.env.VITE_RELAY_URL || "https://relay.mail.otterware.app";
 const THEME_SOURCE_KEY = "otter:theme-source";
-const TITLE = __DEMO__ ? "Otter Mail (demo)" : "Otter Mail";
+const TITLE = __DEMO__ ? "Otter (demo)" : "Otter";
 if (__DEMO__) document.title = TITLE;
 
 type Listener = (params: unknown) => void;

@@ -1,6 +1,6 @@
-# Otter Mail relay
+# Otter relay
 
-https://relay.mail.otterware.app, a Cloudflare Worker. It gives Otter Mail eight things (the
+https://relay.mail.otterware.app, a Cloudflare Worker. It gives Otter eight things (the
 Mac app works without it; the web app needs it):
 
 - **Otter accounts.** Sign in with Google once per Mac, and the mailboxes you use come along to
@@ -148,7 +148,7 @@ credentials (`wrangler login`, or `CLOUDFLARE_API_TOKEN`).
   it.
 - Service account `relay-smoke@otterware.iam.gserviceaccount.com`: the smoke test's identity.
 - Workload Identity pool `github`, provider `otter-mail`: GitHub Actions in
-  `otterware-app/otter-mail` (only) may mint `relay-smoke` ID tokens and publish to `gmail-push`. No
+  `otterware-app/otter` (only) may mint `relay-smoke` ID tokens and publish to `gmail-push`. No
   service account keys exist.
 - Push subscription `gmail-push-relay` → `https://relay.mail.otterware.app/push/gmail`, OIDC
   token with that URL as audience; 10 minutes retention (a missed notification only delays a
@@ -252,7 +252,7 @@ Retries are bounded; errors log category/status only, never provider responses o
 Token transfer/rotation is atomic. Unlink/account deletion cascades credentials and routes;
 legacy auth hooks and central Accounts `IdentityLifecycle.disconnect` remove revoked routing.
 
-The APNs allowlist is “New mail. Open Otter Mail to read it.”, normal sound and
+The APNs allowlist is “New mail. Open Otter Mail to read it.” (the iPhone app keeps that name), normal sound and
 `otter: {version:2,userId,email,provider,historyId,messageId,mode}` (IMAP also has folder/UIDVALIDITY).
 No sender, subject, preview, body, attachment, provider token or unread badge is sent to Apple.
 The existing application topic, `mutable-content: 1`, alert push type, priority 10, per-mailbox

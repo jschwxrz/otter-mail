@@ -89,7 +89,7 @@ export function mcpStep(server: string, tool: string, args: unknown): ToolStep {
   return {
     kind: "tool",
     title: (ours && toolTitle(tool)) || sentence(tool),
-    source: ours ? "Otter Mail" : titled(server),
+    source: ours ? "Otter" : titled(server),
     ...withDetail(argsDetail(args)),
   };
 }

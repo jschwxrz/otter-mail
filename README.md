@@ -1,4 +1,4 @@
-# Otter Mail
+# Otter
 
 Gmail, calm and fast. An app for macOS and Linux, and the same app in your browser at
 [mail.otterware.app](https://mail.otterware.app).
@@ -47,8 +47,8 @@ The native [iPhone app](apps/ios/README.md) supports background notifications af
 each mailbox in Settings. Gmail and Outlook request separate limited permissions; IMAP asks
 to store its password securely. Message content is fetched directly on the phone for previews.
 
-Download the latest DMG (Mac) or .deb (Debian, Ubuntu: `sudo apt install ./Otter-Mail-*.deb`)
-from [Releases](https://github.com/otterware-app/otter-mail/releases).
+Download the latest DMG (Mac) or .deb (Debian, Ubuntu: `sudo apt install ./Otter-*.deb`)
+from [Releases](https://github.com/otterware-app/otter/releases).
 Installed apps update themselves from the same page. Or open
 [mail.otterware.app](https://mail.otterware.app) in your browser.
 

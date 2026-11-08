@@ -27,15 +27,15 @@ does the job; justifications below.
 
 ### Sensitive scopes (calendar.events.owned, contacts.readonly, contacts.other.readonly)
 
-> Otter Mail is an email client for macOS and the web (https://otterware.app/mail/).
-> calendar.events.owned: when a user receives a calendar invitation by email, Otter Mail shows the
+> Otter is an email client for macOS and the web (https://otterware.app/mail/).
+> calendar.events.owned: when a user receives a calendar invitation by email, Otter shows the
 > event and lets the user Accept, Decline or reply Maybe from the message; the reply is written to
 > that event on the user's own primary calendar (events.list by the invitation's iCalUID, then
 > events.patch of the user's attendee response). Read-only calendar scopes cannot record an RSVP;
 > the optional agent also lists, reads, creates, updates and deletes primary-calendar events
 > when the user asks it to. Write tools request approval in the default supervised mode.
 > All Mail calendar calls target the user's own primary calendar; read-only scopes cannot
-> support event changes. contacts.readonly and contacts.other.readonly: Otter Mail shows the
+> support event changes. contacts.readonly and contacts.other.readonly: Otter shows the
 > names and profile photos of the people the user corresponds with next to their messages, and
 > suggests recipients while the user types an address. Both are read-only; we never modify
 > contacts. Calendar/Contacts are fetched directly by the device. When the user invokes an agent,
@@ -46,9 +46,9 @@ does the job; justifications below.
 
 ### Restricted scope (gmail.settings.basic)
 
-> Otter Mail lets the user edit the email signature of each Gmail account in its settings. The
+> Otter lets the user edit the email signature of each Gmail account in its settings. The
 > signature is saved in Gmail itself (users.settings.sendAs.patch on the account's own address),
-> so it is the same in Gmail on the web and in Otter Mail on every device, and Otter Mail adds it
+> so it is the same in Gmail on the web and in Otter on every device, and Otter adds it
 > to messages the user writes. Reading it only needs the Gmail scope; saving it needs
 > gmail.settings.basic. We change nothing else in the user's Gmail settings.
 
@@ -56,7 +56,7 @@ does the job; justifications below.
 
 Features: **Email client**.
 
-> Otter Mail is a full Gmail client for macOS (https://otterware.app/mail/) that users sign in to
+> Otter is a full Gmail client for macOS (https://otterware.app/mail/) that users sign in to
 > in place of the Gmail website. With this scope the user reads and searches their mail, sends,
 > replies and forwards, saves drafts, applies and removes labels, archives, marks read/unread,
 > moves mail to Trash or Spam, and permanently deletes messages when they empty Trash or Spam or
@@ -85,10 +85,10 @@ Features: **Email client**.
 
 Record the installed app, signed in with a test account, narrating or captioning each step:
 
-1. Otter Mail's home page, then open the app and click **Add Gmail account**.
+1. Otter's home page, then open the app and click **Add Gmail account**.
 2. The browser's Google consent screen, with the address bar expanded so the `client_id`
    (`997327858649-n30jr99d21200libki4bgeojpr1kfq59…`) is readable. Show the unverified-app
-   screen (Advanced → Go to Otter Mail) and the scope list, then Continue.
+   screen (Advanced → Go to Otter) and the scope list, then Continue.
 3. Gmail: the inbox loads; open and read a message; search; reply and send; add a label; archive;
    move a message to Trash, then empty Trash (permanent delete).
 4. Calendar: open an invitation email and click Accept; show the event updated in Google Calendar.
@@ -131,7 +131,7 @@ workflows must consume the repository's credentials when Laurin integrates share
 Sign-ins from before a scope was added keep working without it: calendar.events (asked for before
 calendar.events.owned) covers the same calls; without calendar, RSVP is emailed; without
 contacts, avatars fall back to Gravatar; without gmail.settings.basic, a signature is kept in
-Otter Mail until the account is signed in again (the iPhone asks to sign in again).
+Otter until the account is signed in again (the iPhone asks to sign in again).
 
 ## The web app
 

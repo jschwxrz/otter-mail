@@ -146,7 +146,7 @@ export function OtterDriveSettingsPane() {
       {connected ? (
         <SettingsSection
           title="Drives"
-          description="What Otter Mail can reach on this device. A drive that's off isn't shown in Drive, can't be saved to, and isn't offered to agents."
+          description="What Otter can reach on this device. A drive that's off isn't shown in Drive, can't be saved to, and isn't offered to agents."
         >
           {drives.isError ? (
             <SettingsRow
