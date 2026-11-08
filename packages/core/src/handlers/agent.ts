@@ -1,5 +1,5 @@
 import type { AgentChannel } from "@otter/contracts/relay";
-import type { ScheduledTaskInput } from "@otter/contracts/scheduled";
+import type { ResultsTo, ScheduledTaskInput } from "@otter/contracts/scheduled";
 import { handle } from "../ipc.js";
 import { platform } from "../platform.js";
 import { relayRequest } from "../services/otter-account.js";
@@ -60,6 +60,26 @@ function taskIdOf(p: Params): string {
 const MAX_TASK_NAME = 200;
 const MAX_TASK_PROMPT = 5000;
 
+function resultsToOf(raw: unknown): ResultsTo {
+  const r = raw as Params;
+  if (r?.kind === "new-chat" || r?.kind === "off") return { kind: r.kind };
+  if (r?.kind === "channel") {
+    const channel = str(r.channel);
+    const to = str(r.to);
+    if (!channel) throw new Error("Choose where its results go.");
+    if (!to) throw new Error("Say who on it gets the results.");
+    const accountId = str(r.accountId);
+    return { kind: "channel", channel, to, ...(accountId ? { accountId } : {}) };
+  }
+  if (r?.kind === "webhook") {
+    const url = str(r.url);
+    if (!/^https?:\/\//i.test(url) || !URL.canParse(url))
+      throw new Error("A webhook needs an http(s) address.");
+    return { kind: "webhook", url };
+  }
+  throw new Error("Choose where its results go.");
+}
+
 /** A task as the app sends it; an edit may keep a schedule the app wouldn't let you pick. */
 export function scheduledTaskInputOf(raw: unknown, editing = false): ScheduledTaskInput {
   const p = raw as Params;
@@ -86,7 +106,7 @@ export function scheduledTaskInputOf(raw: unknown, editing = false): ScheduledTa
     ...(prompt !== undefined ? { prompt } : {}),
     schedule,
     ...(str(p?.agent) ? { agent: str(p?.agent) } : {}),
-    ...(p?.resultsTo === "new-chat" || p?.resultsTo === "off" ? { resultsTo: p.resultsTo } : {}),
+    ...(p?.resultsTo !== undefined ? { resultsTo: resultsToOf(p.resultsTo) } : {}),
     ...(str(p?.revision) ? { revision: str(p?.revision) } : {}),
   };
 }
@@ -378,6 +398,13 @@ export function registerAgentHandlers(): void {
     const p = params as Params;
     const limit = Math.min(Math.max(Number(p?.limit) || 20, 1), 100);
     return agent.scheduledTaskRuns(providerOf(p), taskIdOf(p), limit);
+  });
+
+  handle("agent:scheduledTargets", async (params: unknown) => {
+    const p = params as Params;
+    const channel = str(p?.channel);
+    if (!channel) return [];
+    return agent.scheduledTargets(providerOf(p), str(p?.agent), channel);
   });
 
   handle("agent:scheduledRunTranscript", async (params: unknown) => {

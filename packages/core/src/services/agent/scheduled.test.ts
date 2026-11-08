@@ -64,7 +64,14 @@ describe("scheduled tasks across agents", () => {
         provider: "hermes",
         tasks: [],
         error: "Can't reach Hermes.",
-        can: { create: false, deliverToOtter: false, history: false, timeZones: false },
+        channels: [],
+        can: {
+          create: false,
+          deliverToOtter: false,
+          webhooks: false,
+          history: false,
+          timeZones: false,
+        },
       },
     ]);
   });
@@ -89,7 +96,7 @@ describe("a task as the app sends it", () => {
         prompt: " Go ",
         schedule: { kind: "cron", expr: " 0 8 * * 1-5 ", tz: "Europe/Paris" },
         agent: "rowan",
-        resultsTo: "new-chat",
+        resultsTo: { kind: "new-chat" },
         extra: "ignored",
       }),
     ).toEqual({
@@ -97,7 +104,7 @@ describe("a task as the app sends it", () => {
       prompt: "Go",
       schedule: { kind: "cron", expr: "0 8 * * 1-5", tz: "Europe/Paris" },
       agent: "rowan",
-      resultsTo: "new-chat",
+      resultsTo: { kind: "new-chat" },
     });
     expect(scheduledTaskInputOf({ name: "x", schedule: { kind: "at", at: future } })).toEqual({
       name: "x",
@@ -116,6 +123,27 @@ describe("a task as the app sends it", () => {
         true,
       ).schedule,
     ).toEqual({ kind: "at", at: "2001-01-01T00:00:00.000Z" });
+  });
+
+  it("says where results go only when that's complete", () => {
+    const base = { name: "x", schedule: { kind: "every", everyMs: 60_000 } };
+    expect(
+      scheduledTaskInputOf({
+        ...base,
+        resultsTo: { kind: "channel", channel: " slack ", to: " channel:C1 ", accountId: "work" },
+      }).resultsTo,
+    ).toEqual({ kind: "channel", channel: "slack", to: "channel:C1", accountId: "work" });
+    expect(
+      scheduledTaskInputOf({ ...base, resultsTo: { kind: "webhook", url: "https://h.io/x" } })
+        .resultsTo,
+    ).toEqual({ kind: "webhook", url: "https://h.io/x" });
+    expect(() =>
+      scheduledTaskInputOf({ ...base, resultsTo: { kind: "channel", channel: "slack", to: "" } }),
+    ).toThrow(/who on it/);
+    expect(() =>
+      scheduledTaskInputOf({ ...base, resultsTo: { kind: "webhook", url: "ftp://h.io" } }),
+    ).toThrow(/http/);
+    expect(() => scheduledTaskInputOf({ ...base, resultsTo: "off" })).toThrow(/where its results/);
   });
 
   it("is refused when it can't run", () => {

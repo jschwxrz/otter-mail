@@ -998,7 +998,14 @@ export const hermesProvider: ChatProvider<HermesSettings> = {
       const { jobs } = await jobsRequest<{ jobs: HermesJob[] }>(settings, "?include_disabled=true");
       return {
         tasks: jobs.map(hermesTask),
-        can: { create: true, deliverToOtter: false, history: false, timeZones: false },
+        channels: [],
+        can: {
+          create: true,
+          deliverToOtter: false,
+          webhooks: false,
+          history: false,
+          timeZones: false,
+        },
       };
     },
     async save(settings, id, input) {

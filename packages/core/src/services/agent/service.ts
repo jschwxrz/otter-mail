@@ -11,7 +11,12 @@
  * fire-and-forget; their events stream as `agent:chatEvent`.
  */
 
-import type { AgentScheduledTasks, ScheduledTaskInput, TaskRun } from "@otter/contracts/scheduled";
+import type {
+  AgentScheduledTasks,
+  ChannelTarget,
+  ScheduledTaskInput,
+  TaskRun,
+} from "@otter/contracts/scheduled";
 import { registeredAgents } from "../../extensions.js";
 import { broadcast } from "../../ipc.js";
 import { logger } from "../../logger.js";
@@ -470,7 +475,14 @@ export async function listScheduledTasks(): Promise<AgentScheduledTasks[]> {
           provider: agent.kind,
           tasks: [],
           error: error instanceof Error ? error.message : String(error),
-          can: { create: false, deliverToOtter: false, history: false, timeZones: false },
+          channels: [],
+          can: {
+            create: false,
+            deliverToOtter: false,
+            webhooks: false,
+            history: false,
+            timeZones: false,
+          },
         };
       }
     }),
@@ -505,6 +517,15 @@ export async function scheduledTaskRuns(
 ): Promise<TaskRun[]> {
   const found = scheduler(kind);
   return found.runs ? found.runs(await agentSettings(kind), id, limit) : [];
+}
+
+export async function scheduledTargets(
+  kind: ProviderKind,
+  agent: string,
+  channel: string,
+): Promise<ChannelTarget[]> {
+  const found = scheduler(kind);
+  return found.targets ? found.targets(await agentSettings(kind), agent, channel) : [];
 }
 
 export async function scheduledRunTranscript(

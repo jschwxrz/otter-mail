@@ -1,5 +1,10 @@
 import type { ChatDelivery } from "@otter/contracts/chats";
-import type { AgentScheduledTasks, ScheduledTaskInput, TaskRun } from "@otter/contracts/scheduled";
+import type {
+  AgentScheduledTasks,
+  ChannelTarget,
+  ScheduledTaskInput,
+  TaskRun,
+} from "@otter/contracts/scheduled";
 export type ProviderKind = string;
 
 export const DEFAULT_AGENT = "openrouter";
@@ -267,6 +272,8 @@ export interface ScheduleSupport<S> {
   remove(settings: S, id: string): Promise<void>;
   runs?(settings: S, id: string, limit: number): Promise<TaskRun[]>;
   runTranscript?(settings: S, id: string, runId: string): Promise<ChatSessionMessage[]>;
+  /** Who results could go to on one of its channels, for its agent `agent`. */
+  targets?(settings: S, agent: string, channel: string): Promise<ChannelTarget[]>;
 }
 
 export interface ChatProvider<S extends AgentSettings = AgentSettings> {

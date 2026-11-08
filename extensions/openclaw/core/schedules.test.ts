@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
   READ_ONLY,
+  channelTargets,
+  deliveryChannels,
   cronError,
   listTasks,
   removeTask,
@@ -105,32 +107,95 @@ describe("taskOf", () => {
     expect(dream.description).toBe("Promote recalls into MEMORY.md.");
   });
 
-  it("says where a result goes", () => {
-    const at = (delivery: unknown, preview?: { detail: string }) =>
-      taskOf({ ...brief, delivery } as never, "main", preview).delivery;
+  it("says where a result goes, on any channel", () => {
+    const labels = { telegram: "Telegram", slack: "Slack" };
+    const at = (delivery: unknown, preview?: { label?: string; detail?: string }) =>
+      taskOf({ ...brief, delivery } as never, "main", preview, labels).delivery;
     expect(at({ mode: "announce", channel: "otter", to: "chat:agent:main:abc" })).toEqual({
       kind: "otter",
       chat: "one",
     });
-    expect(at({ mode: "announce", channel: "telegram", to: "123" })).toEqual({
-      kind: "elsewhere",
-      label: "Telegram",
-    });
-    expect(at({ mode: "announce" })).toEqual({
-      kind: "elsewhere",
-      label: "the last channel used",
-    });
     expect(
-      at(
-        { mode: "announce" },
-        { detail: "last -> no route, will be blocked: Channel is required" },
-      ),
-    ).toEqual({ kind: "none" });
-    expect(at({ mode: "webhook", to: "https://x" })).toEqual({
-      kind: "elsewhere",
-      label: "a webhook",
+      at({ mode: "announce", channel: "slack", to: "channel:C0123", accountId: "work" }),
+    ).toEqual({
+      kind: "channel",
+      channel: "slack",
+      label: "Slack",
+      to: "channel:C0123",
+      accountId: "work",
+    });
+    expect(at({ mode: "announce", channel: "telegram", to: "-100123", threadId: 42 })).toEqual({
+      kind: "channel",
+      channel: "telegram",
+      label: "Telegram",
+      to: "-100123",
+      threadId: "42",
+    });
+    expect(at({ mode: "announce", channel: "matrix", to: "room:!a:b" })).toMatchObject({
+      label: "Matrix",
+    });
+    expect(at({ mode: "announce" }, { label: "announce -> telegram:123" })).toEqual({
+      kind: "channel",
+      channel: "last",
+      label: "The last conversation",
+      to: "telegram:123",
+    });
+    expect(at({ mode: "webhook", to: "https://hooks.example.com/x" })).toEqual({
+      kind: "webhook",
+      url: "https://hooks.example.com/x",
     });
     expect(at({ mode: "none" })).toEqual({ kind: "none" });
+  });
+
+  it("says why a result won't arrive, and where failures are reported", () => {
+    const task = taskOf(
+      {
+        ...brief,
+        delivery: {
+          mode: "announce",
+          failureDestination: { mode: "announce", channel: "slack", to: "channel:COPS" },
+        },
+      } as never,
+      "main",
+      {
+        label: "announce -> last",
+        detail: "last -> no route, will be blocked: Channel is required",
+      },
+      { slack: "Slack" },
+    );
+    expect(task.deliveryProblem).toBe("Channel is required");
+    expect(
+      taskOf({ ...brief, delivery: { mode: "announce" } } as never, "main", {
+        label: "announce -> last",
+        detail:
+          "last -> no route, will be blocked: Channel is required when multiple channels are configured: telegram, otter. Pass --channel <channel> to choose one.",
+      }).deliveryProblem,
+    ).toMatch(/more than one channel/);
+    expect(task.failureAlerts).toBe("Slack channel:COPS");
+    expect(
+      taskOf(
+        { ...brief, failureAlert: { after: 3, mode: "webhook", to: "https://h.io/x" } } as never,
+        "main",
+      ).failureAlerts,
+    ).toBe("a webhook (h.io), after 3 failed runs in a row");
+    expect(taskOf({ ...brief, failureAlert: false } as never, "main").failureAlerts).toBe("Off");
+  });
+
+  it("says what a job runs when it isn't a message, and that it can't post to a chat", () => {
+    const command = taskOf(
+      {
+        ...brief,
+        payload: { kind: "command", argv: ["npm", "test"] },
+        trigger: { script: "check.sh" },
+      } as never,
+      "main",
+    );
+    expect(command).toMatchObject({
+      runs: "Runs npm test",
+      conditional: true,
+      undeliverable: true,
+    });
+    expect(command.prompt).toBeUndefined();
   });
 
   it("reports a running job, its last failure, and a pause OpenClaw made", () => {
@@ -191,7 +256,7 @@ describe("listTasks", () => {
           },
     );
     const listed = await listTasks(g, "main");
-    expect(calls.map((c) => c.params)).toEqual([
+    expect(calls.filter((c) => c.method === "cron.list").map((c) => c.params)).toEqual([
       expect.objectContaining({ includeDisabled: true, offset: 0 }),
       expect.objectContaining({ includeDisabled: true, offset: 1 }),
     ]);
@@ -200,6 +265,7 @@ describe("listTasks", () => {
     expect(listed.can).toEqual({
       create: true,
       deliverToOtter: true,
+      webhooks: true,
       history: true,
       timeZones: true,
     });
@@ -221,7 +287,7 @@ describe("saveTask", () => {
       prompt: "Summarise",
       agent: "rowan",
       schedule: { kind: "cron", expr: "0 8 * * *", tz: "Europe/London" },
-      resultsTo: "new-chat",
+      resultsTo: { kind: "new-chat" },
     });
     expect(calls).toEqual([
       {
@@ -259,7 +325,7 @@ describe("saveTask", () => {
       name: "Morning brief",
       prompt: "Summarise my inbox and calendar",
       schedule: { kind: "cron", expr: "0 8 * * 1-5", tz: "Europe/Paris" },
-      resultsTo: "off",
+      resultsTo: { kind: "off" },
     });
     expect(calls[1]).toEqual({
       method: "cron.update",
@@ -275,9 +341,8 @@ describe("saveTask", () => {
             mode: "none",
             channel: null,
             to: null,
-            threadId: null,
             accountId: null,
-            failureDestination: null,
+            threadId: null,
             completionDestination: null,
           },
         },
@@ -338,7 +403,7 @@ describe("saveTask", () => {
     await saveTask(g, "brief", {
       name: "Morning brief",
       schedule: { kind: "cron", expr: "0 8 * * 1-5", tz: "Europe/Paris" },
-      resultsTo: "new-chat",
+      resultsTo: { kind: "new-chat" },
     });
     expect(calls.at(-1)?.params.patch).toMatchObject({
       delivery: { channel: "otter", to: "chat:new" },
@@ -367,7 +432,7 @@ describe("saveTask", () => {
     });
   });
 
-  it("drops where results went before when they move to Otter", async () => {
+  it("moves results to another target, dropping only what pointed at the old one", async () => {
     const telegram = {
       ...brief,
       delivery: {
@@ -382,19 +447,71 @@ describe("saveTask", () => {
     await saveTask(g, "brief", {
       name: "Morning brief",
       schedule: { kind: "cron", expr: "0 8 * * 1-5", tz: "Europe/Paris" },
-      resultsTo: "new-chat",
+      resultsTo: { kind: "new-chat" },
     });
     expect(calls[1].params.patch).toEqual({
       delivery: {
         mode: "announce",
         channel: "otter",
         to: "chat:new",
-        threadId: null,
         accountId: null,
-        failureDestination: null,
+        threadId: null,
+      },
+    });
+    await saveTask(g, "brief", {
+      name: "Morning brief",
+      schedule: { kind: "cron", expr: "0 8 * * 1-5", tz: "Europe/Paris" },
+      resultsTo: { kind: "channel", channel: "slack", to: "channel:C0123", accountId: "work" },
+    });
+    expect(calls.at(-1)?.params.patch).toEqual({
+      delivery: {
+        mode: "announce",
+        channel: "slack",
+        to: "channel:C0123",
+        accountId: "work",
+        threadId: null,
+      },
+    });
+    await saveTask(g, "brief", {
+      name: "Morning brief",
+      schedule: { kind: "cron", expr: "0 8 * * 1-5", tz: "Europe/Paris" },
+      resultsTo: { kind: "webhook", url: "https://hooks.example.com/x" },
+    });
+    expect(calls.at(-1)?.params.patch).toEqual({
+      delivery: {
+        mode: "webhook",
+        to: "https://hooks.example.com/x",
+        channel: null,
+        accountId: null,
+        threadId: null,
         completionDestination: null,
       },
     });
+  });
+
+  it("leaves results alone when they already go there", async () => {
+    const slack = {
+      ...brief,
+      delivery: { mode: "announce", channel: "slack", to: "channel:C0123", accountId: "work" },
+    };
+    const { g, calls } = fakeGateway((method) => (method === "cron.get" ? slack : {}));
+    await saveTask(g, "brief", {
+      name: "Morning brief",
+      schedule: { kind: "cron", expr: "0 8 * * 1-5", tz: "Europe/Paris" },
+      resultsTo: { kind: "channel", channel: "slack", to: "channel:C0123", accountId: "work" },
+    });
+    expect(calls.map((c) => c.method)).toEqual(["cron.get"]);
+  });
+
+  it("creates a job posting to a channel", async () => {
+    const { g, calls } = fakeGateway(() => ({ id: "new" }));
+    await saveTask(g, null, {
+      name: "Brief",
+      prompt: "Go",
+      schedule: { kind: "every", everyMs: 3_600_000 },
+      resultsTo: { kind: "channel", channel: "telegram", to: "@me" },
+    });
+    expect(calls[0].params.delivery).toEqual({ mode: "announce", channel: "telegram", to: "@me" });
   });
 
   it("says the id of what it saved", async () => {
@@ -420,7 +537,7 @@ describe("saveTask", () => {
       name: "Morning brief",
       prompt: "Summarise my inbox",
       schedule: { kind: "cron", expr: "0 8 * * 1-5", tz: "Europe/Paris" },
-      resultsTo: "new-chat",
+      resultsTo: { kind: "new-chat" },
     });
     expect(calls.map((c) => c.method)).toEqual(["cron.get"]);
   });
@@ -462,6 +579,9 @@ describe("runs", () => {
           durationMs: 2144,
           model: "gpt-6-astra",
           deliveryStatus: "not-delivered",
+          delivery: {
+            resolved: { channel: "slack", to: "channel:C0123", ok: false, error: "not_in_channel" },
+          },
         },
         {
           ts: 5,
@@ -489,6 +609,8 @@ describe("runs", () => {
         durationMs: 2144,
         error: "Couldn't sign in to the AI service.",
         model: "gpt-6-astra",
+        sentTo: { channel: "slack", to: "channel:C0123" },
+        deliveryError: "not_in_channel",
         delivered: false,
       },
       { id: "at:5", at: 5, status: "ok", summary: "All quiet" },
@@ -524,6 +646,62 @@ describe("runs", () => {
     const rows = await runRows(g, "brief", "cron-request.1");
     expect(rows.map((r) => r.content)).toEqual(["one", "two"]);
     expect(calls[1].params).toMatchObject({ runId: "cron-request.1", cursor: "c2" });
+  });
+});
+
+describe("channels", () => {
+  it("offers each set-up chat app and the accounts it sends from, Otter apart", async () => {
+    const { g } = fakeGateway(() => ({
+      channelOrder: ["otter", "slack", "telegram", "discord"],
+      channelLabels: { slack: "Slack", telegram: "Telegram" },
+      channelMeta: [
+        { id: "otter", label: "Otter", detailLabel: "Otter" },
+        { id: "slack", label: "Slack", detailLabel: "Slack" },
+        { id: "telegram", label: "Telegram", detailLabel: "Telegram Bot" },
+        { id: "discord", label: "Discord", detailLabel: "Discord" },
+      ],
+      channelAccounts: {
+        otter: [{ accountId: "default", enabled: true, configured: true }],
+        slack: [
+          { accountId: "work", enabled: true, configured: true },
+          { accountId: "home", enabled: true, configured: true },
+          { accountId: "old", enabled: false, configured: true },
+        ],
+        telegram: [{ accountId: "default", enabled: true, configured: true }],
+        discord: [{ accountId: "default", enabled: true, configured: false }],
+      },
+      channelDefaultAccountId: { slack: "work", telegram: "default" },
+    }));
+    const { channels, labels } = await deliveryChannels(g);
+    expect(channels).toEqual([
+      { id: "slack", label: "Slack", accounts: ["work", "home"], defaultAccount: "work" },
+      { id: "telegram", label: "Telegram", accounts: ["default"], defaultAccount: "default" },
+    ]);
+    expect(labels.discord).toBe("Discord");
+  });
+
+  it("has none when the gateway won't say", async () => {
+    const { g } = fakeGateway(() => new Error("unknown method"));
+    expect((await deliveryChannels(g)).channels).toEqual([]);
+  });
+
+  it("suggests who on a channel results could go to", async () => {
+    const { g, calls } = fakeGateway(() => ({
+      conversations: [
+        { target: "channel:C1", label: "#ops", accountId: "work" },
+        { target: "channel:C1", label: "#ops", accountId: "work" },
+        { target: "user:U2", accountId: "home" },
+        { label: "no target" },
+      ],
+    }));
+    expect(await channelTargets(g, "rowan", "slack")).toEqual([
+      { target: "channel:C1", label: "#ops", accountId: "work" },
+      { target: "user:U2", accountId: "home" },
+    ]);
+    expect(calls[0]).toEqual({
+      method: "conversations.list",
+      params: { agentId: "rowan", channel: "slack", limit: 100 },
+    });
   });
 });
 

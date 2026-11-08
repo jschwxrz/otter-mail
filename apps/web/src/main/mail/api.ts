@@ -3,7 +3,12 @@ import type { AliasMailbox, ImapSettings } from "@otter/contracts";
 import type { NotificationConnection } from "@otter/contracts/relay";
 export type { ChatChange } from "@otter/contracts";
 import type { AgentAccess, AgentTokens, ConnectedAgent } from "@otter/contracts/agent-tokens";
-import type { AgentScheduledTasks, ScheduledTaskInput, TaskRun } from "@otter/contracts/scheduled";
+import type {
+  AgentScheduledTasks,
+  ChannelTarget,
+  ScheduledTaskInput,
+  TaskRun,
+} from "@otter/contracts/scheduled";
 import type {
   ComposeAttachment,
   ContactSuggestion,
@@ -743,6 +748,11 @@ export const mailApi = {
     ipc("agent:deleteScheduled", { provider, id }),
   scheduledTaskRuns: (provider: ProviderKind, id: string, limit = 20): Promise<TaskRun[]> =>
     ipc("agent:scheduledRuns", { provider, id, limit }),
+  scheduledTargets: (
+    provider: ProviderKind,
+    agent: string,
+    channel: string,
+  ): Promise<ChannelTarget[]> => ipc("agent:scheduledTargets", { provider, agent, channel }),
   scheduledRunTranscript: (
     provider: ProviderKind,
     id: string,

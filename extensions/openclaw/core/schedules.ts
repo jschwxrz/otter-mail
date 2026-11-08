@@ -1,5 +1,8 @@
 import type {
   AgentScheduledTasks,
+  ChannelTarget,
+  DeliveryChannel,
+  ResultsTo,
   ScheduledTask,
   ScheduledTaskInput,
   TaskDelivery,
@@ -29,6 +32,8 @@ type Job = {
   schedule: Record<string, unknown> & { kind: string };
   payload: Record<string, unknown> & { kind: string };
   delivery?: (Record<string, unknown> & { mode: string }) | null;
+  failureAlert?: false | Record<string, unknown> | null;
+  trigger?: unknown;
   state?: {
     nextRunAtMs?: number;
     runningAtMs?: number;
@@ -56,7 +61,13 @@ type RunEntry = {
   delivered?: boolean;
   deliveryStatus?: string;
   deliverySuppressionReason?: string;
+  delivery?: {
+    resolved?: { channel?: string; to?: string | null; ok?: boolean; error?: string };
+  };
 };
+
+/** What the scheduler's channels are called (`channels.status`), by id. */
+type ChannelLabels = Record<string, string>;
 
 const ADMIN = "operator.admin";
 
@@ -100,25 +111,92 @@ export function scheduleOf(schedule: Job["schedule"]): TaskSchedule {
     return { kind: "other", text: `When ${String(schedule.command)} exits` };
   if (schedule.kind === "stream")
     return { kind: "other", text: "When a command it watches prints" };
+  if (schedule.kind === "event") return { kind: "other", text: "When an event it waits for comes" };
   return { kind: "other", text: schedule.kind };
 }
 
 const channelName = (channel: string) => channel.charAt(0).toUpperCase() + channel.slice(1);
+const str = (value: unknown) =>
+  typeof value === "string" && value
+    ? value
+    : typeof value === "number"
+      ? String(value)
+      : undefined;
 
-export function deliveryOf(job: Job, preview?: { detail?: string }): TaskDelivery {
+/** The gateway's description of where a result would go: "announce -> telegram:123". */
+type Preview = { label?: string; detail?: string };
+
+export function deliveryOf(job: Job, labels: ChannelLabels = {}, preview?: Preview): TaskDelivery {
   const delivery = job.delivery;
   if (job.payload.kind === "heartbeat" || !delivery || delivery.mode === "none")
     return { kind: "none" };
-  if (delivery.mode === "webhook") return { kind: "elsewhere", label: "a webhook" };
-  const channel = typeof delivery.channel === "string" ? delivery.channel : "last";
+  if (delivery.mode === "webhook") return { kind: "webhook", url: str(delivery.to) ?? "" };
+  const channel = str(delivery.channel) ?? "last";
   if (channel === "otter")
     return { kind: "otter", chat: delivery.to === NEW_CHAT || !delivery.to ? "new" : "one" };
-  // The gateway says where the result would go now; "blocked" is nowhere.
-  if (preview?.detail && /will be blocked/.test(preview.detail)) return { kind: "none" };
+  // Where "last" goes now, as the gateway resolves it.
+  const resolved =
+    channel === "last" ? /^announce -> (?!last\b)(.+)$/.exec(preview?.label ?? "")?.[1] : undefined;
+  const to = str(delivery.to) ?? resolved;
+  const accountId = str(delivery.accountId);
+  const threadId = str(delivery.threadId);
   return {
-    kind: "elsewhere",
-    label: channel === "last" ? "the last channel used" : channelName(channel),
+    kind: "channel",
+    channel,
+    label: channel === "last" ? "The last conversation" : (labels[channel] ?? channelName(channel)),
+    ...(to ? { to } : {}),
+    ...(accountId ? { accountId } : {}),
+    ...(threadId ? { threadId } : {}),
   };
+}
+
+/** Why the gateway says a result won't arrive, if it does. */
+function deliveryProblem(preview?: Preview): string | undefined {
+  const detail = preview?.detail;
+  if (!detail || !/will be blocked|requires review|unavailable|unresolved/.test(detail))
+    return undefined;
+  if (/multiple channels are configured/.test(detail))
+    return "OpenClaw has more than one channel, so it can't tell where to send these: choose one.";
+  const reason = detail.replace(/^.*?will be blocked:\s*/, "");
+  return /^[^.]*\.?/.exec(reason)?.[0] ?? reason;
+}
+
+/** A route as people say it: "Slack channel:C0123", "a webhook (hooks.example.com)". */
+function routeText(route: Record<string, unknown>, labels: ChannelLabels): string {
+  const to = str(route.to);
+  if (route.mode === "webhook") {
+    const host = to && URL.canParse(to) ? new URL(to).host : to;
+    return host ? `a webhook (${host})` : "a webhook";
+  }
+  const channel = str(route.channel) ?? "last";
+  if (channel === "otter") return "Otter";
+  const name =
+    channel === "last" ? "the last conversation" : (labels[channel] ?? channelName(channel));
+  return to ? `${name} ${to}` : name;
+}
+
+/** Where failures are reported, when that's set apart from where results go. */
+function failureAlertsOf(job: Job, labels: ChannelLabels): string | undefined {
+  const alert = job.failureAlert;
+  if (alert === false) return "Off";
+  const route =
+    alert && (alert.channel || alert.to)
+      ? alert
+      : job.delivery?.failureDestination && typeof job.delivery.failureDestination === "object"
+        ? (job.delivery.failureDestination as Record<string, unknown>)
+        : undefined;
+  if (!route) return undefined;
+  const after = alert && typeof alert.after === "number" ? alert.after : undefined;
+  return `${routeText(route, labels)}${after ? `, after ${after} failed runs in a row` : ""}`;
+}
+
+/** What a job runs when it isn't a message to its agent. */
+function runsOf(job: Job): string | undefined {
+  const payload = job.payload;
+  if (payload.kind === "command" && Array.isArray(payload.argv))
+    return `Runs ${payload.argv.map(String).join(" ")}`;
+  if (payload.kind === "script") return "Runs a script";
+  return undefined;
 }
 
 function autoPaused(job: Job): string | undefined {
@@ -132,13 +210,17 @@ function autoPaused(job: Job): string | undefined {
 export function taskOf(
   job: Job,
   defaultAgent: string,
-  preview?: { detail?: string },
+  preview?: Preview,
+  labels: ChannelLabels = {},
 ): ScheduledTask {
   const state = job.state ?? {};
   const lastStatus = state.lastRunStatus ?? state.lastStatus;
   const agent = job.agentId ?? job.sessionKey?.split(":")[1] ?? defaultAgent;
   const description = job.description?.replace(/^\[managed-by=[^\]]*\]\s*/, "").trim();
   const prompt = promptOf(job);
+  const runs = runsOf(job);
+  const problem = deliveryProblem(preview);
+  const failureAlerts = failureAlertsOf(job, labels);
   const managed = managedBy(job);
   const paused = autoPaused(job);
   const nextRunAt = job.enabled ? (state.nextRunAtMs ?? job.nextRunAtMs) : undefined;
@@ -149,7 +231,9 @@ export function taskOf(
     name: job.displayName || job.name,
     ...(description ? { description } : {}),
     ...(prompt !== undefined ? { prompt } : {}),
+    ...(runs ? { runs } : {}),
     schedule: scheduleOf(job.schedule),
+    ...(job.trigger ? { conditional: true as const } : {}),
     enabled: job.enabled,
     running: typeof state.runningAtMs === "number",
     ...(nextRunAt ? { nextRunAt } : {}),
@@ -165,12 +249,16 @@ export function taskOf(
           },
         }
       : {}),
-    delivery: deliveryOf(job, preview),
+    delivery: deliveryOf(job, labels, preview),
+    ...(problem ? { deliveryProblem: problem } : {}),
+    ...(failureAlerts ? { failureAlerts } : {}),
     ...(managed ? { managedBy: managed } : {}),
     ...(paused ? { autoPaused: paused } : {}),
     ...(job.configRevision ? { revision: job.configRevision } : {}),
-    // The gateway sends a main-session run's result to no channel.
-    ...(job.sessionTarget === "main" ? { undeliverable: true } : {}),
+    // Only an agent turn in a session of its own reports to a chat.
+    ...(job.sessionTarget === "main" || job.payload.kind !== "agentTurn"
+      ? { undeliverable: true as const }
+      : {}),
   };
 }
 
@@ -206,13 +294,13 @@ export async function listTasks(
   defaultAgent: string,
 ): Promise<Omit<AgentScheduledTasks, "provider">> {
   const jobs: Job[] = [];
-  const previews: Record<string, { detail?: string }> = {};
+  const previews: Record<string, Preview> = {};
   for (let offset = 0; ;) {
     const page = await call<{
       jobs: Job[];
       hasMore?: boolean;
       nextOffset?: number | null;
-      deliveryPreviews?: Record<string, { detail?: string }>;
+      deliveryPreviews?: Record<string, Preview>;
     }>(g, "cron.list", {
       includeDisabled: true,
       sortBy: "nextRunAtMs",
@@ -227,11 +315,84 @@ export async function listTasks(
     offset = page.nextOffset;
   }
   const admin = g.scopes.includes(ADMIN);
+  const { channels, labels } = await deliveryChannels(g);
   return {
-    tasks: jobs.map((job) => taskOf(job, defaultAgent, previews[job.id])),
+    tasks: jobs.map((job) => taskOf(job, defaultAgent, previews[job.id], labels)),
     ...(admin ? {} : { readOnly: READ_ONLY }),
-    can: { create: admin, deliverToOtter: g.otterChannel, history: true, timeZones: true },
+    channels,
+    can: {
+      create: admin,
+      deliverToOtter: g.otterChannel,
+      webhooks: true,
+      history: true,
+      timeZones: true,
+    },
   };
+}
+
+type ChannelsStatus = {
+  channelOrder?: string[];
+  channelLabels?: Record<string, string>;
+  channelMeta?: { id: string; label: string }[];
+  channelAccounts?: Record<
+    string,
+    { accountId: string; enabled?: boolean; configured?: boolean }[]
+  >;
+  channelDefaultAccountId?: Record<string, string>;
+};
+
+/** The chat apps the gateway has set up (not Otter, offered on its own), from its snapshot: no probe. */
+export async function deliveryChannels(
+  g: CronGateway,
+): Promise<{ channels: DeliveryChannel[]; labels: ChannelLabels }> {
+  const status = await g
+    .request<ChannelsStatus>("channels.status", {})
+    .catch((): ChannelsStatus => ({}));
+  const labels: ChannelLabels = { ...status.channelLabels };
+  for (const meta of status.channelMeta ?? []) labels[meta.id] = meta.label;
+  const ids = status.channelMeta?.map((meta) => meta.id) ?? status.channelOrder ?? [];
+  const channels = ids.flatMap((id): DeliveryChannel[] => {
+    if (id === "otter") return [];
+    const accounts = (status.channelAccounts?.[id] ?? [])
+      .filter((a) => a.enabled !== false && a.configured !== false)
+      .map((a) => a.accountId);
+    if (accounts.length === 0) return [];
+    const defaultAccount = status.channelDefaultAccountId?.[id];
+    return [
+      {
+        id,
+        label: labels[id] ?? channelName(id),
+        accounts,
+        ...(defaultAccount ? { defaultAccount } : {}),
+      },
+    ];
+  });
+  return { channels, labels };
+}
+
+/** Who results could go to on a channel: its directory and the conversations the agent has had there. */
+export async function channelTargets(
+  g: CronGateway,
+  agentId: string,
+  channel: string,
+): Promise<ChannelTarget[]> {
+  const result = await g
+    .request<{
+      conversations?: { target?: string; label?: string; accountId?: string }[];
+    }>("conversations.list", { agentId, channel, limit: 100 })
+    .catch(() => ({ conversations: [] }));
+  const seen = new Set<string>();
+  return (result.conversations ?? []).flatMap((row) => {
+    if (!row.target || seen.has(`${row.accountId}|${row.target}`)) return [];
+    seen.add(`${row.accountId}|${row.target}`);
+    return [
+      {
+        target: row.target,
+        ...(row.label ? { label: row.label } : {}),
+        ...(row.accountId ? { accountId: row.accountId } : {}),
+      },
+    ];
+  });
 }
 
 function cronSchedule(schedule: ScheduledTaskInput["schedule"]): Record<string, unknown> {
@@ -245,14 +406,48 @@ const sameSchedule = (job: Job["schedule"], wanted: Record<string, unknown>) =>
   Object.keys(wanted).every((key) => job[key] === wanted[key]) &&
   (wanted.kind !== "cron" || (job.tz ?? undefined) === wanted.tz);
 
-const otterDelivery = { mode: "announce", channel: "otter", to: NEW_CHAT };
-/** The gateway merges a delivery patch: what routed it elsewhere goes, or failures still alert there. */
-const elsewhereCleared = {
-  threadId: null,
-  accountId: null,
-  failureDestination: null,
-  completionDestination: null,
-};
+/** A job's delivery for where results should go. */
+function deliveryFor(to: ResultsTo): Record<string, unknown> {
+  if (to.kind === "new-chat") return { mode: "announce", channel: "otter", to: NEW_CHAT };
+  if (to.kind === "channel")
+    return {
+      mode: "announce",
+      channel: to.channel,
+      to: to.to,
+      ...(to.accountId ? { accountId: to.accountId } : {}),
+    };
+  if (to.kind === "webhook") return { mode: "webhook", to: to.url };
+  return { mode: "none" };
+}
+
+/**
+ * The patch that sends results there, or null when they already go there. The gateway merges a
+ * delivery patch, so what pointed at the old target (its account, topic) is cleared; where
+ * failures are reported is a setting of its own and stays.
+ */
+export function deliveryPatch(
+  current: Job["delivery"],
+  to: ResultsTo,
+): Record<string, unknown> | null {
+  const wanted = deliveryFor(to);
+  const now = current ?? { mode: "none" };
+  const same =
+    now.mode === wanted.mode &&
+    (wanted.mode === "none" ||
+      ((str(now.channel) ?? null) === (str(wanted.channel) ?? null) &&
+        str(now.to) === str(wanted.to) &&
+        (wanted.mode !== "announce" ||
+          (str(now.accountId) ?? null) === (str(wanted.accountId) ?? null))));
+  if (same) return null;
+  return {
+    channel: null,
+    to: null,
+    accountId: null,
+    threadId: null,
+    ...(wanted.mode === "announce" ? {} : { completionDestination: null }),
+    ...wanted,
+  };
+}
 
 /** Saves the task; its id. */
 export async function saveTask(
@@ -271,7 +466,7 @@ export async function saveTask(
       schedule,
       ...(input.schedule.kind === "at" ? { deleteAfterRun: true } : {}),
       payload: { kind: "agentTurn", message: input.prompt },
-      delivery: input.resultsTo === "new-chat" ? otterDelivery : { mode: "none" },
+      delivery: deliveryFor(input.resultsTo ?? { kind: "off" }),
     });
     return added.id ?? added.job?.id ?? "";
   }
@@ -304,13 +499,8 @@ export async function saveTask(
         ? { ...job.payload, message: input.prompt }
         : { ...job.payload, text: input.prompt };
   if (input.agent && input.agent !== job.agentId && !job.sessionKey) patch.agentId = input.agent;
-  const delivery = job.delivery;
-  const newChat =
-    delivery?.mode === "announce" && delivery.channel === "otter" && delivery.to === NEW_CHAT;
-  if (input.resultsTo === "new-chat" && !newChat)
-    patch.delivery = { ...otterDelivery, ...elsewhereCleared };
-  if (input.resultsTo === "off" && delivery && delivery.mode !== "none")
-    patch.delivery = { mode: "none", channel: null, to: null, ...elsewhereCleared };
+  const delivery = input.resultsTo && deliveryPatch(job.delivery, input.resultsTo);
+  if (delivery) patch.delivery = delivery;
   if (Object.keys(patch).length > 0)
     await call(g, "cron.update", {
       id,
@@ -356,6 +546,17 @@ export async function taskRuns(g: CronGateway, id: string, limit: number): Promi
       : {}),
     ...(entry.summary ? { summary: entry.summary } : {}),
     ...(entry.model ? { model: entry.model } : {}),
+    ...(entry.delivery?.resolved?.channel
+      ? {
+          sentTo: {
+            channel: entry.delivery.resolved.channel,
+            ...(entry.delivery.resolved.to ? { to: entry.delivery.resolved.to } : {}),
+          },
+        }
+      : {}),
+    ...(entry.delivery?.resolved?.ok === false && entry.delivery.resolved.error
+      ? { deliveryError: entry.delivery.resolved.error }
+      : {}),
     // "silent": the agent chose to send nothing, not a failure.
     ...(entry.deliverySuppressionReason === "silent"
       ? { silent: true as const }

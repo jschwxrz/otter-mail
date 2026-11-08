@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type {
   AgentScheduledTasks,
+  ResultsTo,
   ScheduledTask,
   TaskDelivery,
   TaskRun,
@@ -86,11 +87,22 @@ function useAgentName() {
   };
 }
 
+const hostOf = (url: string) => (URL.canParse(url) ? new URL(url).host : url);
+
 function deliveryText(delivery: TaskDelivery): string {
   if (delivery.kind === "otter")
     return delivery.chat === "new" ? "A new chat in Otter each time" : "Its chat in Otter";
   if (delivery.kind === "none") return "Kept on the agent: not sent anywhere";
-  return `Sent to ${delivery.label}`;
+  if (delivery.kind === "webhook") return `Posted to a webhook (${hostOf(delivery.url)})`;
+  if (delivery.kind === "elsewhere") return `Sent to ${delivery.label}`;
+  return [
+    delivery.label,
+    delivery.to,
+    delivery.threadId ? `topic ${delivery.threadId}` : null,
+    delivery.accountId && delivery.accountId !== "default" ? `as ${delivery.accountId}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function useTaskAction() {
@@ -618,7 +630,7 @@ function TaskPage({
       <div className="mt-6 grid gap-10 border-t border-border/60 pt-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div className="flex min-w-0 flex-col gap-8">
           {agent.can.history ? (
-            <RunHistory task={task} now={now} />
+            <RunHistory task={task} agent={agent} now={now} />
           ) : (
             <p className="text-sm text-muted-foreground">
               {agentName(task.provider)} doesn't keep a history of runs Otter can show.
@@ -652,17 +664,37 @@ function TaskPage({
             <Detail label="Instructions">
               <span className="block whitespace-pre-wrap">{task.prompt}</span>
             </Detail>
+          ) : task.runs ? (
+            <Detail label="What it runs">
+              <span className="block font-mono text-xs break-all">{task.runs}</span>
+            </Detail>
           ) : task.description ? (
             <Detail label="What it does">{task.description}</Detail>
           ) : null}
-          <Detail label="Repeats">{scheduleText(task.schedule)}</Detail>
+          <Detail label="Repeats">
+            {scheduleText(task.schedule)}
+            {task.conditional ? (
+              <span className="block pt-0.5 text-xs">Only when its own check says so</span>
+            ) : null}
+          </Detail>
           <Detail label="Agent">
             <span className="flex items-center gap-2">
               <AgentAvatar kind={task.provider} agent={task.agent} className="size-4" />
               {agentName(task.provider, task.agent)}
             </span>
           </Detail>
-          <Detail label="Results">{deliveryText(task.delivery)}</Detail>
+          <Detail label="Results">
+            {deliveryText(task.delivery)}
+            {task.deliveryProblem ? (
+              <span className="flex items-start gap-1.5 pt-1 text-xs text-warning-foreground">
+                <CircleAlertIcon aria-hidden className="mt-px size-3.5 shrink-0" />
+                {task.deliveryProblem}
+              </span>
+            ) : null}
+          </Detail>
+          {task.failureAlerts ? (
+            <Detail label="Failures reported to">{task.failureAlerts}</Detail>
+          ) : null}
           {task.managedBy ? (
             <Detail label="Kept by">
               {task.managedBy}: it can be paused or run here, and changed in its config.
@@ -682,7 +714,15 @@ function TaskPage({
   );
 }
 
-function RunHistory({ task, now }: { task: ScheduledTask; now: number }) {
+function RunHistory({
+  task,
+  agent,
+  now,
+}: {
+  task: ScheduledTask;
+  agent: AgentScheduledTasks;
+  now: number;
+}) {
   const runs = useQuery({
     queryKey: ["agent-scheduled-runs", task.provider, task.id, task.lastRun?.at ?? 0],
     queryFn: () => mailApi.scheduledTaskRuns(task.provider, task.id, 20),
@@ -708,6 +748,7 @@ function RunHistory({ task, now }: { task: ScheduledTask; now: number }) {
           <RunRow
             key={run.id}
             task={task}
+            agent={agent}
             run={run}
             now={now}
             open={open === run.id}
@@ -721,12 +762,14 @@ function RunHistory({ task, now }: { task: ScheduledTask; now: number }) {
 
 function RunRow({
   task,
+  agent,
   run,
   now,
   open,
   onToggle,
 }: {
   task: ScheduledTask;
+  agent: AgentScheduledTasks;
   run: TaskRun;
   now: number;
   open: boolean;
@@ -769,12 +812,30 @@ function RunRow({
           )}
         />
       </button>
-      {open ? <RunTranscript task={task} run={run} /> : null}
+      {open ? <RunTranscript task={task} agent={agent} run={run} /> : null}
     </div>
   );
 }
 
-function RunTranscript({ task, run }: { task: ScheduledTask; run: TaskRun }) {
+function RunTranscript({
+  task,
+  agent,
+  run,
+}: {
+  task: ScheduledTask;
+  agent: AgentScheduledTasks;
+  run: TaskRun;
+}) {
+  const sentTo = run.sentTo
+    ? [
+        run.sentTo.channel === "otter"
+          ? "Otter"
+          : (agent.channels.find((c) => c.id === run.sentTo!.channel)?.label ?? run.sentTo.channel),
+        run.sentTo.channel === "otter" ? null : run.sentTo.to,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : null;
   const transcript = useQuery({
     queryKey: ["agent-scheduled-run", task.provider, task.id, run.id],
     queryFn: () => mailApi.scheduledRunTranscript(task.provider, task.id, run.id),
@@ -786,8 +847,14 @@ function RunTranscript({ task, run }: { task: ScheduledTask; run: TaskRun }) {
       {run.error ? <p className="text-destructive-foreground">{run.error}</p> : null}
       {run.silent ? (
         <p className="text-xs text-muted-foreground">It chose to send nothing this time.</p>
+      ) : run.deliveryError ? (
+        <p className="text-xs text-warning-foreground">
+          Couldn't send it{sentTo ? ` to ${sentTo}` : ""}: {run.deliveryError}
+        </p>
       ) : run.delivered === false ? (
         <p className="text-xs text-muted-foreground">Its result wasn't delivered.</p>
+      ) : sentTo && run.delivered ? (
+        <p className="text-xs text-muted-foreground">Sent to {sentTo}.</p>
       ) : null}
       {transcript.isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
@@ -819,8 +886,169 @@ const REPEATS: { value: Repeat; label: string }[] = [
   { value: "cron", label: "Custom (cron)" },
 ];
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-/** Where results go: as they do now ("This chat", another channel), a new chat each run, or nowhere. */
-type ResultsTo = "keep" | "new-chat" | "off";
+/**
+ * Where results go, as the editor holds it: `pick` is "keep" (as they go now: this chat, the last
+ * conversation), "new-chat", "off", "webhook", or "channel:<id>".
+ */
+type Destination = { pick: string; to: string; account: string; url: string };
+
+/** How a channel names who gets a message, as a hint for the recipient field. */
+const TARGET_HINTS: Record<string, string> = {
+  slack: "channel:C0123ABC or user:U0123ABC",
+  discord: "channel:<id> or user:<id>",
+  telegram: "@username or chat id",
+  whatsapp: "+15551234567",
+  signal: "+15551234567 or group:<id>",
+  imessage: "chat_id:123 or +15551234567",
+  matrix: "room:!id:server or user:@you:server",
+  msteams: "user:<id> or conversation:<id>",
+};
+
+function destinationOf(task: ScheduledTask | null, agent?: AgentScheduledTasks): Destination {
+  const none = { to: "", account: "", url: "" };
+  if (!task) return { ...none, pick: agent?.can.deliverToOtter ? "new-chat" : "off" };
+  const d = task.delivery;
+  if (d.kind === "none") return { ...none, pick: "off" };
+  if (d.kind === "otter" && d.chat === "new") return { ...none, pick: "new-chat" };
+  if (d.kind === "webhook") return { ...none, pick: "webhook", url: d.url };
+  if (d.kind === "channel" && agent?.channels.some((c) => c.id === d.channel))
+    return { ...none, pick: `channel:${d.channel}`, to: d.to ?? "", account: d.accountId ?? "" };
+  return { ...none, pick: "keep" };
+}
+
+/** What to save for where results go; a problem to show instead when it isn't complete. */
+function resultsToOf(dest: Destination): ResultsTo | undefined | { problem: string } {
+  if (dest.pick === "keep") return undefined;
+  if (dest.pick === "new-chat" || dest.pick === "off") return { kind: dest.pick };
+  if (dest.pick === "webhook")
+    return /^https?:\/\/\S+$/i.test(dest.url.trim())
+      ? { kind: "webhook", url: dest.url.trim() }
+      : { problem: "A webhook needs an http(s) address." };
+  const channel = dest.pick.slice("channel:".length);
+  if (!dest.to.trim()) return { problem: "Say who on it gets the results." };
+  return {
+    kind: "channel",
+    channel,
+    to: dest.to.trim(),
+    ...(dest.account ? { accountId: dest.account } : {}),
+  };
+}
+
+function ResultsField({
+  task,
+  agent,
+  agentId,
+  value,
+  onChange,
+}: {
+  task: ScheduledTask | null;
+  agent: AgentScheduledTasks;
+  agentId: string;
+  value: Destination;
+  onChange: (dest: Destination) => void;
+}) {
+  const chats = !task?.undeliverable;
+  const channel = value.pick.startsWith("channel:")
+    ? agent.channels.find((c) => `channel:${c.id}` === value.pick)
+    : undefined;
+  const targets = useQuery({
+    queryKey: ["agent-scheduled-targets", agent.provider, agentId, channel?.id],
+    queryFn: () => mailApi.scheduledTargets(agent.provider, agentId, channel!.id),
+    enabled: Boolean(channel),
+    staleTime: 60_000,
+  });
+  const d = task?.delivery;
+  const keep =
+    d?.kind === "otter" && d.chat === "one"
+      ? "This chat"
+      : d?.kind === "channel" || d?.kind === "elsewhere"
+        ? deliveryText(d)
+        : null;
+  const options = [
+    ...(keep && destinationOf(task, agent).pick === "keep" ? [{ value: "keep", label: keep }] : []),
+    ...(chats && agent.can.deliverToOtter
+      ? [{ value: "new-chat", label: "A new chat in Otter each time" }]
+      : []),
+    ...(chats ? agent.channels.map((c) => ({ value: `channel:${c.id}`, label: c.label })) : []),
+    ...(agent.can.webhooks ? [{ value: "webhook", label: "A webhook" }] : []),
+    { value: "off", label: "Off" },
+  ];
+  const set = (patch: Partial<Destination>) => onChange({ ...value, ...patch });
+  const suggestions = (targets.data ?? []).filter(
+    (t) => !value.account || !t.accountId || t.accountId === value.account,
+  );
+  const listId = `targets-${agent.provider}-${channel?.id ?? ""}`;
+  return (
+    <Field
+      label="Send results to"
+      description={
+        value.pick === "off"
+          ? "Results stay on the agent."
+          : value.pick === "webhook"
+            ? "Each finished run is posted there."
+            : value.pick === "new-chat"
+              ? "Each run's result arrives as a new chat in Otter, and notifies you."
+              : channel
+                ? `The agent posts each result on ${channel.label}.`
+                : "Results keep going where they go now."
+      }
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <SelectField
+          label="Send results to"
+          value={value.pick}
+          onChange={(pick) => {
+            const next = agent.channels.find((c) => `channel:${c.id}` === pick);
+            onChange({
+              ...value,
+              pick,
+              to: d?.kind === "channel" && `channel:${d.channel}` === pick ? (d.to ?? "") : "",
+              account:
+                next && next.accounts.length > 1 ? (next.defaultAccount ?? next.accounts[0]) : "",
+            });
+          }}
+          options={options}
+        />
+        {channel && channel.accounts.length > 1 ? (
+          <SelectField
+            label="Account"
+            value={value.account || channel.defaultAccount || channel.accounts[0]}
+            onChange={(account) => set({ account })}
+            options={channel.accounts.map((a) => ({ value: a, label: `as ${a}` }))}
+          />
+        ) : null}
+      </div>
+      {channel ? (
+        <>
+          <Input
+            aria-label={`Who on ${channel.label}`}
+            value={value.to}
+            list={listId}
+            placeholder={TARGET_HINTS[channel.id] ?? "A chat, user or phone number"}
+            onChange={(e) => set({ to: e.target.value })}
+            className="font-mono"
+          />
+          <datalist id={listId}>
+            {suggestions.map((t) => (
+              <option key={`${t.accountId}|${t.target}`} value={t.target}>
+                {t.label}
+              </option>
+            ))}
+          </datalist>
+        </>
+      ) : null}
+      {value.pick === "webhook" ? (
+        <Input
+          aria-label="Webhook address"
+          value={value.url}
+          placeholder="https://example.com/hooks/otter"
+          onChange={(e) => set({ url: e.target.value })}
+          className="font-mono"
+        />
+      ) : null}
+    </Field>
+  );
+}
 
 /** The select's value for a schedule with no zone of its own: the agent's. */
 const AGENT_ZONE = "agent";
@@ -893,23 +1121,15 @@ function TaskEditor({
     task ? ownerKey(task) : choices[0] ? ownerKey(choices[0]) : "",
   );
   const provider = task?.provider ?? owner.split("|")[0];
-  const can = agents.find((a) => a.provider === provider)?.can;
+  const agentTasks = agents.find((a) => a.provider === provider);
+  const can = agentTasks?.can;
   const [name, setName] = useState(task?.name ?? "");
   const [prompt, setPrompt] = useState(task?.prompt ?? "");
   const [when, setWhen] = useState<WhenForm>(
     () => (task && whenFormOf(task.schedule)) || newWhenForm(),
   );
-  const [resultsTo, setResultsTo] = useState<ResultsTo>(() =>
-    !task
-      ? can?.deliverToOtter
-        ? "new-chat"
-        : "off"
-      : task.delivery.kind === "none"
-        ? "off"
-        : task.delivery.kind === "otter" && task.delivery.chat === "new"
-          ? "new-chat"
-          : "keep",
-  );
+  const [destination, setDestination] = useState(() => destinationOf(task, agentTasks));
+  const routes = Boolean(can?.deliverToOtter || can?.webhooks || agentTasks?.channels.length);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const zones = Intl.supportedValuesOf?.("timeZone") ?? [localTimeZone()];
@@ -927,10 +1147,12 @@ function TaskEditor({
   const summary = kept ? scheduleText(kept) : whenProblem(when) ? null : scheduleText(schedule());
 
   const save = async () => {
+    const results = routes ? resultsToOf(destination) : undefined;
     const problem =
       (!name.trim() && "Give it a name.") ||
       (asksPrompt && !prompt.trim() && "Say what the agent should do.") ||
-      (kept ? null : whenProblem(when));
+      (kept ? null : whenProblem(when)) ||
+      (results && "problem" in results ? results.problem : null);
     if (problem) {
       setError(problem);
       throw new Error(problem);
@@ -944,7 +1166,7 @@ function TaskEditor({
         ...(asksPrompt ? { prompt: prompt.trim() } : {}),
         schedule: schedule(),
         ...(!task && agent ? { agent } : {}),
-        ...(can?.deliverToOtter && resultsTo !== "keep" ? { resultsTo } : {}),
+        ...(results && !("problem" in results) ? { resultsTo: results } : {}),
         ...(task?.revision ? { revision: task.revision } : {}),
       });
       await qc.invalidateQueries({ queryKey: TASKS_KEY });
@@ -979,8 +1201,12 @@ function TaskEditor({
               value={owner}
               onChange={(value) => {
                 setOwner(value);
-                const next = agents.find((a) => a.provider === value.split("|")[0]);
-                setResultsTo(next?.can.deliverToOtter ? "new-chat" : "off");
+                setDestination(
+                  destinationOf(
+                    null,
+                    agents.find((a) => a.provider === value.split("|")[0]),
+                  ),
+                );
               }}
               options={choices.map((o) => ({ value: ownerKey(o), label: o.label }))}
             />
@@ -1109,34 +1335,21 @@ function TaskEditor({
             </p>
           ) : null}
         </Field>
-        {task?.undeliverable ? null : can?.deliverToOtter ? (
-          <Field
-            label="Send results to"
-            description={
-              resultsTo === "off"
-                ? "Results stay on the agent."
-                : "Each run's result arrives in Otter, and notifies you."
-            }
-          >
-            <SelectField
-              label="Send results to"
-              value={resultsTo}
-              onChange={(value) => setResultsTo(value as ResultsTo)}
-              className="self-start"
-              options={[
-                ...(task?.delivery.kind === "otter" && task.delivery.chat === "one"
-                  ? [{ value: "keep", label: "This chat" }]
-                  : task?.delivery.kind === "elsewhere"
-                    ? [{ value: "keep", label: task.delivery.label }]
-                    : []),
-                { value: "new-chat", label: "A new chat each time" },
-                { value: "off", label: "Off" },
-              ]}
-            />
-          </Field>
-        ) : provider === "openclaw" ? (
+        {agentTasks && routes ? (
+          <ResultsField
+            task={task}
+            agent={agentTasks}
+            agentId={task?.agent ?? owner.split("|")[1] ?? ""}
+            value={destination}
+            onChange={(next) => {
+              setError(null);
+              setDestination(next);
+            }}
+          />
+        ) : null}
+        {provider === "openclaw" && !can?.deliverToOtter && !task?.undeliverable ? (
           <p className="text-xs text-muted-foreground">
-            To get results here, set up Messages from your agents in Settings → OpenClaw.
+            To get results in Otter, set up Messages from your agents in Settings → OpenClaw.
           </p>
         ) : null}
         {error ? (

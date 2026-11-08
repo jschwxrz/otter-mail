@@ -42,6 +42,7 @@ import {
 } from "@openclaw/gateway-client/browser";
 import { OpenClawText, openClawMessageText as textOf } from "./openclaw-stream.js";
 import {
+  channelTargets,
   listTasks,
   removeTask,
   runRows,
@@ -2145,6 +2146,8 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
     runs: async (settings, id, limit) => taskRuns(await cronGateway(settings), id, limit),
     runTranscript: async (settings, id, runId) =>
       transcript(await runRows(await cronGateway(settings), id, runId)),
+    targets: async (settings, agent, channel) =>
+      channelTargets(await cronGateway(settings), agent, channel),
   },
 
   watch(settings, sessions, started, read) {
