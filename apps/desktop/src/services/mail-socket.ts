@@ -1,7 +1,7 @@
 import * as net from "node:net";
 import * as tls from "node:tls";
 
-import type { ByteStream } from "@otter-mail/core";
+import type { ByteStream } from "@otter/core";
 
 const CONNECT_TIMEOUT_MS = 20_000;
 const HIGH_WATER_BYTES = 1 << 20;

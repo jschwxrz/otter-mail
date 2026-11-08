@@ -3,7 +3,7 @@ import {
   type AgentSettingsProps,
   type LocalAgentRuntime,
   type UiExtension,
-} from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
 
 import { manifest } from "../manifest";
 import { ClaudeIcon } from "./icon";

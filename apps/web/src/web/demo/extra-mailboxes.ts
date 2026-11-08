@@ -1,4 +1,4 @@
-import type { SeedAccount, SeedThread } from "@otter-mail/shared/demo-mailboxes";
+import type { SeedAccount, SeedThread } from "@otter/shared/demo-mailboxes";
 
 const person = (name: string, email: string) => ({ name, email });
 

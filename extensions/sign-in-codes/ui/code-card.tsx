@@ -1,4 +1,4 @@
-import { toast, Btn } from "@otter-mail/web/extension-kit";
+import { toast, Btn } from "@otter/web/extension-kit";
 import { useEffect, useState } from "react";
 import { CheckIcon, CopyIcon, KeyRoundIcon } from "lucide-react";
 

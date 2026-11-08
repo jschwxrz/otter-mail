@@ -1,5 +1,5 @@
 import { HTTPException } from "hono/http-exception";
-import type { PutPushDeviceRequest } from "@otter-mail/contracts/relay";
+import type { PutPushDeviceRequest } from "@otter/contracts/relay";
 import type { Env } from "./worker.ts";
 
 export type PushDevice = PutPushDeviceRequest & {

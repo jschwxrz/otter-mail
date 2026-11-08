@@ -8,7 +8,7 @@
  * `capabilities`, never on the provider.
  */
 
-import type { MailCapabilities, MailProviderKind, MeetingService } from "@otter-mail/contracts";
+import type { MailCapabilities, MailProviderKind, MeetingService } from "@otter/contracts";
 
 import type {
   ComposeAttachment,

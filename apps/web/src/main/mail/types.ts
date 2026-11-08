@@ -3,7 +3,7 @@ import type {
   ImapSettings,
   MailCapabilities,
   MailProviderKind,
-} from "@otter-mail/contracts";
+} from "@otter/contracts";
 
 export type MailAccount = {
   id: string;

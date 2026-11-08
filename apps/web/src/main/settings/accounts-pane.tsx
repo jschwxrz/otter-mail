@@ -13,7 +13,7 @@ import {
   useAliasMailInParent,
   useMailboxArrangement,
 } from "../mailboxes";
-import type { AliasMailbox } from "@otter-mail/contracts";
+import type { AliasMailbox } from "@otter/contracts";
 import {
   aliasMailboxId,
   aliasMailboxLook,

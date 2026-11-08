@@ -100,7 +100,7 @@ Type what you want and Enter does it: commands you name come first, and mail sea
 
 ## Screenshots
 
-- From the made-up mailbox (`pnpm dev:fake`, see the test-otter-mail skill),
+- From the made-up mailbox (`pnpm dev:fake`, see the test-otter skill),
   never real mail, at a 1600x1000 viewport. Dark is the default; light is fine
   when the feature is about appearance.
 - Crop to the feature when the whole window isn't the point.
@@ -109,7 +109,7 @@ Type what you want and Enter does it: commands you name come first, and mail sea
 
 ## Check it
 
-- `pnpm --filter @otter-mail/shared test`: every note parses and every image it
+- `pnpm --filter @otter/shared test`: every note parses and every image it
   shows exists.
 - The page itself: copy the note and its images into a checkout of the website
   (`changelog/mail/`), then `pnpm dev` there and open `/mail/changelog/`.

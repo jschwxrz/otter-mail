@@ -1,5 +1,5 @@
-import { handle, setPlatform, registeredHandlers } from "@otter-mail/core/extension-kit";
-import type { Platform } from "@otter-mail/core/extension-kit";
+import { handle, setPlatform, registeredHandlers } from "@otter/core/extension-kit";
+import type { Platform } from "@otter/core/extension-kit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { registerTodoistHandlers } from "./handlers.js";
 import {

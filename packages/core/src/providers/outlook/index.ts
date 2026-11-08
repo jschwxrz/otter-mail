@@ -1,4 +1,4 @@
-import { OUTLOOK_CAPABILITIES } from "@otter-mail/contracts";
+import { OUTLOOK_CAPABILITIES } from "@otter/contracts";
 
 import { OUTLOOK_SIGNED_OUT_MESSAGE } from "../../microsoft.js";
 import { platform } from "../../platform.js";

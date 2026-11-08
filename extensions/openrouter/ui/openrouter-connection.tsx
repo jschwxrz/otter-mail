@@ -5,8 +5,8 @@ import {
   SettingsRow,
   SettingsSection,
   TextInput,
-} from "@otter-mail/web/extension-kit";
-import type { ProviderSnapshot } from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
+import type { ProviderSnapshot } from "@otter/web/extension-kit";
 import { useState } from "react";
 import { openRouterApi } from "./api";
 

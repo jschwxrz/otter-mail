@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
-import type { MailProviderKind } from "@otter-mail/contracts/mail";
-import type { Preferences, RelayAccount } from "@otter-mail/contracts/relay";
+import type { MailProviderKind } from "@otter/contracts/mail";
+import type { Preferences, RelayAccount } from "@otter/contracts/relay";
 
 import * as schema from "./schema.ts";
 

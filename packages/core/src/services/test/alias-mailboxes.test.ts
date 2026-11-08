@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { useNodePlatform } from "../../providers/imap/test/node-platform.ts";
 import type { MailAccount, MessageSummary } from "../../types.ts";
-import { validAliasMailboxes } from "@otter-mail/contracts";
+import { validAliasMailboxes } from "@otter/contracts";
 import { aliasMailboxFor, parseAliasMailboxes } from "../alias-mailboxes.ts";
 import * as store from "../mail-store.ts";
 import { firstCopy } from "../notifier.ts";

@@ -1,4 +1,4 @@
-import type { UiExtension } from "@otter-mail/web/extension-kit";
+import type { UiExtension } from "@otter/web/extension-kit";
 import { HardDriveUploadIcon } from "lucide-react";
 
 import { manifest } from "../manifest";

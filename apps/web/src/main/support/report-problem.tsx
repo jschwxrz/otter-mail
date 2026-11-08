@@ -26,7 +26,7 @@ import {
   type SupportReport,
   type SupportSession,
   type SupportTerminals,
-} from "@otter-mail/shared/support";
+} from "@otter/shared/support";
 import {
   Dialog,
   DialogContent,

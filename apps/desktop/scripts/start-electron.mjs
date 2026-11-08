@@ -21,8 +21,8 @@ if (missing.length > 0) {
 const env = electronChildEnv();
 delete env.VITE_DEV_SERVER_URL;
 const home = resolveDevHome({ cwd: desktopDir });
-if (home) env.OTTER_MAIL_HOME = home;
-else delete env.OTTER_MAIL_HOME;
+if (home) env.OTTER_HOME = home;
+else delete env.OTTER_HOME;
 
 const child = NodeChildProcess.spawn(resolveElectronPath(), [desktopDir], {
   cwd: desktopDir,

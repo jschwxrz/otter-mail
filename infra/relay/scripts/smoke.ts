@@ -13,7 +13,7 @@
 import { execFileSync } from "node:child_process";
 import * as NodeFS from "node:fs";
 
-import type { RelayEvent } from "@otter-mail/contracts/relay";
+import type { RelayEvent } from "@otter/contracts/relay";
 
 const RELAY_URL = process.env.RELAY_URL ?? "https://relay.mail.otterware.app";
 const config = NodeFS.readFileSync(`${import.meta.dirname}/../wrangler.jsonc`, "utf8");

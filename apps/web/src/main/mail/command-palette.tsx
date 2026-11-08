@@ -40,7 +40,7 @@ import { useDebouncedValue, useSearchMessages } from "./hooks";
 import { getAccountColor, getAccountDisplayName } from "./account-style";
 import { senderLabel } from "./address";
 import { cn } from "./ui";
-import { changelogUrl } from "@otter-mail/shared/changelog";
+import { changelogUrl } from "@otter/shared/changelog";
 import { openLink } from "../browser/store";
 import { getThemeModes } from "../theme/themePalette";
 import {

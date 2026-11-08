@@ -1,4 +1,4 @@
-import type { AgentChannel } from "@otter-mail/contracts/relay";
+import type { AgentChannel } from "@otter/contracts/relay";
 import { handle } from "../ipc.js";
 import { platform } from "../platform.js";
 import { relayRequest } from "../services/otter-account.js";

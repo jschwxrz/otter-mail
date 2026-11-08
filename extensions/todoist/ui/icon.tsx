@@ -1,4 +1,4 @@
-import { cn } from "@otter-mail/web/extension-kit";
+import { cn } from "@otter/web/extension-kit";
 
 export function TodoistIcon({ className }: { className?: string }) {
   return (

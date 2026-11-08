@@ -6,7 +6,7 @@ import {
   searchableSetting,
   toast,
   useOpenWorkspace,
-} from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronRightIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";

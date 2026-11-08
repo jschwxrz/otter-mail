@@ -14,7 +14,7 @@ import {
   sha256Hex,
   toBase64,
   utf8Encode,
-} from "@otter-mail/core/extension-kit";
+} from "@otter/core/extension-kit";
 
 import * as local from "./local.js";
 

@@ -1,4 +1,4 @@
-import { openClawStep } from "@otter-mail/core/extension-kit";
+import { openClawStep } from "@otter/core/extension-kit";
 import { describe, expect, it } from "vite-plus/test";
 import {
   browserTabOf,

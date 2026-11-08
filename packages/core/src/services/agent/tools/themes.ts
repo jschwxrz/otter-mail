@@ -3,8 +3,8 @@ import {
   THEME_COLOR_ROLES,
   type ThemeAppearance,
   type ThemeDefinition,
-} from "@otter-mail/shared/themes";
-import { displayedThemeColors, PAINTED_ROLES } from "@otter-mail/shared/theme-display";
+} from "@otter/shared/themes";
+import { displayedThemeColors, PAINTED_ROLES } from "@otter/shared/theme-display";
 import { getUiPreferences, setUiPreference } from "../../preferences.js";
 import { optBool, optStr, str, type AgentTool, type ToolArgs } from "./tool.js";
 

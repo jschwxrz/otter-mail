@@ -20,9 +20,9 @@ import {
   type RelayUser,
   type SignInMethod,
   TUNNEL_CLOSE,
-} from "@otter-mail/contracts/relay";
-import type { MailProviderKind } from "@otter-mail/contracts/mail";
-import { CHAT_LIMITS, type Chat, type ListChatsResponse } from "@otter-mail/contracts/chats";
+} from "@otter/contracts/relay";
+import type { MailProviderKind } from "@otter/contracts/mail";
+import { CHAT_LIMITS, type Chat, type ListChatsResponse } from "@otter/contracts/chats";
 
 import { createAuth, googleClientIds, googleKeys, type Auth } from "./auth.ts";
 import * as agentChannels from "./agent-channels.ts";

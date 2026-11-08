@@ -2,7 +2,7 @@ import { constants } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { SupportAgent } from "@otter-mail/shared/support";
+import type { SupportAgent } from "@otter/shared/support";
 
 export const expandSupportPath = (value: string): string =>
   value.startsWith("~/") ? path.join(os.homedir(), value.slice(2)) : value;

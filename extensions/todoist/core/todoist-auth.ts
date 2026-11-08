@@ -1,6 +1,6 @@
 /** Public-client OAuth: PKCE verifier and all credentials stay in the backend. */
 
-import { platform } from "@otter-mail/core/extension-kit";
+import { platform } from "@otter/core/extension-kit";
 const AUTH = "todoist-oauth";
 const TOKEN = "todoist-token";
 type Session = { clientId: string; accessToken: string; refreshToken?: string; expiresAt: number };

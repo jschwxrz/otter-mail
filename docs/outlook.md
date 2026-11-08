@@ -34,7 +34,7 @@ MailProvider               packages/core/src/providers/provider.ts
   (`PUT /v1/accounts/:email` with `provider: "outlook"`). Microsoft's `email` claim isn't verified
   for work accounts, so the relay takes the address from `preferred_username`, or from `email`
   only for personal accounts or with the `xms_edov` claim (`infra/relay/src/microsoft-jwt.ts`).
-- Builds without a Microsoft client (`OTTER_MAIL_MICROSOFT_CLIENT_ID` on the desktop, the relay's
+- Builds without a Microsoft client (`OTTER_MICROSOFT_CLIENT_ID` on the desktop, the relay's
   `MICROSOFT_CLIENT_ID` and secret for the web app) don't offer Outlook (`gmail:mailProviders`).
   The Azure app registration is described in infra/relay/README.md.
 

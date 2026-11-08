@@ -11,7 +11,7 @@ import {
   useSetProvidersState,
   type AgentSettingsProps,
   type ProviderSnapshot,
-} from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
 import { useState } from "react";
 
 import { hermesApi } from "./api";

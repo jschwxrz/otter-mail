@@ -3,8 +3,8 @@ import electronUpdater from "electron-updater";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { UPDATE_STATE_CHANNEL, type UpdateState, type UpdateChannel } from "@otter-mail/contracts";
-import { releaseChannel, versionMatchesChannel } from "@otter-mail/shared/release-channel";
+import { UPDATE_STATE_CHANNEL, type UpdateState, type UpdateChannel } from "@otter/contracts";
+import { releaseChannel, versionMatchesChannel } from "@otter/shared/release-channel";
 
 import { broadcast } from "./ipc.js";
 import { logger } from "./logger.js";
@@ -35,7 +35,7 @@ function setState(patch: Partial<UpdateState>): UpdateState {
 }
 
 function disabledReason(): string | null {
-  if (process.env.OTTER_MAIL_DISABLE_AUTO_UPDATE === "1") return "Updates are turned off.";
+  if (process.env.OTTER_DISABLE_AUTO_UPDATE === "1") return "Updates are turned off.";
   if (!app.isPackaged) return "Updates only run in packaged builds.";
   if (!fs.existsSync(path.join(process.resourcesPath, "app-update.yml"))) {
     return "This build has no update feed.";

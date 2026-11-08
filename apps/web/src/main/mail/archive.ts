@@ -1,4 +1,4 @@
-import type { MailCapabilities } from "@otter-mail/contracts";
+import type { MailCapabilities } from "@otter/contracts";
 import type { MailLabel } from "./types";
 
 export function archiveFrom(

@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { summarizeSupportLog, type SupportError } from "@otter-mail/shared/support";
+import { summarizeSupportLog, type SupportError } from "@otter/shared/support";
 import { appInfo } from "../backend-protocol.js";
 import { backendOS } from "../os/backend.js";
 

@@ -1,4 +1,4 @@
-import { openLink, type BodyLinks, type PaletteSearch } from "@otter-mail/web/extension-kit";
+import { openLink, type BodyLinks, type PaletteSearch } from "@otter/web/extension-kit";
 import { FileTextIcon } from "lucide-react";
 
 import { SHARED, driveApi } from "./api";

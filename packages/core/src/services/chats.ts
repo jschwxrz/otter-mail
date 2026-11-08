@@ -16,7 +16,7 @@ import {
   type ChatSummary,
   type ChatTurn,
   type ListChatsResponse,
-} from "@otter-mail/contracts/chats";
+} from "@otter/contracts/chats";
 
 import { broadcast } from "../ipc.js";
 import { readJson, writeJson } from "../json-file.js";

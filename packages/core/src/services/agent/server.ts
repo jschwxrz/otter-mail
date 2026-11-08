@@ -24,8 +24,8 @@ import type {
   OpenRouterSession,
   OpenRouterToolOutput,
   OpenRouterTurn,
-} from "@otter-mail/contracts/openrouter";
-import { AGENT_INSTRUCTIONS } from "@otter-mail/core/agent-instructions";
+} from "@otter/contracts/openrouter";
+import { AGENT_INSTRUCTIONS } from "@otter/core/agent-instructions";
 
 const API = "https://openrouter.ai/api/v1";
 const OUTPUT_LIMIT = 30_000;

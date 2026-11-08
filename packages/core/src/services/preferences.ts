@@ -1,6 +1,6 @@
 // Preference sections are replaced whole: preserve fields owned by other devices when updating them.
 
-import type { PreferencesResponse } from "@otter-mail/contracts/relay";
+import type { PreferencesResponse } from "@otter/contracts/relay";
 
 import { broadcast } from "../ipc.js";
 import { readJson, writeJson } from "../json-file.js";
@@ -26,7 +26,7 @@ import {
 import { followAliasMailApart, parseAliasMailboxes } from "./alias-mailboxes.js";
 import { getSettings, updateSettings, type AppSettings } from "./settings-store.js";
 import { listViews, writeViews } from "./views-store.js";
-import type { AliasMailbox } from "@otter-mail/contracts";
+import type { AliasMailbox } from "@otter/contracts";
 import type { MailView } from "../types.js";
 
 const UI_FILE = "ui-preferences.json";

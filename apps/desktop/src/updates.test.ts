@@ -45,7 +45,7 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   vi.useFakeTimers();
-  fixture.directory = mkdtempSync(join(tmpdir(), "otter-mail-updates-"));
+  fixture.directory = mkdtempSync(join(tmpdir(), "otter-updates-"));
   fixture.version = "0.13.9";
   fixture.ipc.clear();
   fixture.events.clear();

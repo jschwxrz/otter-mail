@@ -29,7 +29,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { AgentIcon } from "../mail/agent-icon";
-import { changelogUrl } from "@otter-mail/shared/changelog";
+import { changelogUrl } from "@otter/shared/changelog";
 import { openLink } from "../browser/store";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { mailApi, type SettingsPane } from "../mail/api";

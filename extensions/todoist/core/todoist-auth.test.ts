@@ -1,5 +1,5 @@
-import { setPlatform } from "@otter-mail/core/extension-kit";
-import type { Platform } from "@otter-mail/core/extension-kit";
+import { setPlatform } from "@otter/core/extension-kit";
+import type { Platform } from "@otter/core/extension-kit";
 import { beforeEach, afterEach, it, expect, vi } from "vite-plus/test";
 import { signInTodoist, todoistAccessToken, clearTodoistOAuth } from "./todoist-auth.js";
 const secrets = new Map<string, string>();

@@ -1,4 +1,4 @@
-import type { ThemeSource } from "@otter-mail/contracts";
+import type { ThemeSource } from "@otter/contracts";
 
 const THEME_SOURCE = "otter:theme-source";
 

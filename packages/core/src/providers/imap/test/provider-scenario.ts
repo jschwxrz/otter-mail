@@ -1,4 +1,4 @@
-import type { ImapSettings } from "@otter-mail/contracts";
+import type { ImapSettings } from "@otter/contracts";
 import { afterAll, beforeAll, expect, it, vi } from "vite-plus/test";
 
 import { searchMail } from "../../../handlers/search.ts";

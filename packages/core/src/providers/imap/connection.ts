@@ -7,7 +7,7 @@
  * user just did first, then sync, then offline downloads.
  */
 
-import type { ImapSettings } from "@otter-mail/contracts";
+import type { ImapSettings } from "@otter/contracts";
 
 import { platform, type AsyncContext } from "../../platform.js";
 import {

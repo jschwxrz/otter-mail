@@ -1,4 +1,4 @@
-import { Markdown, cn } from "@otter-mail/web/extension-kit";
+import { Markdown, cn } from "@otter/web/extension-kit";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { PlusIcon } from "lucide-react";
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";

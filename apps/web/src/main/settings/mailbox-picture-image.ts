@@ -1,4 +1,4 @@
-import { MAILBOX_PICTURE_MAX_LENGTH } from "@otter-mail/contracts/relay";
+import { MAILBOX_PICTURE_MAX_LENGTH } from "@otter/contracts/relay";
 
 const SIDES = [128, 96, 64];
 const QUALITY = 0.85;

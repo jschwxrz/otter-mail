@@ -1,6 +1,6 @@
 import { app, nativeImage, type NativeImage } from "electron";
 import { join } from "node:path";
-import { isNightlyVersion } from "@otter-mail/shared/release-channel";
+import { isNightlyVersion } from "@otter/shared/release-channel";
 
 export function appIconImage(): NativeImage {
   const dir = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), "resources");

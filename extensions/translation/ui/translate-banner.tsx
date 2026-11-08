@@ -5,8 +5,8 @@ import {
   DropdownMenuTrigger,
   buttonClass,
   IconBtn,
-} from "@otter-mail/web/extension-kit";
-import type { MessageDetail } from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
+import type { MessageDetail } from "@otter/web/extension-kit";
 import { createContext, useContext, useState } from "react";
 import { ChevronDownIcon, LanguagesIcon, LoaderCircleIcon } from "lucide-react";
 import {

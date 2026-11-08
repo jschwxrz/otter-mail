@@ -6,7 +6,7 @@
 
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ConnectionSummary } from "@otter-mail/contracts";
+import type { ConnectionSummary } from "@otter/contracts";
 import { ipc } from "~/lib/ipc";
 import { signInProvider } from "./capabilities";
 import { useAddAccount } from "./hooks";

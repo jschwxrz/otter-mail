@@ -1,4 +1,4 @@
-import { IMAP_CAPABILITIES, type ImapSettings, type MailServer } from "@otter-mail/contracts/mail";
+import { IMAP_CAPABILITIES, type ImapSettings, type MailServer } from "@otter/contracts/mail";
 
 import { broadcast, handle } from "../ipc.js";
 import { MailProtocolError, connectImap, connectSmtp } from "../protocols/index.js";

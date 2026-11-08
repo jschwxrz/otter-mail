@@ -1,6 +1,6 @@
 // Domain autoconfig usually lacks CORS, so only desktop requests it; web uses ISPDB and DNS-over-HTTPS.
 
-import type { ImapSettings, MailServer } from "@otter-mail/contracts/mail";
+import type { ImapSettings, MailServer } from "@otter/contracts/mail";
 
 import { platform } from "../platform.js";
 

@@ -20,8 +20,8 @@ import {
   getAccount,
   getAttachmentData,
   mailStore as store,
-} from "@otter-mail/core/extension-kit";
-import type { RsvpResponse } from "@otter-mail/core/extension-kit";
+} from "@otter/core/extension-kit";
+import type { RsvpResponse } from "@otter/core/extension-kit";
 
 export type { RsvpResponse };
 

@@ -1,4 +1,4 @@
-import type { MailServer } from "@otter-mail/contracts/mail";
+import type { MailServer } from "@otter/contracts/mail";
 import { toBase64, utf8Encode } from "../bytes.js";
 import { platform, type ByteStream } from "../platform.js";
 

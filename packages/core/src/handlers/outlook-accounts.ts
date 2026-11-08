@@ -1,4 +1,4 @@
-import { OUTLOOK_CAPABILITIES } from "@otter-mail/contracts";
+import { OUTLOOK_CAPABILITIES } from "@otter/contracts";
 
 import { SignInCancelledError } from "../google.js";
 import { broadcast, handle } from "../ipc.js";

@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import type { ImapSettings } from "@otter-mail/contracts/mail";
+import type { ImapSettings } from "@otter/contracts/mail";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
 import { utf8Decode, utf8Encode } from "../../bytes.ts";

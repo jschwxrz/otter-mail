@@ -1,3 +1,3 @@
-import type { BridgeFeatures } from "@otter-mail/contracts";
+import type { BridgeFeatures } from "@otter/contracts";
 
 export const features: BridgeFeatures = window.desktopBridge.features;

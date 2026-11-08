@@ -1,5 +1,5 @@
 import { useLatest } from "../use-latest";
-import { DEFAULT_SETTINGS } from "@otter-mail/contracts";
+import { DEFAULT_SETTINGS } from "@otter/contracts";
 import { ExtensionCategoryPane } from "../extensions/extensions-pane";
 import { hasIntegrations } from "../extensions/registry";
 import { useCallback, useEffect, useState } from "react";

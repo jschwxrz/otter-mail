@@ -1,13 +1,13 @@
 /**
- * The browser's Platform for @otter-mail/core, inside the Web Worker: the
+ * The browser's Platform for @otter/core, inside the Web Worker: the
  * mail cache in SQLite WASM and the app's files both live in the origin's
  * private file system (OPFS); anything that needs the page goes through
  * `page` (worker.ts).
  */
 
 import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
-import type { AsyncContext, FileInfo, Platform, SqlDatabase, SqlValue } from "@otter-mail/core";
-import { SENTRY_DSN, type LogLevel } from "@otter-mail/shared/error-reports";
+import type { AsyncContext, FileInfo, Platform, SqlDatabase, SqlValue } from "@otter/core";
+import { SENTRY_DSN, type LogLevel } from "@otter/shared/error-reports";
 
 import { webGoogleAuth } from "./google";
 import { connectMailSocket } from "./mail-socket";

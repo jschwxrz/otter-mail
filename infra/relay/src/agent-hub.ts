@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { EncryptJWT, jwtDecrypt } from "jose";
-import { OpenRouterAgentServer, type AgentStorage } from "@otter-mail/core/agent-server";
+import { OpenRouterAgentServer, type AgentStorage } from "@otter/core/agent-server";
 import { derivedKey } from "./keys.ts";
 import { SESSION_HEADER } from "./user-hub.ts";
 import type { Env } from "./worker.ts";

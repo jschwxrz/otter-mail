@@ -6,7 +6,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import type { AsyncContext, Platform, SqlDatabase } from "@otter-mail/core";
+import type { AsyncContext, Platform, SqlDatabase } from "@otter/core";
 
 import { appInfo } from "./backend-protocol.js";
 import { logger } from "./logger.js";
@@ -122,7 +122,7 @@ export function desktopPlatform(): Platform {
     google: googleAuth,
     microsoft: microsoftAuth,
     todoistSignIn,
-    relayUrl: process.env.OTTER_MAIL_RELAY_URL?.trim() || "https://relay.mail.otterware.app",
+    relayUrl: process.env.OTTER_RELAY_URL?.trim() || "https://relay.mail.otterware.app",
     relaySession: "bearer",
     deviceName: backendOS.deviceName(),
 

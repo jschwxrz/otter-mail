@@ -1,5 +1,5 @@
-import type { AgentAccess, AgentTokens, ConnectedAgent } from "@otter-mail/contracts/agent-tokens";
-import { getAttachmentBytes, handle, syncAllAccounts } from "@otter-mail/core";
+import type { AgentAccess, AgentTokens, ConnectedAgent } from "@otter/contracts/agent-tokens";
+import { getAttachmentBytes, handle, syncAllAccounts } from "@otter/core";
 
 import {
   addAgent,

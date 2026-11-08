@@ -1,8 +1,8 @@
 import { ipc, task } from "~/lib/ipc";
-import type { AliasMailbox, ImapSettings } from "@otter-mail/contracts";
-import type { NotificationConnection } from "@otter-mail/contracts/relay";
-export type { ChatChange } from "@otter-mail/contracts";
-import type { AgentAccess, AgentTokens, ConnectedAgent } from "@otter-mail/contracts/agent-tokens";
+import type { AliasMailbox, ImapSettings } from "@otter/contracts";
+import type { NotificationConnection } from "@otter/contracts/relay";
+export type { ChatChange } from "@otter/contracts";
+import type { AgentAccess, AgentTokens, ConnectedAgent } from "@otter/contracts/agent-tokens";
 import type {
   ComposeAttachment,
   ContactSuggestion,
@@ -165,7 +165,7 @@ export type ChatEvent =
   | { requestId: string; type: "text"; id: string; text: string }
   | { requestId: string; type: "tool"; id?: string; step: ToolStep }
   | { requestId: string; type: "toolResult"; id?: string; output: string }
-  | { requestId: string; type: "change"; change: import("@otter-mail/contracts").ChatChange }
+  | { requestId: string; type: "change"; change: import("@otter/contracts").ChatChange }
   | { requestId: string; type: "approval"; approval: ApprovalRequest }
   | { requestId: string; type: "approvalResolved"; approvalId: string }
   | { requestId: string; type: "question"; question: ChatQuestion }
@@ -464,7 +464,7 @@ export const mailApi = {
   ): Promise<{ done: true } | { openUrl: string }> =>
     task("gmail:unsubscribe", { accountId, messageId }),
 
-  listSchedules: (): Promise<import("@otter-mail/contracts").MailSchedule[]> =>
+  listSchedules: (): Promise<import("@otter/contracts").MailSchedule[]> =>
     ipc("gmail:listSchedules"),
   cancelSchedule: (id: string): Promise<"cancelled" | "sent" | undefined> =>
     task("gmail:cancelSchedule", { id }),

@@ -1,7 +1,7 @@
 // Only the relay can unseal refresh tokens; the browser keeps the sealed value and the relay stores none.
 
-import { GMAIL_SCOPES } from "@otter-mail/contracts";
-import { signInPage } from "@otter-mail/shared/sign-in-page";
+import { GMAIL_SCOPES } from "@otter/contracts";
+import { signInPage } from "@otter/shared/sign-in-page";
 import { EncryptJWT, jwtDecrypt, jwtVerify, SignJWT } from "jose";
 
 import { googleKeys } from "./auth.ts";

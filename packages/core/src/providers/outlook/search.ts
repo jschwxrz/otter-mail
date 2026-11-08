@@ -7,7 +7,7 @@
  * `is:starred`, a category) is checked on each result.
  */
 
-import { ARCHIVE_LABEL_ID, SNOOZED_LABEL_ID } from "@otter-mail/contracts";
+import { ARCHIVE_LABEL_ID, SNOOZED_LABEL_ID } from "@otter/contracts";
 
 import { categoryOf, folderOfLabel, isSyncedFolder, labelsFor } from "./folders.js";
 import { graph, type Page } from "./graph.js";

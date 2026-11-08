@@ -53,12 +53,12 @@ Build a newer version into a folder, serve it, and point an older build at it:
 
 ```sh
 node scripts/build-desktop-artifact.ts --arch arm64 --build-version 0.9.1 --output-dir /tmp/feed
-OTTER_MAIL_UPDATE_URL=http://127.0.0.1:8791 \
+OTTER_UPDATE_URL=http://127.0.0.1:8791 \
   node scripts/build-desktop-artifact.ts --arch arm64 --build-version 0.9.0 --skip-build --output-dir /tmp/old
 (cd /tmp/feed && python3 -m http.server 8791 --bind 127.0.0.1)
 ```
 
-Run the 0.9.0 app from `/tmp/old` with `OTTER_MAIL_HOME=/tmp/test-home` so it stays off your
+Run the 0.9.0 app from `/tmp/old` with `OTTER_HOME=/tmp/test-home` so it stays off your
 data. Unsigned builds download the update but macOS refuses to install it; the full flow needs
 signed builds (below).
 
@@ -72,9 +72,9 @@ apt checks the update's SHA-512 from the feed.
 Release builds need the Google OAuth client, or the app can't sign in (the workflow fails early
 without it). Under Settings → Secrets and variables → Actions:
 
-- Variable `OTTER_MAIL_GOOGLE_CLIENT_ID`: the "Desktop app" client ID from the `otterware`
+- Variable `OTTER_GOOGLE_CLIENT_ID`: the "Desktop app" client ID from the `otterware`
   project.
-- Secret `OTTER_MAIL_GOOGLE_CLIENT_SECRET`: its client secret.
+- Secret `OTTER_GOOGLE_CLIENT_SECRET`: its client secret.
 
 ## Signing and notarization
 
@@ -135,7 +135,7 @@ The workflow and `scripts/release-ios.ts` (`pnpm release:ios [--version x.y.z]`,
 from a Mac with Xcode 27, if GitHub can't) sign with:
 
 - The "Apple Distribution: Christophe Nicolas Kafrouni (838JVGY7W4)" identity: the
-  `IOS_DISTRIBUTION_P12` secret (base64 of `~/.otter-mail/signing/apple-distribution.p12`) and
+  `IOS_DISTRIBUTION_P12` secret (base64 of `~/.otter/signing/apple-distribution.p12`) and
   `IOS_DISTRIBUTION_P12_PASSWORD`; on the Mac, the keychain.
 - The "Otter Mail App Store" provisioning profile for `dev.otterware.mail`: the
   `IOS_PROVISIONING_PROFILE` secret (base64 of the `.mobileprovision`); on the Mac, Xcode ›
@@ -146,8 +146,8 @@ from a Mac with Xcode 27, if GitHub can't) sign with:
   enable the shared group `group.dev.otterware.mail.notifications` on both App IDs/profiles.
   The extension and app must be signed by the same team. The release script exports both.
 - An App Store Connect API key: the `APPLE_API_KEY`, `APPLE_API_KEY_ID` and `APPLE_API_ISSUER`
-  secrets the Mac release notarizes with; on the Mac, `~/.otter-mail/signing/AuthKey_<id>.p8` or
-  `OTTER_MAIL_ASC_KEY`, `OTTER_MAIL_ASC_KEY_ID` and `OTTER_MAIL_ASC_ISSUER`.
+  secrets the Mac release notarizes with; on the Mac, `~/.otter/signing/AuthKey_<id>.p8` or
+  `OTTER_ASC_KEY`, `OTTER_ASC_KEY_ID` and `OTTER_ASC_ISSUER`.
 
 The App Store app is "Otter Mail: Calm Email" (ID 6817249947); on the phone it's "Otter Mail".
 Release builds sign in to Google with their own "iOS" OAuth client (for `dev.otterware.mail`);

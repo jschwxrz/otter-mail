@@ -5,7 +5,7 @@
  */
 
 import { and, count, eq, isNull, sql } from "drizzle-orm";
-import { CHAT_LIMITS, type Chat, type ChatSummary } from "@otter-mail/contracts/chats";
+import { CHAT_LIMITS, type Chat, type ChatSummary } from "@otter/contracts/chats";
 
 import * as schema from "./schema.ts";
 import type { Db } from "./store.ts";

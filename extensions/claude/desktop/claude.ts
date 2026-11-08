@@ -30,8 +30,8 @@ import {
   toolAccess,
   withAttachmentPaths,
   type ToolAccess,
-} from "@otter-mail/desktop/extension-kit";
-import { TOOL_OUTPUT_CHARS, claudeStep, TextStream } from "@otter-mail/core/extension-kit";
+} from "@otter/desktop/extension-kit";
+import { TOOL_OUTPUT_CHARS, claudeStep, TextStream } from "@otter/core/extension-kit";
 import type {
   ApprovalDecision,
   ApprovalRequest,
@@ -43,7 +43,7 @@ import type {
   ProviderModelOption,
   RuntimeMode,
   Skill,
-} from "@otter-mail/core/extension-kit";
+} from "@otter/core/extension-kit";
 import { CLAUDE_DEFAULTS, type ClaudeSettings } from "./settings.js";
 
 const PROBE_TIMEOUT_MS = 25_000;

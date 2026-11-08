@@ -74,5 +74,5 @@ export const linuxTerminals: HostOS["terminals"] = {
     throw new Error("No terminal is installed.");
   },
   // bash is on every Debian system; zsh may not be.
-  launcher: { fileName: "investigate-otter-mail.sh", shebang: "#!/bin/bash -l" },
+  launcher: { fileName: "investigate-otter.sh", shebang: "#!/bin/bash -l" },
 };

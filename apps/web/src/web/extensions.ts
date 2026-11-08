@@ -1,12 +1,12 @@
-import calendarInvites from "@otter-mail/extension-calendar-invites/core";
-import hermes from "@otter-mail/extension-hermes/core";
-import openclaw from "@otter-mail/extension-openclaw/core";
-import openrouter from "@otter-mail/extension-openrouter/core";
-import otterDrive from "@otter-mail/extension-otter-drive/core";
-import todoist from "@otter-mail/extension-todoist/core";
-import translation from "@otter-mail/extension-translation/core";
-import { runsOn } from "@otter-mail/contracts/extensions";
-import type { CoreExtension } from "@otter-mail/core";
+import calendarInvites from "@otter/extension-calendar-invites/core";
+import hermes from "@otter/extension-hermes/core";
+import openclaw from "@otter/extension-openclaw/core";
+import openrouter from "@otter/extension-openrouter/core";
+import otterDrive from "@otter/extension-otter-drive/core";
+import todoist from "@otter/extension-todoist/core";
+import translation from "@otter/extension-translation/core";
+import { runsOn } from "@otter/contracts/extensions";
+import type { CoreExtension } from "@otter/core";
 
 const ALL: CoreExtension[] = [
   calendarInvites,

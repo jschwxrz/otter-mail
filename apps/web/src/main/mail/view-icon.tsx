@@ -43,7 +43,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { VIEW_COLORS, type ViewIconKey } from "@otter-mail/shared/view-marks";
+import { VIEW_COLORS, type ViewIconKey } from "@otter/shared/view-marks";
 import { cn } from "./ui";
 import type { MailView } from "./types";
 

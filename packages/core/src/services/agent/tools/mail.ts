@@ -1,4 +1,4 @@
-import { ARCHIVE_LABEL_ID } from "@otter-mail/contracts";
+import { ARCHIVE_LABEL_ID } from "@otter/contracts";
 
 import { toBase64 } from "../../../bytes.js";
 import { providerFor } from "../../../providers/index.js";

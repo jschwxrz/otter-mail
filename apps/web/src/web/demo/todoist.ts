@@ -1,5 +1,5 @@
-import type { TodoistTask, TodoistReminder } from "@otter-mail/contracts/todoist";
-import type { Platform } from "@otter-mail/core";
+import type { TodoistTask, TodoistReminder } from "@otter/contracts/todoist";
+import type { Platform } from "@otter/core";
 
 const FILE = "demo-todoist.json";
 const projects = [

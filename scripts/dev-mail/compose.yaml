@@ -11,8 +11,8 @@ services:
       - "127.0.0.1:31587:31587" # SMTP submission, STARTTLS
     volumes:
       - ./dovecot.conf:/etc/dovecot/conf.d/otter-mail-dev.conf:ro
-      - ${OTTER_MAIL_DEV_MAIL_CERTS:?run pnpm dev:mail}/tls.crt:/etc/dovecot/ssl/tls.crt:ro
-      - ${OTTER_MAIL_DEV_MAIL_CERTS:?run pnpm dev:mail}/tls.key:/etc/dovecot/ssl/tls.key:ro
+      - ${OTTER_DEV_MAIL_CERTS:?run pnpm dev:mail}/tls.crt:/etc/dovecot/ssl/tls.crt:ro
+      - ${OTTER_DEV_MAIL_CERTS:?run pnpm dev:mail}/tls.key:/etc/dovecot/ssl/tls.key:ro
   mailpit:
     image: axllent/mailpit:latest
     ports:

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { UpdateState, UpdateChannel } from "@otter-mail/contracts";
-import { changelogUrl } from "@otter-mail/shared/changelog";
+import type { UpdateState, UpdateChannel } from "@otter/contracts";
+import { changelogUrl } from "@otter/shared/changelog";
 import { openLink } from "./browser/store";
 
 import { ArrowDownCircleIcon, SparklesIcon, XIcon } from "lucide-react";

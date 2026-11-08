@@ -1,4 +1,4 @@
-import type { ChatEvent } from "@otter-mail/core/extension-kit";
+import type { ChatEvent } from "@otter/core/extension-kit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { OpenRouterSettings } from "./settings.js";
 

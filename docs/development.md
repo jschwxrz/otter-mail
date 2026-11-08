@@ -31,7 +31,7 @@
 | `pnpm dist:desktop:deb`  | The Linux .deb (x64) in `release/`; on Linux.                                            |
 
 The dev commands pick ports from the worktree path, so several checkouts can run at once. Set
-`OTTER_MAIL_PORT_OFFSET` to choose one yourself. `t3.json` sets up new T3 Code worktrees (install,
+`OTTER_PORT_OFFSET` to choose one yourself. `t3.json` sets up new T3 Code worktrees (install,
 then symlinks to the main checkout's `.env.local` and `infra/relay/.dev.vars`) and offers both dev
 commands as scripts. These files are shared, so editing them in a worktree changes the main
 checkout's copy too.
@@ -58,20 +58,21 @@ worktree values and environment variables taking precedence. No env value enters
 
 ## Data homes
 
-Like T3 Code, data lives under a home, `~/.otter-mail` (or `OTTER_MAIL_HOME`), with one state
+Like T3 Code, data lives under a home, `~/.otter` (or `OTTER_HOME`), with one state
 directory per kind of run, so development never shares a database with the installed app:
 
-| Run                                                    | State directory                                |
-| ------------------------------------------------------ | ---------------------------------------------- |
-| Installed app                                          | `~/.otter-mail/userdata`                       |
-| `pnpm dev:desktop` / `pnpm start` in the main checkout | `~/.otter-mail/dev`                            |
-| `pnpm dev:desktop` / `pnpm start` in a linked worktree | `<worktree>/.otter-mail/userdata` (gitignored) |
-| `pnpm dev:desktop --home <dir>`                        | `<dir>/userdata`                               |
+| Run                                                    | State directory                           |
+| ------------------------------------------------------ | ----------------------------------------- |
+| Installed app                                          | `~/.otter/userdata`                       |
+| `pnpm dev:desktop` / `pnpm start` in the main checkout | `~/.otter/dev`                            |
+| `pnpm dev:desktop` / `pnpm start` in a linked worktree | `<worktree>/.otter/userdata` (gitignored) |
+| `pnpm dev:desktop --home <dir>`                        | `<dir>/userdata`                          |
 
-`--home` wins over the worktree default, which wins over an ambient `OTTER_MAIL_HOME`: an
-inherited variable pointing at `~/.otter-mail` would otherwise put a branch on the installed
+`--home` wins over the worktree default, which wins over an ambient `OTTER_HOME`: an
+inherited variable pointing at `~/.otter` would otherwise put a branch on the installed
 app's database. The rules live in `apps/desktop/src/paths.ts` and
-`apps/desktop/scripts/dev-home.mjs`.
+`apps/desktop/scripts/dev-home.mjs`. Before the rename to Otter the home was `~/.otter-mail`
+(`<worktree>/.otter-mail`): the first run that finds one moves it, leaving a link at the old path.
 
 A state directory holds the mail cache (`mail-cache.db`), accounts, Google tokens
 (`google-tokens.json`, encrypted with a Keychain key), settings, views, keybindings, Chromium's
@@ -98,7 +99,7 @@ One variable in the main checkout's ignored `.env.local` holds them, a JSON list
 (`packages/contracts/src/demo.ts`):
 
 ```dotenv
-OTTER_MAIL_DEMO_MAILBOXES='[{"provider":"gmail","email":"otterware.demo@gmail.com","password":"…","refreshTokens":{}},{"provider":"outlook","email":"…@outlook.com","password":"…","refreshTokens":{}}]'
+OTTER_DEMO_MAILBOXES='[{"provider":"gmail","email":"otterware.demo@gmail.com","password":"…","refreshTokens":{}},{"provider":"outlook","email":"…@outlook.com","password":"…","refreshTokens":{}}]'
 ```
 
 Once per machine, `pnpm dev:demo:desktop --login` and `pnpm dev:demo --login` sign the Gmail
@@ -106,7 +107,7 @@ mailbox in to Google (Google's page, in your browser; the password is there) and
 sign-in in the list, one per OAuth client: the Mac app's, and the relay's web client, which comes
 back to `http://localhost:8787/v1/gmail/callback` (so no other `pnpm dev` may hold that port
 then). The Outlook mailbox signs in to Microsoft the same way: the Mac app's public client
-(`OTTER_MAIL_MICROSOFT_CLIENT_ID` in `.env.local`), and the relay's web client
+(`OTTER_MICROSOFT_CLIENT_ID` in `.env.local`), and the relay's web client
 (`MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET` in `infra/relay/.dev.vars`), coming back to
 `http://localhost:8787/v1/outlook/callback`, which the app registration must list. Microsoft's
 sign-ins lapse after 90 days unused: `--login` again then. `--login` signs in the mailboxes that
@@ -117,7 +118,7 @@ brings them along. An IMAP entry is
 How they get in, in development only:
 
 - The dev runner reads the list, adds the local IMAP server's mailbox and hands it to the app as
-  `OTTER_MAIL_DEMO_MAILBOXES`.
+  `OTTER_DEMO_MAILBOXES`.
 - Core's `addDemoMailboxes` adds those the app doesn't have yet before the windows ask for any.
   The Mac app refreshes the saved Google (or Microsoft) sign-in itself; the web app has the local
   relay seal it, as its sign-in popup would.
@@ -139,21 +140,21 @@ Accounts sign in through the browser with PKCE and a loopback redirect (`127.0.0
 "Desktop app" OAuth client of the `otterware` Google Cloud project. The client ID and secret are
 baked in at build time and never committed: copy `.env.example` to `.env.local` and fill them in
 (Credentials: https://console.cloud.google.com/auth/clients?project=otterware). The same
-`OTTER_MAIL_GOOGLE_CLIENT_ID` / `OTTER_MAIL_GOOGLE_CLIENT_SECRET` variables override the baked-in
+`OTTER_GOOGLE_CLIENT_ID` / `OTTER_GOOGLE_CLIENT_SECRET` variables override the baked-in
 values at runtime.
 
 Outlook mailboxes sign in the same way (`apps/desktop/src/services/microsoft-oauth.ts`), with a
 public client of an Azure app registration: no secret, PKCE, and a loopback redirect on
 `http://localhost` (any port, under "Mobile and desktop applications"; "Allow public client
-flows" on). Its Application (client) ID is `OTTER_MAIL_MICROSOFT_CLIENT_ID`, baked in and
+flows" on). Its Application (client) ID is `OTTER_MICROSOFT_CLIENT_ID`, baked in and
 overridable like Google's; without one the app doesn't offer Outlook. The web app signs in to
 Outlook through the relay instead.
 
 The same client signs in to the Otter account (`infra/relay`): with a Gmail account already on the
 Mac, the app proves the identity with a fresh ID token from that account's refresh token, no
 browser needed; otherwise it runs the same browser flow with identity scopes only.
-`OTTER_MAIL_RELAY_URL` points the app at another relay (e.g. `http://127.0.0.1:8787` for
-`pnpm --filter @otter-mail/relay dev`).
+`OTTER_RELAY_URL` points the app at another relay (e.g. `http://127.0.0.1:8787` for
+`pnpm --filter @otter/relay dev`).
 
 The consent screen is published but not yet verified by Google, so sign-in shows an "unverified
 app" warning and is capped at 100 users. The home page, privacy policy and terms it links to are
@@ -188,7 +189,7 @@ settings to enter: password `pass`, IMAP on `localhost` port 31993 (TLS), SMTP o
 `pnpm dev:mail down` stops it and drops its mail: the next run starts from the seed again.
 
 Both apps verify certificates, so the server's comes from a dev CA made once in
-`~/.otter-mail/dev-mail/`, shared by every checkout (one server serves them all). The dev runner
+`~/.otter/dev-mail/`, shared by every checkout (one server serves them all). The dev runner
 trusts it when it exists, and only there:
 
 - `pnpm dev`: the web app's TLS (`apps/web/src/web/tls.ts`) adds it to Mozilla's roots through
@@ -198,7 +199,7 @@ trusts it when it exists, and only there:
 - `pnpm dev:desktop`: `NODE_EXTRA_CA_CERTS`, which the Mac app's backend process honors.
 
 The web app still needs an Otter account to open the tunnel (sign in as usual). Delete
-`~/.otter-mail/dev-mail/` and rerun `pnpm dev:mail` for a new CA.
+`~/.otter/dev-mail/` and rerun `pnpm dev:mail` for a new CA.
 
 ## Made-up mailbox
 
@@ -218,5 +219,5 @@ and trash, and plenty of non-ASCII names. Use it to build and test without your 
   to start over (close other tabs of it first).
 - Real builds leave all of it out: `__DEMO__` is `false` unless `VITE_DEMO=1`.
 
-`pnpm --filter @otter-mail/site build` assembles the deployable site (the web app) in
+`pnpm --filter @otter/site build` assembles the deployable site (the web app) in
 `site/dist`.

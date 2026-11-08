@@ -112,9 +112,9 @@ Mac ◀──── WebSocket /v1/events ◀── UserHub (Durable Object, one 
 ## Working on it
 
 ```sh
-pnpm --filter @otter-mail/relay test        # unit + end-to-end tests in workerd (local D1, DO)
-pnpm --filter @otter-mail/relay dev         # wrangler dev on :8787
-pnpm --filter @otter-mail/relay db:generate # after changing src/schema.ts
+pnpm --filter @otter/relay test        # unit + end-to-end tests in workerd (local D1, DO)
+pnpm --filter @otter/relay dev         # wrangler dev on :8787
+pnpm --filter @otter/relay db:generate # after changing src/schema.ts
 ```
 
 The end-to-end tests run the real Worker with a local D1 and Durable Object; a local JWKS server
@@ -125,7 +125,7 @@ plays Google and signs the ID and push tokens.
 Cloudflare Workers Builds deploys on every push to `main` that touches `infra/relay/`,
 `packages/contracts/` or `pnpm-lock.yaml` (trigger "Deploy relay from main" on the
 `otter-mail-relay` Worker): it installs the workspace from the repo root and runs
-`pnpm --filter @otter-mail/relay run deploy`, which applies D1 migrations and deploys. Builds and
+`pnpm --filter @otter/relay run deploy`, which applies D1 migrations and deploys. Builds and
 logs are in the Cloudflare dashboard (Workers → otter-mail-relay → Deployments) and on the
 commit's checks. `site/` deploys the same way ("Deploy site from main").
 
@@ -134,10 +134,10 @@ real Google ID token, links the address, publishes a notification to the real to
 on the socket, and deletes the account. To run it from a laptop:
 
 ```sh
-pnpm --filter @otter-mail/relay smoke   # needs gcloud; Token Creator on relay-smoke
+pnpm --filter @otter/relay smoke   # needs gcloud; Token Creator on relay-smoke
 ```
 
-A manual deploy, if ever needed: `pnpm --filter @otter-mail/relay run deploy` with wrangler
+A manual deploy, if ever needed: `pnpm --filter @otter/relay run deploy` with wrangler
 credentials (`wrangler login`, or `CLOUDFLARE_API_TOKEN`).
 
 ## Google Cloud setup (project `otterware`, number `997327858649`)

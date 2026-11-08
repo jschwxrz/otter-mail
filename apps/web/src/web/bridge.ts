@@ -11,8 +11,8 @@ import { prepareTodoistPopup, closeTodoistPopup, authorizeTodoistPopup } from ".
  * invokes the channel, and the backend's request picks up what they return.
  */
 
-import type { MeResponse, OutlookSignInResult } from "@otter-mail/contracts/relay";
-import type { DesktopBridge, NativeThemeInfo, ThemeSource } from "@otter-mail/contracts";
+import type { MeResponse, OutlookSignInResult } from "@otter/contracts/relay";
+import type { DesktopBridge, NativeThemeInfo, ThemeSource } from "@otter/contracts";
 
 import { connectBackend } from "./backend";
 import { detectLanguage, hasBuiltInTranslator, translate } from "./translator";

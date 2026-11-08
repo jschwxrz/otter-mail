@@ -1,5 +1,5 @@
-import { findVerificationCode } from "@otter-mail/shared/verification-code";
-import { htmlToText, type MessageCardProps, type UiExtension } from "@otter-mail/web/extension-kit";
+import { findVerificationCode } from "@otter/shared/verification-code";
+import { htmlToText, type MessageCardProps, type UiExtension } from "@otter/web/extension-kit";
 import { useMemo } from "react";
 
 import { manifest } from "../manifest";

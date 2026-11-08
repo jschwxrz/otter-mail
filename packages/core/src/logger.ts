@@ -1,5 +1,5 @@
-import type { ReportTags } from "@otter-mail/shared/error-reports";
-import { supportError } from "@otter-mail/shared/support";
+import type { ReportTags } from "@otter/shared/error-reports";
+import { supportError } from "@otter/shared/support";
 
 import { GMAIL_ACCESS_MISSING_MESSAGE, SIGNED_OUT_MESSAGE } from "./google.js";
 import { OUTLOOK_SIGNED_OUT_MESSAGE } from "./microsoft.js";

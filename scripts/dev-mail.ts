@@ -6,10 +6,11 @@ import * as NodeNet from "node:net";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
+import { otterHome } from "../apps/desktop/scripts/dev-home.mjs";
 import type { DemoImapMailbox } from "../packages/contracts/src/demo.ts";
 
 const repoRoot = NodePath.resolve(import.meta.dirname, "..");
-const certDir = NodePath.join(NodeOS.homedir(), ".otter-mail/dev-mail");
+const certDir = NodePath.join(otterHome(), "dev-mail");
 const compose = ["compose", "-f", NodePath.join(repoRoot, "scripts/dev-mail/compose.yaml")];
 const DOVECOT = "dovecot/dovecot:2.4.5";
 const USER = "me@otter.test";
@@ -28,7 +29,7 @@ const docker = (args: string[], input?: string) =>
   NodeChildProcess.execFileSync("docker", args, {
     input,
     encoding: "utf8",
-    env: { ...process.env, OTTER_MAIL_DEV_MAIL_CERTS: certDir },
+    env: { ...process.env, OTTER_DEV_MAIL_CERTS: certDir },
     stdio: [input === undefined ? "ignore" : "pipe", "pipe", "inherit"],
   });
 
@@ -258,6 +259,6 @@ if (import.meta.main) {
   SMTP      localhost, port 31465, TLS    (31587 with STARTTLS)
 
 What it sends lands in Mailpit: http://localhost:8025
-Its certificate is from ~/.otter-mail/dev-mail/ca.pem, which only the dev runs trust.
+Its certificate is from ~/.otter/dev-mail/ca.pem, which only the dev runs trust.
 Stop it with \`pnpm dev:mail down\`.`);
 }

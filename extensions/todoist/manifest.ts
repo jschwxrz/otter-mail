@@ -1,4 +1,4 @@
-import { extensionManifest } from "@otter-mail/contracts/extensions";
+import { extensionManifest } from "@otter/contracts/extensions";
 
 import pkg from "./package.json" with { type: "json" };
 

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import type { Platform, SqlDatabase } from "@otter-mail/core";
+import type { Platform, SqlDatabase } from "@otter/core";
 
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const EMAIL = "jordan.lee@contoso.example";
@@ -225,7 +225,7 @@ async function until(check: () => boolean | Promise<boolean>, what: string) {
 
 async function boot() {
   const fake = await install();
-  const core = await import("@otter-mail/core");
+  const core = await import("@otter/core");
   const sqlite = "node:sqlite";
   const { DatabaseSync } = (await import(/* @vite-ignore */ sqlite)) as {
     DatabaseSync: new (path: string) => SqlDatabase;

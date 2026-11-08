@@ -1,4 +1,4 @@
-import { landLabelChange } from "@otter-mail/contracts";
+import { landLabelChange } from "@otter/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import type { MessageSummary } from "../types.ts";

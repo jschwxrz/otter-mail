@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 
-import type { RelayAccount, RelayEvent } from "@otter-mail/contracts/relay";
+import type { RelayAccount, RelayEvent } from "@otter/contracts/relay";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import type { Platform, SqlDatabase } from "../../platform.ts";

@@ -36,7 +36,7 @@ async function start(
   ready: { port: number; tls: boolean }[],
   dockerArgs: string[] = [],
 ): Promise<Container> {
-  const name = `otter-mail-test-${Math.random().toString(36).slice(2, 10)}`;
+  const name = `otter-test-${Math.random().toString(36).slice(2, 10)}`;
   const envArgs = Object.entries(env).flatMap(([key, value]) => ["-e", `${key}=${value}`]);
   const portArgs = ports.flatMap((port) => ["-p", `127.0.0.1::${port}`]);
   await run(

@@ -2,8 +2,8 @@ import { app, BrowserWindow, Menu, ipcMain, nativeTheme, shell } from "electron"
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import type { NativeThemeInfo, ThemeSource } from "@otter-mail/contracts";
-import type { AppSettings, ErrorReportsConfig } from "@otter-mail/core";
+import type { NativeThemeInfo, ThemeSource } from "@otter/contracts";
+import type { AppSettings, ErrorReportsConfig } from "@otter/core";
 
 import { invokeBackend, setDockBadgeEnabled, startBackend, stopBackend } from "./backend-host.js";
 import { registerHandlers } from "./handlers/index.js";

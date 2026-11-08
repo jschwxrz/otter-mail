@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import type { ImapSettings, MailServer } from "@otter-mail/contracts";
+import type { ImapSettings, MailServer } from "@otter/contracts";
 import { ChevronRightIcon, CloudIcon, ServerIcon } from "lucide-react";
 import { GmailMark, MicrosoftMark } from "./provider-mark";
 import { Button } from "~/components/ui/button";

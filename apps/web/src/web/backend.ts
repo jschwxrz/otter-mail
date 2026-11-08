@@ -11,7 +11,7 @@
  * from the hosting tab; the unread badge shows in every tab.
  */
 
-import { reportLog } from "@otter-mail/shared/error-reports";
+import { reportLog } from "@otter/shared/error-reports";
 
 import type { FromWorker, PageEffect, PageRequests, ToWorker } from "./protocol";
 

@@ -4,7 +4,7 @@ import {
   type Notification,
   type ServerRequest,
 } from "./codex-app-server.js";
-import { TOOL_OUTPUT_CHARS, codexStep, dataUrl, TextStream } from "@otter-mail/core/extension-kit";
+import { TOOL_OUTPUT_CHARS, codexStep, dataUrl, TextStream } from "@otter/core/extension-kit";
 import {
   AGENT_INSTRUCTIONS,
   MCP_SERVER_NAME,
@@ -14,7 +14,7 @@ import {
   toolAccess,
   withAttachmentPaths,
   type ToolAccess,
-} from "@otter-mail/desktop/extension-kit";
+} from "@otter/desktop/extension-kit";
 import type {
   ChatProvider,
   ChatSession,
@@ -27,7 +27,7 @@ import type {
   RuntimeMode,
   SendTurnInput,
   Skill,
-} from "@otter-mail/core/extension-kit";
+} from "@otter/core/extension-kit";
 import { CODEX_DEFAULTS, type CodexSettings } from "./settings.js";
 
 const PROBE_TIMEOUT_MS = 10_000;

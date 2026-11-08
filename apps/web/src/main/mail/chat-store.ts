@@ -9,7 +9,7 @@ import {
   type ChatTabRef,
   type ChatDelivery,
   type ChatTurn,
-} from "@otter-mail/contracts/chats";
+} from "@otter/contracts/chats";
 
 import { ipc } from "~/lib/ipc";
 import { EXTENSIONS } from "../extensions/registry";

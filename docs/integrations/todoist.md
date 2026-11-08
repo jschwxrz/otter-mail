@@ -6,9 +6,9 @@ only when the user explicitly creates an email task (title, entered notes and co
 
 ## Owned modules
 
-Todoist is a built-in extension: the `extensions/todoist` package (`@otter-mail/extension-todoist`).
+Todoist is a built-in extension: the `extensions/todoist` package (`@otter/extension-todoist`).
 
-- `package.json`: its manifest (`otterMail`) and dependencies.
+- `package.json`: its manifest (`otter`) and dependencies.
 - `core/`: `index.ts` activates it (its IPC registration, `handlers.ts`); `todoist.ts`,
   `todoist-auth.ts` and their tests: API, safe mutation retries, PKCE, and token refresh. Mail
   access is limited to validating the chosen email and building its link. There are no scheduled

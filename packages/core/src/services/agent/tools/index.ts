@@ -19,7 +19,7 @@ export type { AgentTool, ToolCaller, ToolFiles } from "./tool.js";
 
 const TOOLS: AgentTool[] = [...mailTools, ...calendarTools, ...themeTools, ...viewTools];
 
-export const OTTER_TOOLS_SERVER = "otter-mail";
+export const OTTER_TOOLS_SERVER = "otter";
 
 export function toolTitle(name: string): string | undefined {
   return TOOLS.find((t) => t.name === name)?.title;

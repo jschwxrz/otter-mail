@@ -12,7 +12,7 @@ import {
   runAgentTool,
   writeJson,
   type ToolCaller,
-} from "@otter-mail/core";
+} from "@otter/core";
 
 import { appInfo } from "../../backend-protocol.js";
 import { logger } from "../../logger.js";

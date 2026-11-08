@@ -44,24 +44,20 @@ export const EXTENSION_CATEGORIES = {
 
 export type ExtensionCategory = keyof typeof EXTENSION_CATEGORIES;
 
-export function extensionManifest(pkg: { otterMail?: unknown }): ExtensionManifest {
-  const m = pkg.otterMail as Partial<Record<keyof ExtensionManifest, unknown>> | undefined;
+export function extensionManifest(pkg: { otter?: unknown }): ExtensionManifest {
+  const m = pkg.otter as Partial<Record<keyof ExtensionManifest, unknown>> | undefined;
   const text = (v: unknown) => typeof v === "string" && v.trim().length > 0;
   if (!m || !text(m.id) || !text(m.name) || !text(m.description) || !text(m.dataUse))
-    throw new Error(
-      "An extension's package.json needs otterMail.id, name, description and dataUse.",
-    );
+    throw new Error("An extension's package.json needs otter.id, name, description and dataUse.");
   if (typeof m.category !== "string" || !(m.category in EXTENSION_CATEGORIES))
-    throw new Error(
-      `${String(m.id)}: otterMail.category is mail, integration, connection or agent.`,
-    );
+    throw new Error(`${String(m.id)}: otter.category is mail, integration, connection or agent.`);
   const platforms = m.platforms;
   if (
     platforms !== undefined &&
     (!Array.isArray(platforms) ||
       !platforms.every((p) => (APP_PLATFORMS as readonly unknown[]).includes(p)))
   )
-    throw new Error(`${String(m.id)}: otterMail.platforms lists ${APP_PLATFORMS.join(", ")}.`);
+    throw new Error(`${String(m.id)}: otter.platforms lists ${APP_PLATFORMS.join(", ")}.`);
   const contributes = readContributes(String(m.id), m.contributes);
   return {
     id: m.id as string,
@@ -78,8 +74,7 @@ function readContributes(id: string, value: unknown): ExtensionContributes | und
   if (value === undefined) return undefined;
   const workspaces = (value as { workspaces?: unknown } | null)?.workspaces;
   if (workspaces === undefined) return {};
-  if (!Array.isArray(workspaces))
-    throw new Error(`${id}: otterMail.contributes.workspaces is a list.`);
+  if (!Array.isArray(workspaces)) throw new Error(`${id}: otter.contributes.workspaces is a list.`);
   return {
     workspaces: workspaces.map((w: Partial<WorkspaceManifest> | null) => {
       if (

@@ -19,23 +19,23 @@ import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { unstable_startWorker } from "wrangler";
 import { derivedKey } from "./keys.ts";
 import { localConfig } from "../scripts/local-config.ts";
-import type { Chat, ListChatsResponse } from "@otter-mail/contracts/chats";
+import type { Chat, ListChatsResponse } from "@otter/contracts/chats";
 import type {
   ListAccountsResponse,
   MeResponse,
   PreferencesResponse,
   RelayEvent,
-} from "@otter-mail/contracts/relay";
+} from "@otter/contracts/relay";
 import {
   ALIAS_PICTURES_MAX,
   MAILBOX_PICTURE_MAX_LENGTH,
   TUNNEL_CLOSE,
-} from "@otter-mail/contracts/relay";
+} from "@otter/contracts/relay";
 import type {
   OutlookSignInResult,
   OutlookTokenResponse,
   OutlookWatchResponse,
-} from "@otter-mail/contracts/relay";
+} from "@otter/contracts/relay";
 
 const CLIENT_ID = "test-client.apps.googleusercontent.com";
 const WEB_CLIENT_ID = "997327858649-test-web.apps.googleusercontent.com";

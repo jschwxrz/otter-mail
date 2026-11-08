@@ -5,7 +5,7 @@
  * so the database alone can't reveal it.
  */
 
-import type { Preferences, PreferencesResponse } from "@otter-mail/contracts/relay";
+import type { Preferences, PreferencesResponse } from "@otter/contracts/relay";
 import { EncryptJWT, jwtDecrypt } from "jose";
 
 import { derivedKey } from "./keys.ts";

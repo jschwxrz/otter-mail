@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "path";
 
-import type { TranslationStatus, Translator } from "@otter-mail/core";
+import type { TranslationStatus, Translator } from "@otter/core";
 
 import { appInfo } from "../../backend-protocol.js";
 

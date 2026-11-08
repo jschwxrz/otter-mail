@@ -1,4 +1,4 @@
-import type { ChatContextKind, ChatContextMeta } from "@otter-mail/contracts/chats";
+import type { ChatContextKind, ChatContextMeta } from "@otter/contracts/chats";
 
 import type { ProviderKind } from "./api";
 import { clampTitle } from "./chat-store";
@@ -81,7 +81,7 @@ export function buildHandoffText(
   lines.push(
     provider === "hermes" || provider === "openclaw"
       ? "Fetch full content with gog if needed."
-      : "Read them with the otter-mail tools (get_thread) if needed.",
+      : "Read them with the otter tools (get_thread) if needed.",
   );
   return lines.join("\n");
 }

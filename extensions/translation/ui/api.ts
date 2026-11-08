@@ -1,4 +1,4 @@
-import { ipc, task } from "@otter-mail/web/extension-kit";
+import { ipc, task } from "@otter/web/extension-kit";
 
 export type TranslationSettings = {
   readLanguages: string[];

@@ -11,8 +11,8 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
-import { agentTokenHash, newAgentToken } from "@otter-mail/contracts/agent-tokens";
-import type { AgentChannel, AgentPointer } from "@otter-mail/contracts/relay";
+import { agentTokenHash, newAgentToken } from "@otter/contracts/agent-tokens";
+import type { AgentChannel, AgentPointer } from "@otter/contracts/relay";
 
 import { agentChannels } from "./schema.ts";
 import type { App } from "./worker.ts";

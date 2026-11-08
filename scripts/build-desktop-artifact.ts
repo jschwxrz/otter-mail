@@ -43,10 +43,10 @@ Options:
   -h, --help                Show this help.
 
 Environment:
-  OTTER_MAIL_UPDATE_REPOSITORY  owner/repo for the GitHub update feed
+  OTTER_UPDATE_REPOSITORY  owner/repo for the GitHub update feed
                                 (falls back to GITHUB_REPOSITORY, then
                                 ${DEFAULT_UPDATE_REPOSITORY}).
-  OTTER_MAIL_UPDATE_URL         Update feed URL instead of GitHub Releases, for
+  OTTER_UPDATE_URL         Update feed URL instead of GitHub Releases, for
                                 testing the updater against a local server.
 `;
 
@@ -140,10 +140,10 @@ export function resolvePublishConfig(version: string, env: NodeJS.ProcessEnv) {
   if (version.includes("-") && !nightly) return undefined;
   // Testing the updater against a local feed (a folder of release artifacts
   // served over http) instead of GitHub Releases.
-  const url = env.OTTER_MAIL_UPDATE_URL?.trim();
+  const url = env.OTTER_UPDATE_URL?.trim();
   if (url) return { provider: "generic", url, channel: nightly ? "nightly" : "latest" };
   const repository =
-    env.OTTER_MAIL_UPDATE_REPOSITORY?.trim() ||
+    env.OTTER_UPDATE_REPOSITORY?.trim() ||
     env.GITHUB_REPOSITORY?.trim() ||
     DEFAULT_UPDATE_REPOSITORY;
   const [owner, repo, ...rest] = repository.split("/");
@@ -364,13 +364,13 @@ function main(): void {
   if (!options.skipBuild) {
     run(vpBin, ["build"], {
       cwd: webDir,
-      env: { ...process.env, OTTER_MAIL_VERSION: options.version },
+      env: { ...process.env, OTTER_VERSION: options.version },
       label: "(apps/web) vp build",
     });
     run(vpBin, ["pack"], {
       cwd: desktopDir,
-      env: { ...process.env, OTTER_MAIL_VERSION: options.version },
-      label: `(apps/desktop) OTTER_MAIL_VERSION=${options.version} vp pack`,
+      env: { ...process.env, OTTER_VERSION: options.version },
+      label: `(apps/desktop) OTTER_VERSION=${options.version} vp pack`,
     });
     // Before staging: it writes the debug ids that pair the bundles with their maps.
     uploadSourcemaps(SENTRY_PROJECTS.desktop, [

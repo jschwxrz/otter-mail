@@ -40,4 +40,4 @@ jobs:
         uses: google-github-actions/setup-gcloud@v3
 
       - name: Smoke test production
-        run: pnpm --filter @otter-mail/relay smoke
+        run: pnpm --filter @otter/relay smoke

@@ -1,4 +1,4 @@
-import type { AppSettings, PickedFile } from "@otter-mail/core";
+import type { AppSettings, PickedFile } from "@otter/core";
 
 import type { Level } from "./logger.js";
 
@@ -51,7 +51,7 @@ export type AppInfo = {
   errorReports: boolean;
 };
 
-const APP_INFO_ENV = "OTTER_MAIL_APP_INFO";
+const APP_INFO_ENV = "OTTER_APP_INFO";
 
 export const appInfoEnv = (info: AppInfo) => ({ [APP_INFO_ENV]: JSON.stringify(info) });
 

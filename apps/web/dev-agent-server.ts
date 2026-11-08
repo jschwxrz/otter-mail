@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { OpenRouterAgentServer } from "@otter-mail/core/agent-server";
+import { OpenRouterAgentServer } from "@otter/core/agent-server";
 import { loadEnv, type Plugin } from "vite-plus";
 
 const COOKIE = "otter-agent-demo";
@@ -58,7 +58,7 @@ export function demoAgentServer(): Plugin {
               );
             let agent = agents.get(id);
             if (!agent) {
-              const home = path.resolve(server.config.root, "../../.otter-mail/agent-demo", id);
+              const home = path.resolve(server.config.root, "../../.otter/agent-demo", id);
               const file = (name: string) => path.join(home, name);
               agent = new OpenRouterAgentServer(
                 {

@@ -68,7 +68,7 @@ async function waitForResources() {
 await waitForResources();
 
 const electronPath = resolveElectronPath();
-const debuggingPort = Number(process.env.OTTER_MAIL_REMOTE_DEBUGGING_PORT ?? 0);
+const debuggingPort = Number(process.env.OTTER_REMOTE_DEBUGGING_PORT ?? 0);
 const debuggingArgs =
   debuggingPort > 0 ? [`--remote-debugging-port=${debuggingPort}`, "--remote-allow-origins=*"] : [];
 const childEnv = electronChildEnv({ VITE_DEV_SERVER_URL: devServerUrl });

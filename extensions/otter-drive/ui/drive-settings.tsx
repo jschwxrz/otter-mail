@@ -12,7 +12,7 @@ import {
   SettingsSection,
   TextInput,
   toast,
-} from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeftIcon, CopyIcon, KeyRoundIcon } from "lucide-react";
 import { useState, type ChangeEvent } from "react";

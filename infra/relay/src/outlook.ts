@@ -1,7 +1,7 @@
 // Microsoft rotates refresh tokens: return the resealed replacement to the browser after each refresh.
 
-import type { OutlookSignInResult, OutlookTokenResponse } from "@otter-mail/contracts/relay";
-import { MICROSOFT_AUTHORITY, OUTLOOK_SCOPES } from "@otter-mail/contracts";
+import type { OutlookSignInResult, OutlookTokenResponse } from "@otter/contracts/relay";
+import { MICROSOFT_AUTHORITY, OUTLOOK_SCOPES } from "@otter/contracts";
 import { base64url, EncryptJWT, jwtDecrypt, jwtVerify, SignJWT } from "jose";
 
 import { popupPage } from "./gmail.ts";

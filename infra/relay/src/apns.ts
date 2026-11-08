@@ -1,5 +1,5 @@
 import { importPKCS8, SignJWT } from "jose";
-import type { MailPushMetadata, NewMailPushMetadata } from "@otter-mail/contracts/relay";
+import type { MailPushMetadata, NewMailPushMetadata } from "@otter/contracts/relay";
 import type { Env } from "./worker.ts";
 import type { PushDevice } from "./push.ts";
 

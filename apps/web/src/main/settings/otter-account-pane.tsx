@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { OtterAccountState, OtterDevice } from "@otter-mail/contracts";
+import type { OtterAccountState, OtterDevice } from "@otter/contracts";
 import { LaptopIcon } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";

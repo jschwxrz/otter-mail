@@ -10,6 +10,7 @@ describe("tool steps", () => {
       source: "Otter",
       detail: '{"query":"from:unid.be"}',
     };
+    expect(claudeStep("mcp__otter__search_mail", { query: "from:unid.be" })).toEqual(expected);
     expect(claudeStep("mcp__otter-mail__search_mail", { query: "from:unid.be" })).toEqual(expected);
     expect(
       codexStep({

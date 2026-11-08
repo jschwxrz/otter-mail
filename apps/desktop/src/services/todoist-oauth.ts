@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { signInPage } from "@otter-mail/shared/sign-in-page";
+import { signInPage } from "@otter/shared/sign-in-page";
 
 import { requestMain } from "../main-link.js";
 

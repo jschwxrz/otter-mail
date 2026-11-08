@@ -1,5 +1,5 @@
-import { runAsTask } from "@otter-mail/core/extension-kit";
-import type { CoreExtension } from "@otter-mail/core/extension-kit";
+import { runAsTask } from "@otter/core/extension-kit";
+import type { CoreExtension } from "@otter/core/extension-kit";
 
 import { manifest } from "../manifest.ts";
 import * as drive from "./drive.js";

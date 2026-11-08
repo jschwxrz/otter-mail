@@ -176,10 +176,10 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ needs.preflight.outputs.version }}
-          OTTER_MAIL_GOOGLE_CLIENT_ID: ${{ vars.OTTER_MAIL_GOOGLE_CLIENT_ID }}
-          OTTER_MAIL_GOOGLE_CLIENT_SECRET: ${{ secrets.OTTER_MAIL_GOOGLE_CLIENT_SECRET }}
+          OTTER_GOOGLE_CLIENT_ID: ${{ vars.OTTER_GOOGLE_CLIENT_ID }}
+          OTTER_GOOGLE_CLIENT_SECRET: ${{ secrets.OTTER_MAIL_GOOGLE_CLIENT_SECRET }}
           # Outlook's sign-in (a public client: no secret); without it the app offers no Outlook.
-          OTTER_MAIL_MICROSOFT_CLIENT_ID: ${{ vars.OTTER_MAIL_MICROSOFT_CLIENT_ID }}
+          OTTER_MICROSOFT_CLIENT_ID: ${{ vars.OTTER_MICROSOFT_CLIENT_ID }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
@@ -189,8 +189,8 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: |
           set -euo pipefail
-          if [[ -z "$OTTER_MAIL_GOOGLE_CLIENT_ID" || -z "$OTTER_MAIL_GOOGLE_CLIENT_SECRET" ]]; then
-            echo "::error::Set the OTTER_MAIL_GOOGLE_CLIENT_ID variable and OTTER_MAIL_GOOGLE_CLIENT_SECRET secret; without them the app can't sign in to Google."
+          if [[ -z "$OTTER_GOOGLE_CLIENT_ID" || -z "$OTTER_GOOGLE_CLIENT_SECRET" ]]; then
+            echo "::error::Set the OTTER_GOOGLE_CLIENT_ID variable and OTTER_GOOGLE_CLIENT_SECRET secret; without them the app can't sign in to Google."
             exit 1
           fi
           args=(--platform mac --target dmg --arch arm64 --build-version "$VERSION" --verbose)
@@ -245,16 +245,16 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ needs.preflight.outputs.version }}
-          OTTER_MAIL_GOOGLE_CLIENT_ID: ${{ vars.OTTER_MAIL_GOOGLE_CLIENT_ID }}
-          OTTER_MAIL_GOOGLE_CLIENT_SECRET: ${{ secrets.OTTER_MAIL_GOOGLE_CLIENT_SECRET }}
+          OTTER_GOOGLE_CLIENT_ID: ${{ vars.OTTER_GOOGLE_CLIENT_ID }}
+          OTTER_GOOGLE_CLIENT_SECRET: ${{ secrets.OTTER_MAIL_GOOGLE_CLIENT_SECRET }}
           # Outlook's sign-in (a public client: no secret); without it the app offers no Outlook.
-          OTTER_MAIL_MICROSOFT_CLIENT_ID: ${{ vars.OTTER_MAIL_MICROSOFT_CLIENT_ID }}
+          OTTER_MICROSOFT_CLIENT_ID: ${{ vars.OTTER_MICROSOFT_CLIENT_ID }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
         run: |
           set -euo pipefail
-          if [[ -z "$OTTER_MAIL_GOOGLE_CLIENT_ID" || -z "$OTTER_MAIL_GOOGLE_CLIENT_SECRET" ]]; then
-            echo "::error::Set the OTTER_MAIL_GOOGLE_CLIENT_ID variable and OTTER_MAIL_GOOGLE_CLIENT_SECRET secret; without them the app can't sign in to Google."
+          if [[ -z "$OTTER_GOOGLE_CLIENT_ID" || -z "$OTTER_GOOGLE_CLIENT_SECRET" ]]; then
+            echo "::error::Set the OTTER_GOOGLE_CLIENT_ID variable and OTTER_GOOGLE_CLIENT_SECRET secret; without them the app can't sign in to Google."
             exit 1
           fi
           node scripts/build-desktop-artifact.ts --platform linux --arch x64 --build-version "$VERSION"
@@ -373,7 +373,7 @@ jobs:
       - name: Build and deploy
         working-directory: site
         env:
-          OTTER_MAIL_VERSION: ${{ needs.preflight.outputs.version }}
+          OTTER_VERSION: ${{ needs.preflight.outputs.version }}
           NIGHTLY: ${{ needs.preflight.outputs.prerelease }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}

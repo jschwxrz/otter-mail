@@ -12,7 +12,7 @@ import {
   toast,
   useOpenWorkspace,
   type MessageTarget,
-} from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";

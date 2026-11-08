@@ -1,4 +1,4 @@
-import { landLabelChange, type MailSchedule } from "@otter-mail/contracts";
+import { landLabelChange, type MailSchedule } from "@otter/contracts";
 import { broadcast } from "../ipc.js";
 import { platform } from "../platform.js";
 import { capabilitiesOf, providerFor } from "../providers/index.js";

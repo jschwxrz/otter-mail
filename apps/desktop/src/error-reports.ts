@@ -9,7 +9,7 @@ import {
   reportEnvironment,
   reportLog,
   SENTRY_DSN,
-} from "@otter-mail/shared/error-reports";
+} from "@otter/shared/error-reports";
 
 import { reportLogsTo } from "./logger.js";
 
@@ -19,7 +19,7 @@ const LEFT_OUT = new Set(["SentryMinidump", "LocalVariables", "Console", "Screen
 const gate = new ConsentGate();
 
 export const sendsErrorReports =
-  Boolean(SENTRY_DSN.desktop) && (app.isPackaged || process.env.OTTER_MAIL_ERROR_REPORTS === "1");
+  Boolean(SENTRY_DSN.desktop) && (app.isPackaged || process.env.OTTER_ERROR_REPORTS === "1");
 
 /** Before `ready`, and after the app's paths are set: Sentry keeps its queue in userData. */
 export function startErrorReports(): void {

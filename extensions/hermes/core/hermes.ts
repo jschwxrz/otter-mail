@@ -17,7 +17,7 @@ import {
   getHermesKey,
   hermesStep,
   TOOL_OUTPUT_CHARS,
-} from "@otter-mail/core/extension-kit";
+} from "@otter/core/extension-kit";
 import type {
   ApprovalDecision,
   ChatAttachment,
@@ -28,7 +28,7 @@ import type {
   ProviderModel,
   ProviderModelOption,
   Skill,
-} from "@otter-mail/core/extension-kit";
+} from "@otter/core/extension-kit";
 import { HERMES_DEFAULTS, type HermesSettings } from "./settings.js";
 
 const IDLE_TIMEOUT_MS = 180_000;

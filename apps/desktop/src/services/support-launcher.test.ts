@@ -13,7 +13,7 @@ import {
   supportIssueUrl,
   summarizeSupportLog,
   supportError,
-} from "@otter-mail/shared/support";
+} from "@otter/shared/support";
 
 const exec = promisify(execFile);
 

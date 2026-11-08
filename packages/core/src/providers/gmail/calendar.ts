@@ -7,7 +7,7 @@
  * services/calendar-invites.ts replies by email instead.
  */
 
-import { findMeetingLink } from "@otter-mail/contracts";
+import { findMeetingLink } from "@otter/contracts";
 import { wallClock } from "../wall-clock.js";
 import { platform } from "../../platform.js";
 import {

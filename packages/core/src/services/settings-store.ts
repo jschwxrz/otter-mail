@@ -1,7 +1,7 @@
 import { readJson, writeJson } from "../json-file.js";
 
-import { DEFAULT_SETTINGS, type AppSettings } from "@otter-mail/contracts";
-export { DEFAULT_SETTINGS, type AppSettings, type NotificationsMode } from "@otter-mail/contracts";
+import { DEFAULT_SETTINGS, type AppSettings } from "@otter/contracts";
+export { DEFAULT_SETTINGS, type AppSettings, type NotificationsMode } from "@otter/contracts";
 
 export async function getSettings(): Promise<AppSettings> {
   return { ...DEFAULT_SETTINGS, ...(await readJson<Partial<AppSettings>>("settings.json")) };

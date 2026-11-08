@@ -1,4 +1,4 @@
-import { VIEW_COLORS, VIEW_ICON_KEYS } from "@otter-mail/shared/view-marks";
+import { VIEW_COLORS, VIEW_ICON_KEYS } from "@otter/shared/view-marks";
 import type { MailAccount, MailView, ViewRule } from "../../../types.js";
 import { labelId, labelsOf } from "./mail.js";
 import {

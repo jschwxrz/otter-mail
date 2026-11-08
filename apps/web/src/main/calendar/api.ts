@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
-import type { MeetingService } from "@otter-mail/contracts";
+import type { MeetingService } from "@otter/contracts";
 import {
   keepPreviousData,
   useQuery,

@@ -3,8 +3,8 @@ import type {
   ImapSettings,
   MailCapabilities,
   MailProviderKind,
-} from "@otter-mail/contracts";
-import type { AliasPictures } from "@otter-mail/contracts/relay";
+} from "@otter/contracts";
+import type { AliasPictures } from "@otter/contracts/relay";
 
 export interface MailAccount {
   id: string;

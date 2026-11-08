@@ -1,4 +1,4 @@
-import { ARCHIVE_LABEL_ID } from "@otter-mail/contracts";
+import { ARCHIVE_LABEL_ID } from "@otter/contracts";
 
 import type { ImapClient, ImapFolder, SpecialUse } from "../../protocols/index.js";
 

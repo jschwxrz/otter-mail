@@ -1,7 +1,7 @@
 import { registeredHandlers } from "../../../ipc.js";
 import { turnedOffMailboxes } from "../../mail-sync.js";
-import type { AgentAccess } from "@otter-mail/contracts/agent-tokens";
-import type { ChatChange } from "@otter-mail/contracts";
+import type { AgentAccess } from "@otter/contracts/agent-tokens";
+import type { ChatChange } from "@otter/contracts";
 
 import type { MailAccount } from "../../../types.js";
 import type { Emit, RuntimeMode } from "../types.js";

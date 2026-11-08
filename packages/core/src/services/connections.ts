@@ -5,7 +5,7 @@
  * or the operation works: never stored, so nothing about stored mailboxes changes.
  */
 
-import type { AccessNeed, ConnectionSummary } from "@otter-mail/contracts";
+import type { AccessNeed, ConnectionSummary } from "@otter/contracts";
 
 import { broadcast } from "../ipc.js";
 import { logger } from "../logger.js";

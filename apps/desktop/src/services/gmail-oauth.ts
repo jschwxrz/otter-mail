@@ -3,8 +3,8 @@ import * as fs from "node:fs/promises";
 import * as http from "node:http";
 import * as path from "node:path";
 
-import { GMAIL_MAIL_SCOPE, GMAIL_SCOPES } from "@otter-mail/contracts";
-import type { DemoGmailMailbox } from "@otter-mail/contracts/demo";
+import { GMAIL_MAIL_SCOPE, GMAIL_SCOPES } from "@otter/contracts";
+import type { DemoGmailMailbox } from "@otter/contracts/demo";
 import {
   accountStore,
   broadcast,
@@ -15,9 +15,9 @@ import {
   SignInTimedOutError,
   type MailAccount,
   type GoogleAuth,
-} from "@otter-mail/core";
+} from "@otter/core";
 
-import { signInPage } from "@otter-mail/shared/sign-in-page";
+import { signInPage } from "@otter/shared/sign-in-page";
 
 import { appInfo } from "../backend-protocol.js";
 import { requestMain } from "../main-link.js";

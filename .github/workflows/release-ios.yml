@@ -128,9 +128,9 @@ jobs:
           key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
           printf '%s' "$APPLE_API_KEY" > "$key_path"
           {
-            echo "OTTER_MAIL_ASC_KEY=$key_path"
-            echo "OTTER_MAIL_ASC_KEY_ID=$APPLE_API_KEY_ID"
-            echo "OTTER_MAIL_ASC_ISSUER=$APPLE_API_ISSUER"
+            echo "OTTER_ASC_KEY=$key_path"
+            echo "OTTER_ASC_KEY_ID=$APPLE_API_KEY_ID"
+            echo "OTTER_ASC_ISSUER=$APPLE_API_ISSUER"
           } >> "$GITHUB_ENV"
 
       - id: upload

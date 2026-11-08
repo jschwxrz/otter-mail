@@ -1,5 +1,5 @@
-import { sha256Hex, platform } from "@otter-mail/core/extension-kit";
-import type { LanguageDetection, TranslationResult } from "@otter-mail/core/extension-kit";
+import { sha256Hex, platform } from "@otter/core/extension-kit";
+import type { LanguageDetection, TranslationResult } from "@otter/core/extension-kit";
 
 const MAX_DETECTIONS = 500;
 const detections = new Map<string, LanguageDetection>();

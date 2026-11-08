@@ -31,5 +31,5 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: Relevant lines from ~/.otter-mail/userdata/logs/main.log. Remove anything private.
+      description: Relevant lines from ~/.otter/userdata/logs/main.log. Remove anything private.
       render: text

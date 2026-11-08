@@ -1,5 +1,5 @@
 {
-  "name": "@otter-mail/shared",
+  "name": "@otter/shared",
   "version": "0.1.0",
   "private": true,
   "description": "What every app shows the same, the iPhone app included: the color themes, the demo mailbox, what views can wear and the codes sign-in mail carries; and the changelog's format, for the website and the GitHub Releases.",

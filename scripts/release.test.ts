@@ -38,18 +38,13 @@ test("stable and nightly feeds are separate, while other prereleases have no upd
     releaseType: "prerelease",
     channel: "nightly",
   });
-  assert.deepEqual(
-    resolvePublishConfig(nightly, { OTTER_MAIL_UPDATE_URL: "http://localhost:8791" }),
-    {
-      provider: "generic",
-      url: "http://localhost:8791",
-      channel: "nightly",
-    },
-  );
+  assert.deepEqual(resolvePublishConfig(nightly, { OTTER_UPDATE_URL: "http://localhost:8791" }), {
+    provider: "generic",
+    url: "http://localhost:8791",
+    channel: "nightly",
+  });
   assert.equal(resolvePublishConfig("0.13.10-rc.1", {}), undefined);
-  assert.throws(() =>
-    resolvePublishConfig(nightly, { OTTER_MAIL_UPDATE_REPOSITORY: "bad/repo/path" }),
-  );
+  assert.throws(() => resolvePublishConfig(nightly, { OTTER_UPDATE_REPOSITORY: "bad/repo/path" }));
   assert.equal(versionMatchesChannel(nightly, "stable"), false);
   assert.equal(versionMatchesChannel("0.13.9", "nightly"), false);
   assert.equal(versionMatchesChannel("0.13.10-rc.1", "stable"), false);

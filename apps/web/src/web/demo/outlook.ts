@@ -3,7 +3,7 @@
  * backend's Worker, beside the pretend Gmail (gmail.ts).
  *
  * `installFakeOutlook` wraps the Worker's fetch: calls to Graph are answered
- * from the seeded mailbox (@otter-mail/shared/demo-mailboxes'
+ * from the seeded mailbox (@otter/shared/demo-mailboxes'
  * DEMO_OUTLOOK_ACCOUNT), which lives in the demo's own files and changes as
  * the app moves, flags, categorizes, drafts and sends. Every change takes the
  * mailbox's next change number, and every message leaving a folder is
@@ -18,13 +18,13 @@ import {
   type MailAccount,
   type MicrosoftAuth,
   type Platform,
-} from "@otter-mail/core";
+} from "@otter/core";
 
 import {
   DEMO_OUTLOOK_ACCOUNT,
   type OutlookSeedAccount,
   type OutlookSeedFolder,
-} from "@otter-mail/shared/demo-mailboxes";
+} from "@otter/shared/demo-mailboxes";
 
 import { parseMime } from "./gmail";
 import { busyWeek } from "./calendar";

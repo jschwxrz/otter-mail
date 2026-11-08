@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 const state = vi.hoisted(() => ({ home: "" }));
 vi.mock("../../backend-protocol.js", () => ({ appInfo: () => ({ stateDir: state.home }) }));
 vi.mock("../../main-link.js", () => ({ requestMain: vi.fn() }));
-vi.mock("@otter-mail/core", async () => ({
+vi.mock("@otter/core", async () => ({
   ...(await import("../../../../../packages/core/src/services/agent/files.js")),
   ATTACHMENTS_DIR: "assistant-attachments",
 }));

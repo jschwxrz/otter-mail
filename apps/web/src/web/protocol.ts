@@ -1,6 +1,6 @@
-import type { LogLevel, ReportTags, SerializedError } from "@otter-mail/shared/error-reports";
-import type { OutlookSignInResult } from "@otter-mail/contracts/relay";
-import type { LanguageDetection, PickedFile, TranslationResult } from "@otter-mail/core";
+import type { LogLevel, ReportTags, SerializedError } from "@otter/shared/error-reports";
+import type { OutlookSignInResult } from "@otter/contracts/relay";
+import type { LanguageDetection, PickedFile, TranslationResult } from "@otter/core";
 
 export type GoogleSignInResult = {
   email: string;
@@ -11,7 +11,7 @@ export type GoogleSignInResult = {
   expiresIn: number;
 };
 
-export { GMAIL_SIGN_IN_CANCELLED as SIGN_IN_CANCELLED } from "@otter-mail/contracts/relay";
+export { GMAIL_SIGN_IN_CANCELLED as SIGN_IN_CANCELLED } from "@otter/contracts/relay";
 
 export type PageRequests = {
   todoistSignIn: { params: { url?: string; close?: boolean }; result: string };

@@ -10,7 +10,7 @@ import {
   SettingsSection,
   type AgentSettingsProps,
   type RuntimeMode,
-} from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
 
 import { OpenRouterConnection } from "./openrouter-connection";
 

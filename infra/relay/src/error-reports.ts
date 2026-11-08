@@ -1,6 +1,6 @@
 import type { CloudflareOptions } from "@sentry/cloudflare";
 
-import { errorReportOptions, SENTRY_DSN } from "@otter-mail/shared/error-reports";
+import { errorReportOptions, SENTRY_DSN } from "@otter/shared/error-reports";
 
 import type { Env } from "./worker.ts";
 

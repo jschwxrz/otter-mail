@@ -24,7 +24,7 @@ const isExternal = (id: string) => id === "electron" || id.startsWith("electron/
 const shared = {
   format: "cjs",
   alias: {
-    "@otter-mail/desktop/extension-kit": NodeURL.fileURLToPath(
+    "@otter/desktop/extension-kit": NodeURL.fileURLToPath(
       new URL("./src/extension-kit.ts", import.meta.url),
     ),
   },
@@ -33,10 +33,10 @@ const shared = {
   sourcemap: true,
   outExtensions: () => ({ js: ".cjs" }),
   define: {
-    __APP_VERSION__: JSON.stringify(process.env.OTTER_MAIL_VERSION?.trim() || pkg.version),
-    __GOOGLE_CLIENT_ID__: JSON.stringify(buildEnv("OTTER_MAIL_GOOGLE_CLIENT_ID")),
-    __GOOGLE_CLIENT_SECRET__: JSON.stringify(buildEnv("OTTER_MAIL_GOOGLE_CLIENT_SECRET")),
-    __MICROSOFT_CLIENT_ID__: JSON.stringify(buildEnv("OTTER_MAIL_MICROSOFT_CLIENT_ID")),
+    __APP_VERSION__: JSON.stringify(process.env.OTTER_VERSION?.trim() || pkg.version),
+    __GOOGLE_CLIENT_ID__: JSON.stringify(buildEnv("OTTER_GOOGLE_CLIENT_ID")),
+    __GOOGLE_CLIENT_SECRET__: JSON.stringify(buildEnv("OTTER_GOOGLE_CLIENT_SECRET")),
+    __MICROSOFT_CLIENT_ID__: JSON.stringify(buildEnv("OTTER_MICROSOFT_CLIENT_ID")),
   },
   deps: {
     alwaysBundle: (id: string) => !id.startsWith("node:") && !isExternal(id),

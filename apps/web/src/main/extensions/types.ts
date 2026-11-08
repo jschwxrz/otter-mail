@@ -1,4 +1,4 @@
-import type { ExtensionManifest } from "@otter-mail/contracts/extensions";
+import type { ExtensionManifest } from "@otter/contracts/extensions";
 import type { ComponentType, ReactNode } from "react";
 
 import type { AgentSettingsPatch, ProviderSnapshot, ProvidersState } from "../mail/api";

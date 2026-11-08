@@ -59,7 +59,7 @@ when a feature lands or goes.
 - `extensions/`: the built-in extensions, a package each (VS Code's model; contracts'
   `src/extensions.ts`): Sign-in codes, Calendar invites, Translation, Todoist, Otter Drive, and
   the agents (`openrouter`, the Otter agent; `hermes`, `openclaw`, `claude`, `codex`). Each
-  `package.json` carries its manifest (`otterMail`); its halves are `./core` (`activate(context)`:
+  `package.json` carries its manifest (`otter`); its halves are `./core` (`activate(context)`:
   handlers, an agent; core's `src/extensions.ts`), `./ui` (what it contributes to the screens'
   slots: cards, actions, commands, settings, an agent's form, a workspace; `apps/web/src/main/extensions`;
   Settings lists them by manifest `category` in Agents, Connections (services you sign in to,
@@ -74,8 +74,8 @@ when a feature lands or goes.
   their list to `startCore`
   (`apps/desktop/src/extensions.ts`, `apps/web/src/web/extensions.ts`), the renderer lists the
   `./ui` halves (`extensions/registry.ts`). Extensions reach the app only through the kits
-  (`@otter-mail/core/extension-kit`, `@otter-mail/web/extension-kit`,
-  `@otter-mail/desktop/extension-kit`; the last two are aliases), which lint enforces. An agent is
+  (`@otter/core/extension-kit`, `@otter/web/extension-kit`,
+  `@otter/desktop/extension-kit`; the last two are aliases), which lint enforces. An agent is
   the strict contribution: core's `ChatProvider` (its settings are its own, under its id) and, in
   the renderer, its icon and settings form; the chat UI is shared.
 - `packages/contracts`: types shared by both sides, including `DesktopBridge`, the
@@ -143,11 +143,11 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
   screen).
 - `pnpm dev:fake`: the web app on a made-up mailbox (a pretend Gmail, no Google or Otter
   account, no relay). Build and test against it rather than the user's real accounts; see the
-  `test-otter-mail` skill (`.agents/skills`).
+  `test-otter` skill (`.agents/skills`).
 - `pnpm dev:demo` and `pnpm dev:demo:desktop`: `pnpm dev` and `pnpm dev:desktop` opening on the
   demo mailboxes, already added: the dedicated `otterware.demo@gmail.com` Google account and the
   local IMAP server's (`pnpm dev:mail`, started for you). For real Gmail, Google OAuth, Contacts,
-  Calendar or IMAP checks. They come from `OTTER_MAIL_DEMO_MAILBOXES` in the main checkout's
+  Calendar or IMAP checks. They come from `OTTER_DEMO_MAILBOXES` in the main checkout's
   ignored `.env.local` (shared with T3 worktrees by symlink); `--login` signs them in to Google
   once per machine. Preserve the demo fixtures and send test mail only to the demo account itself.
   Keep credentials out of logs, commits, screenshots and app bundles. See
@@ -155,7 +155,7 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
 - `pnpm start` runs the built app unpackaged; `pnpm dist:desktop:dmg` builds a DMG in `release/`
   (on a Mac), `pnpm dist:desktop:deb` a .deb (on Linux).
 - Data homes (`apps/desktop/src/paths.ts`, as in T3 Code): the installed app uses
-  `~/.otter-mail/userdata`; dev runs use `~/.otter-mail/dev`, or `<worktree>/.otter-mail` in a
+  `~/.otter/userdata`; dev runs use `~/.otter/dev`, or `<worktree>/.otter` in a
   linked worktree. `pnpm dev:desktop --home <dir>` overrides. Never point dev at the installed app's home.
 - Main-process logs: the terminal, and `logs/main.log` in the state directory.
 

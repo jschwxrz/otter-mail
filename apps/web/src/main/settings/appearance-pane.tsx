@@ -1,7 +1,7 @@
 import { useLatest } from "../use-latest";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { toast } from "../mail/toast";
-import type { NativeThemeInfo } from "@otter-mail/contracts";
+import type { NativeThemeInfo } from "@otter/contracts";
 import {
   CopyIcon,
   EllipsisIcon,
@@ -34,7 +34,7 @@ import {
   type ThemeAppearance,
   type ThemeColors,
   type ThemeDefinition,
-} from "@otter-mail/shared/themes";
+} from "@otter/shared/themes";
 import { getThemeModes, removeCustomTheme, serializeThemeFile } from "../theme/themePalette";
 import { Button } from "~/components/ui/button";
 import { Switch } from "~/components/ui/switch";

@@ -1,9 +1,4 @@
-import {
-  broadcast,
-  platform,
-  listAccounts,
-  getMessageLabelIds,
-} from "@otter-mail/core/extension-kit";
+import { broadcast, platform, listAccounts, getMessageLabelIds } from "@otter/core/extension-kit";
 import {
   todoistTaskInput,
   todoistTaskUpdate,
@@ -13,7 +8,7 @@ import {
   type TodoistReminder,
   type TodoistPage,
   type TodoistProject,
-} from "@otter-mail/contracts/todoist";
+} from "@otter/contracts/todoist";
 
 import {
   todoistAccessToken,

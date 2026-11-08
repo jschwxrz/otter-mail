@@ -1,4 +1,4 @@
-import type { ChatEvent } from "@otter-mail/core/extension-kit";
+import type { ChatEvent } from "@otter/core/extension-kit";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { OpenClawSettings } from "./settings.js";
 

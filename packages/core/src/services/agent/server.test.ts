@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import type { OpenRouterEvent, OpenRouterTurn } from "@otter-mail/contracts/openrouter";
+import type { OpenRouterEvent, OpenRouterTurn } from "@otter/contracts/openrouter";
 import { OpenRouterAgentServer, type AgentStorage } from "./server.js";
 
 const KEY = "sk-or-test-server-only-key";

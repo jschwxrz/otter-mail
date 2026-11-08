@@ -7,9 +7,9 @@ import {
   type MailAccount,
   type GoogleAuth,
   type Platform,
-} from "@otter-mail/core";
+} from "@otter/core";
 
-import { DEMO_ACCOUNTS, type SeedAccount } from "@otter-mail/shared/demo-mailboxes";
+import { DEMO_ACCOUNTS, type SeedAccount } from "@otter/shared/demo-mailboxes";
 import { EXTRA_DEMO_ACCOUNTS } from "./extra-mailboxes";
 
 const SEEDS = [...DEMO_ACCOUNTS, ...EXTRA_DEMO_ACCOUNTS];

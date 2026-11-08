@@ -1,4 +1,4 @@
-import { MAX_SUPPORT_BODY } from "@otter-mail/shared/support";
+import { MAX_SUPPORT_BODY } from "@otter/shared/support";
 import { handle } from "../ipc.js";
 import { platform } from "../platform.js";
 import { errorReportsConfig } from "../services/error-reports.js";

@@ -6,7 +6,7 @@ import {
   type MailAccount,
   type GoogleAuth,
   type Platform,
-} from "@otter-mail/core";
+} from "@otter/core";
 
 import type { Page } from "./platform";
 import { SIGN_IN_CANCELLED, type GoogleSignInResult } from "./protocol";

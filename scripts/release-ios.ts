@@ -3,11 +3,12 @@
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
+import { otterHome } from "../apps/desktop/scripts/dev-home.mjs";
 import * as NodePath from "node:path";
 
 const root = NodePath.resolve(import.meta.dirname, "..");
 const project = NodePath.join(root, "apps/ios/OtterMail.xcodeproj");
-const work = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "otter-mail-ios-"));
+const work = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "otter-ios-"));
 
 function fail(message: string): never {
   console.error(`[release-ios] ${message}`);
@@ -29,15 +30,15 @@ const version =
 if (!version || !/^\d+\.\d+\.\d+$/.test(version)) fail(`"${version}" isn't a version (x.y.z).`);
 const build = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12);
 
-const signing = NodePath.join(NodeOS.homedir(), ".otter-mail/signing");
+const signing = NodePath.join(otterHome(), "signing");
 const keyPath =
-  process.env.OTTER_MAIL_ASC_KEY ??
+  process.env.OTTER_ASC_KEY ??
   NodeFS.readdirSync(signing, { withFileTypes: true })
     .filter((f) => /^AuthKey_\w+\.p8$/.test(f.name))
     .map((f) => NodePath.join(signing, f.name))[0];
-if (!keyPath) fail("No App Store Connect API key (OTTER_MAIL_ASC_KEY, or ~/.otter-mail/signing).");
-const keyId = process.env.OTTER_MAIL_ASC_KEY_ID ?? /AuthKey_(\w+)\.p8$/.exec(keyPath)?.[1];
-const issuer = process.env.OTTER_MAIL_ASC_ISSUER ?? "b010c56a-fe59-481d-a7db-7350e51eb8b8";
+if (!keyPath) fail("No App Store Connect API key (OTTER_ASC_KEY, or ~/.otter/signing).");
+const keyId = process.env.OTTER_ASC_KEY_ID ?? /AuthKey_(\w+)\.p8$/.exec(keyPath)?.[1];
+const issuer = process.env.OTTER_ASC_ISSUER ?? "b010c56a-fe59-481d-a7db-7350e51eb8b8";
 const auth = [
   "-authenticationKeyPath",
   keyPath,

@@ -1,6 +1,6 @@
 import { connect } from "cloudflare:sockets";
-import { connectImap, type ImapClient } from "@otter-mail/core/imap";
-import type { MailProviderKind } from "@otter-mail/contracts/mail";
+import { connectImap, type ImapClient } from "@otter/core/imap";
+import type { MailProviderKind } from "@otter/contracts/mail";
 import {
   accessToken,
   credential,
@@ -272,7 +272,7 @@ async function tcp(host: string, port: number, options: { tls: boolean }) {
 
 function imapOptions(
   env: Env,
-  settings: import("@otter-mail/contracts/mail").ImapSettings,
+  settings: import("@otter/contracts/mail").ImapSettings,
   password: string,
 ) {
   const localTest =

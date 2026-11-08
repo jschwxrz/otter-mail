@@ -6,8 +6,8 @@
  * connection), so the relay only carries ciphertext.
  */
 
-import type { ByteStream } from "@otter-mail/core";
-import { TUNNEL_CLOSE } from "@otter-mail/contracts/relay";
+import type { ByteStream } from "@otter/core";
+import { TUNNEL_CLOSE } from "@otter/contracts/relay";
 
 const CONNECT_TIMEOUT_MS = 20_000;
 /** Bytes from the server not yet read: past this the connection goes (a WebSocket can't be paused). */

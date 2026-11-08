@@ -1,5 +1,5 @@
 export type { CoreExtension, ExtensionContext } from "./extensions.js";
-export { extensionManifest, type ExtensionManifest } from "@otter-mail/contracts/extensions";
+export { extensionManifest, type ExtensionManifest } from "@otter/contracts/extensions";
 
 export type {
   AgentSettings,

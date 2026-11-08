@@ -17,7 +17,7 @@ import {
   setOpenClawDeviceKey,
   setOpenClawDeviceToken,
   openClawStep,
-} from "@otter-mail/core/extension-kit";
+} from "@otter/core/extension-kit";
 import type {
   ApprovalDecision,
   ApprovalRequest,
@@ -31,7 +31,7 @@ import type {
   ChatSessionMessage,
   Emit,
   ForkPoint,
-} from "@otter-mail/core/extension-kit";
+} from "@otter/core/extension-kit";
 import { OPENCLAW_DEFAULTS, type OpenClawSettings } from "./settings.js";
 import {
   GatewayBrowserDeviceAuthLifecycle,

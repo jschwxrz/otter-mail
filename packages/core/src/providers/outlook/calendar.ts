@@ -16,7 +16,7 @@ import {
   type EventInput,
   type RsvpResponse,
 } from "../provider.js";
-import { findMeetingLink } from "@otter-mail/contracts";
+import { findMeetingLink } from "@otter/contracts";
 import { wallClock } from "../wall-clock.js";
 import { GraphError, graph, isNotFound, type GraphInit } from "./graph.js";
 

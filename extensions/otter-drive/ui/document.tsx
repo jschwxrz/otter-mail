@@ -16,7 +16,7 @@ import {
   cn,
   toast,
   type WorkspaceMainProps,
-} from "@otter-mail/web/extension-kit";
+} from "@otter/web/extension-kit";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";

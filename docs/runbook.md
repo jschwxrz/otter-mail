@@ -66,7 +66,7 @@ bundles from `packages/shared` has changed. A Mac release doesn't need one.
    `gh workflow run release-ios.yml -f bump=patch`). It builds `main` on GitHub's `xcode-27`
    runner and uploads it (about 10 min), then tags the commit and bumps the version on `main`.
    The same from this Mac, if GitHub is down: `pnpm release:ios` (needs Xcode 27 and
-   `~/.otter-mail/signing`).
+   `~/.otter/signing`).
 2. Apple processes it (10–30 min). The internal group **Otter team** gets it automatically.
 3. External testers: App Store Connect → Otter Mail: Calm Email → TestFlight → **Testers** →
    Builds → + → pick the build. The first build of a new version goes through Beta App Review
@@ -112,13 +112,13 @@ See [verified background notifications](#verified-background-notifications) for 
 
 ## Accounts and access
 
-- **Apple:** team 838JVGY7W4 (chris.kafrouni@gmail.com, Account Holder). App Store Connect app 6817249947. The API key in `~/.otter-mail/signing` has the Developer role: it uploads builds but
+- **Apple:** team 838JVGY7W4 (chris.kafrouni@gmail.com, Account Holder). App Store Connect app 6817249947. The API key in `~/.otter/signing` has the Developer role: it uploads builds but
   can't create App IDs, profiles or review submissions (do those in the browser).
 - **Google Cloud:** project `otterware`. Until Gmail access is verified, only accounts listed as
   test users (Google Auth Platform → Audience, 100 max) can sign in. See
   `docs/google-verification.md`.
 - **Cloudflare:** the `otter-mail-relay` and site workers.
-- **Back up `~/.otter-mail/signing`** (a password manager works). Losing it means new
+- **Back up `~/.otter/signing`** (a password manager works). Losing it means new
   certificates and keys from Apple's portals.
 
 ## Verified background notifications

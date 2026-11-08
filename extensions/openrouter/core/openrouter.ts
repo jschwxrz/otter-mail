@@ -10,8 +10,8 @@ import {
   agentTools,
   cancelToolApprovals,
   runAgentTool,
-} from "@otter-mail/core/extension-kit";
-import type { ToolCaller, ToolFiles, ChatProvider, Emit } from "@otter-mail/core/extension-kit";
+} from "@otter/core/extension-kit";
+import type { ToolCaller, ToolFiles, ChatProvider, Emit } from "@otter/core/extension-kit";
 import { OPENROUTER_DEFAULTS, type OpenRouterSettings } from "./settings.js";
 import type {
   OpenRouterConnection,
@@ -20,7 +20,7 @@ import type {
   OpenRouterMessage,
   OpenRouterSession,
   OpenRouterToolOutput,
-} from "@otter-mail/contracts/openrouter";
+} from "@otter/contracts/openrouter";
 
 function api() {
   const p = platform();

@@ -1,4 +1,4 @@
-import type { ThemeSource } from "@otter-mail/contracts";
+import type { ThemeSource } from "@otter/contracts";
 import { setSyncedPreference } from "../synced-preferences";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
@@ -11,7 +11,7 @@ import {
   type ThemeColorRole,
   type ThemeColors,
   type ThemeDefinition,
-} from "@otter-mail/shared/themes";
+} from "@otter/shared/themes";
 import { getCustomThemes, subscribeToCustomThemes } from "./themePalette";
 
 export const DEFAULT_THEME_ID = OTTER_THEME.id;

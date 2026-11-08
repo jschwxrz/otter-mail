@@ -1,4 +1,4 @@
-import { platform, sha256Hex, utf8Decode, utf8Encode } from "@otter-mail/core/extension-kit";
+import { platform, sha256Hex, utf8Decode, utf8Encode } from "@otter/core/extension-kit";
 
 const LISTS = "otter-drive/lists";
 const DOCUMENTS = "otter-drive/documents";

@@ -4,7 +4,7 @@
     "types": ["node"],
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "paths": {
-      "@otter-mail/desktop/extension-kit": ["./src/extension-kit.ts"]
+      "@otter/desktop/extension-kit": ["./src/extension-kit.ts"]
     }
   },
   "include": [

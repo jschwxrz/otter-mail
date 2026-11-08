@@ -2,14 +2,14 @@ import { app, ipcMain, shell } from "electron";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { ProvidersState } from "@otter-mail/core";
+import type { ProvidersState } from "@otter/core";
 import {
   buildSupportPrompt,
   MAX_SUPPORT_BODY,
   type SupportAgent,
   type SupportDiagnostics,
   type SupportSession,
-} from "@otter-mail/shared/support";
+} from "@otter/shared/support";
 import { invokeBackend } from "../backend-host.js";
 import { hostOS } from "../os/index.js";
 import { ensureShellPath } from "../services/agent/shell-path.js";
