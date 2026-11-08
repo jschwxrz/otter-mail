@@ -5,78 +5,70 @@ import * as NodeChildProcess from "node:child_process";
 import * as NodeCrypto from "node:crypto";
 import * as NodeFS from "node:fs";
 import * as NodeNet from "node:net";
-import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import * as NodeReadline from "node:readline";
 import { parseArgs, parseEnv } from "node:util";
 
-import {
-  otterHome,
-  resolveDevHome,
-  resolveLinkedWorktree,
-} from "../apps/desktop/scripts/dev-home.mjs";
-import {
-  DEMO_MAILBOXES_ENV,
-  parseDemoMailboxes,
-  type DemoMailbox,
-} from "../packages/contracts/src/demo.ts";
+import { resolveLinkedWorktree } from "../apps/desktop/scripts/dev-home.mjs";
+import type { DevData } from "../packages/contracts/src/dev-data.ts";
 import { localConfig } from "../infra/relay/scripts/local-config.ts";
 import { buildTranslator, findTranslatorBinary, repoRoot } from "./build-translator.ts";
-import { login } from "./demo-login.ts";
-import { devMailbox, devMailCa, startDevMail } from "./dev-mail.ts";
-import { devStateDir, installedStateDir, needsSeed, seedDevHome } from "./seed-dev-home.ts";
+import { desktopDataHome, desktopStateDir, prepareData, type DevApp } from "./dev-data.ts";
+import { imapServerCa } from "./imap-server.ts";
 
 const BASE_WEB_PORT = 5833;
 const BASE_RELAY_PORT = 8787;
 const MAX_HASH_OFFSET = 3000;
 const SHUTDOWN_GRACE_MS = 3_000;
 
-const MODES = [
-  "dev",
-  "dev:web",
-  "dev:fake",
-  "dev:desktop",
-  "dev:demo",
-  "dev:demo:desktop",
-] as const;
-type Mode = (typeof MODES)[number];
+/** Each command is an app and what it opens on (scripts/dev-data.ts). */
+const MODES = {
+  dev: { app: "web", data: "empty" },
+  "dev:fake": { app: "web", data: "fake" },
+  "dev:demo": { app: "web", data: "demo" },
+  "dev:desktop": { app: "desktop", data: "empty" },
+  "dev:desktop:fake": { app: "desktop", data: "fake" },
+  "dev:desktop:demo": { app: "desktop", data: "demo" },
+  "dev:desktop:real": { app: "desktop", data: "real" },
+} as const satisfies Record<string, { app: DevApp; data: DevData }>;
+type Mode = keyof typeof MODES;
 
-const HELP = `Usage: pnpm dev | dev:web | dev:fake | dev:desktop | dev:demo | dev:demo:desktop [options]
+const HELP = `Usage: pnpm dev[:desktop][:fake|:demo|:real] [options]
 
-  pnpm dev               The web app (apps/web) and the relay (infra/relay) it signs
-                         in through, on localhost. Open the printed URL in a browser.
-  pnpm dev:web           Only the web app, against VITE_RELAY_URL (default:
-                         production, which only accepts its own origin).
-  pnpm dev:fake          Only the web app, on a made-up mailbox: no Google or Otter
-                         account, no relay (VITE_DEMO=1, apps/web/src/web/demo).
-  pnpm dev:desktop       The Mac app: the web dev server, \`vp pack --watch\`
-                         (apps/desktop) and Electron against them.
-  pnpm dev:demo          \`pnpm dev\`, opening on the demo mailboxes: .env.local's
-  pnpm dev:demo:desktop  ${DEMO_MAILBOXES_ENV} and the local IMAP server's
-                         (\`pnpm dev:mail\`, started for it). docs/development.md.
+  pnpm dev                The web app (apps/web) and a local relay (infra/relay) to sign in
+                          through. Open the printed URL in a browser.
+  pnpm dev:desktop        The desktop app: the web dev server, \`vp pack --watch\`
+                          (apps/desktop) and Electron against them.
+
+  What they open on (docs/development.md#what-a-dev-run-opens-on):
+    (nothing)  An empty sandbox: add what you need.
+    :fake      Made-up mailboxes from pretend services: no accounts, no network.
+    :demo      The demo accounts in .env.local, signed in, and the local IMAP
+               server's (\`pnpm imap-server\`, started for it).
+    :real      Desktop only: a copy of your installed app, signed in to your own
+               mail, calendars and agents, but not your Otter account. Only when
+               asked; nothing lasting without your say.
 
 Ctrl-C stops everything.
 
 Options:
-  --home <dir>    Data home of the Mac app. Default: a linked worktree's own
-                  .otter, otherwise ~/.otter/dev (never the installed
-                  app's ~/.otter/userdata); for the demo, its demo/ inside.
-  --login         Demo runs: sign the demo Gmail mailboxes in to Google (Outlook ones to Microsoft) first
-                  (once per machine), saving the sign-ins in .env.local.
-  --no-seed       \`pnpm dev:desktop\`: start empty instead of seeding a new data
-                  home from the installed app's (\`pnpm dev:seed\` refreshes it).
+  --home <dir>    The desktop app's data home. Default: one per kind in this
+                  checkout's .otter (the main checkout's: ~/.otter/dev for the empty
+                  one, ~/.otter/<kind> for the rest), never the installed app's.
+  --reset         Desktop: start its data over (for :real, a fresh copy).
+  --login         :demo: sign the demo Gmail mailboxes in to Google (Outlook ones to
+                  Microsoft) first, once per machine, saving the sign-ins in .env.local.
   --dry-run       Print the resolved ports and commands, then exit.
   -h, --help      Show this help.
 
 Environment:
-  OTTER_HOME         Data home, same as --home.
-  OTTER_DEV_SEED=0   Same as --no-seed.
+  OTTER_HOME              Data home, same as --home.
   OTTER_REMOTE_DEBUGGING_PORT
                           Chrome DevTools port of the dev app (default: dev server
                           port + 1000; 0 turns it off). Playwright and agents attach
                           here with connectOverCDP.
   PORT                    Exact dev server port.
-  OTTER_PORT_OFFSET  Offset added to ${BASE_WEB_PORT} and the relay's ${BASE_RELAY_PORT}
+  OTTER_PORT_OFFSET       Offset added to ${BASE_WEB_PORT} and the relay's ${BASE_RELAY_PORT}
                           (default: hashed from the worktree path in linked
                           worktrees, 0 otherwise). Google sign-in through the
                           local relay only works on ${BASE_RELAY_PORT}.
@@ -135,9 +127,15 @@ function ensureTranslator(): void {
 
 function prepareRelay(wrangler: string): void {
   const relayDir = NodePath.join(repoRoot, "infra/relay");
-  if (!NodeFS.existsSync(NodePath.join(relayDir, ".dev.vars"))) {
+  const varsFile = NodePath.join(relayDir, ".dev.vars");
+  const vars = NodeFS.existsSync(varsFile) ? parseEnv(NodeFS.readFileSync(varsFile, "utf8")) : {};
+  // Without them the relay starts, then fails every sign-in with a bare 500.
+  const missing = ["BETTER_AUTH_SECRET", "GOOGLE_GMAIL_CLIENT_SECRET"].filter(
+    (name) => !vars[name],
+  );
+  if (missing.length > 0) {
     throw new Error(
-      "infra/relay/.dev.vars is missing: it needs BETTER_AUTH_SECRET and GOOGLE_GMAIL_CLIENT_SECRET (see docs/development.md).",
+      `infra/relay/.dev.vars needs ${missing.join(" and ")} (see docs/development.md#the-web-app).`,
     );
   }
   const migrate = NodeChildProcess.spawnSync(
@@ -148,85 +146,6 @@ function prepareRelay(wrangler: string): void {
   if (migrate.status !== 0) {
     throw new Error(`Couldn't migrate the relay's local database:\n${migrate.stderr}`);
   }
-}
-
-function envLocalPath(): string {
-  const own = NodePath.join(repoRoot, ".env.local");
-  if (NodeFS.existsSync(own)) return own;
-  const common = NodeChildProcess.execFileSync(
-    "git",
-    ["rev-parse", "--path-format=absolute", "--git-common-dir"],
-    { cwd: repoRoot, encoding: "utf8" },
-  );
-  return NodePath.join(NodePath.dirname(common.trim()), ".env.local");
-}
-
-function googleClient(app: "desktop" | "web", env: Record<string, string | undefined>) {
-  if (app === "desktop") {
-    const id = process.env.OTTER_GOOGLE_CLIENT_ID ?? env.OTTER_GOOGLE_CLIENT_ID;
-    const secret = process.env.OTTER_GOOGLE_CLIENT_SECRET ?? env.OTTER_GOOGLE_CLIENT_SECRET;
-    if (!id || !secret) throw new Error(".env.local needs OTTER_GOOGLE_CLIENT_ID and _SECRET.");
-    return { id, secret };
-  }
-  const relayDir = NodePath.join(repoRoot, "infra/relay");
-  const id = /"GOOGLE_GMAIL_CLIENT_ID":\s*"([^"]+)"/.exec(
-    NodeFS.readFileSync(NodePath.join(relayDir, "wrangler.jsonc"), "utf8"),
-  )?.[1];
-  const vars = NodePath.join(relayDir, ".dev.vars");
-  const secret = NodeFS.existsSync(vars)
-    ? parseEnv(NodeFS.readFileSync(vars, "utf8")).GOOGLE_GMAIL_CLIENT_SECRET
-    : undefined;
-  if (!id || !secret) throw new Error("infra/relay/.dev.vars needs GOOGLE_GMAIL_CLIENT_SECRET.");
-  return { id, secret, redirectUri: `http://localhost:${BASE_RELAY_PORT}/v1/gmail/callback` };
-}
-
-function microsoftClient(app: "desktop" | "web", env: Record<string, string | undefined>) {
-  if (app === "desktop") {
-    const id = process.env.OTTER_MICROSOFT_CLIENT_ID ?? env.OTTER_MICROSOFT_CLIENT_ID;
-    if (!id) throw new Error(".env.local needs OTTER_MICROSOFT_CLIENT_ID.");
-    return { id };
-  }
-  const relayDir = NodePath.join(repoRoot, "infra/relay");
-  const vars = NodePath.join(relayDir, ".dev.vars");
-  const devVars = NodeFS.existsSync(vars) ? parseEnv(NodeFS.readFileSync(vars, "utf8")) : {};
-  const id =
-    devVars.MICROSOFT_CLIENT_ID ||
-    /"MICROSOFT_CLIENT_ID":\s*"([^"]+)"/.exec(
-      NodeFS.readFileSync(NodePath.join(relayDir, "wrangler.jsonc"), "utf8"),
-    )?.[1];
-  const secret = devVars.MICROSOFT_CLIENT_SECRET;
-  if (!id || !secret) {
-    throw new Error("infra/relay/.dev.vars needs MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET.");
-  }
-  return { id, secret, redirectUri: `http://localhost:${BASE_RELAY_PORT}/v1/outlook/callback` };
-}
-
-async function demoMailboxes(mode: Mode, signIn: boolean): Promise<DemoMailbox[]> {
-  const file = envLocalPath();
-  const env = NodeFS.existsSync(file) ? parseEnv(NodeFS.readFileSync(file, "utf8")) : {};
-  const json = process.env[DEMO_MAILBOXES_ENV] ?? env[DEMO_MAILBOXES_ENV];
-  let mailboxes = json ? parseDemoMailboxes(json) : [];
-  const app = mode === "dev:demo:desktop" ? "desktop" : "web";
-  if (signIn) {
-    mailboxes = await login(file, mailboxes, app, {
-      google: () => googleClient(app, env),
-      microsoft: () => microsoftClient(app, env),
-    });
-  }
-  if (!json) console.warn(`[dev] ${file} has no ${DEMO_MAILBOXES_ENV} (docs/development.md).`);
-  for (const mailbox of mailboxes) {
-    if (mailbox.provider !== "imap" && !mailbox.refreshTokens[app]) {
-      console.warn(`[dev] ${mailbox.email} isn't signed in yet: run \`pnpm ${mode} --login\`.`);
-    }
-  }
-  try {
-    await startDevMail();
-    mailboxes.push(devMailbox);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn(`[dev] Skipping the local IMAP mailbox (is Docker running?): ${message}`);
-  }
-  return mailboxes;
 }
 
 const COLORS = ["\u001b[36m", "\u001b[35m", "\u001b[33m"];
@@ -242,11 +161,10 @@ interface Task {
 async function main(): Promise<void> {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    allowNegative: true,
     options: {
       home: { type: "string" },
       login: { type: "boolean", default: false },
-      seed: { type: "boolean", default: process.env.OTTER_DEV_SEED !== "0" },
+      reset: { type: "boolean", default: false },
       "dry-run": { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
     },
@@ -256,10 +174,11 @@ async function main(): Promise<void> {
     return;
   }
   const mode = (positionals[0] ?? "dev") as Mode;
-  if (!MODES.includes(mode)) throw new Error(`Unknown mode "${mode}".\n\n${HELP}`);
-  const desktop = mode === "dev:desktop" || mode === "dev:demo:desktop";
-  const demo = mode === "dev:demo" || mode === "dev:demo:desktop";
-  const relay = mode === "dev" || mode === "dev:demo";
+  if (!(mode in MODES)) throw new Error(`Unknown mode "${mode}".\n\n${HELP}`);
+  const { app, data } = MODES[mode];
+  const desktop = app === "desktop";
+  // The web app signs in through a relay; the made-up mailbox needs none.
+  const relay = app === "web" && data !== "fake";
 
   const { offset, source } = resolvePortOffset(process.env, repoRoot);
   const explicitPort = process.env.PORT?.trim();
@@ -309,7 +228,7 @@ async function main(): Promise<void> {
         "COOKIE_DOMAIN:",
         "--var",
         "TUNNEL_ALLOW_PRIVATE:true",
-        ...(demo ? ["--var", "DEV_DEMO:true"] : []),
+        ...(data === "demo" ? ["--var", "DEV_DEMO:true"] : []),
       ],
       cwd: NodePath.join(repoRoot, "infra/relay"),
     });
@@ -331,8 +250,7 @@ async function main(): Promise<void> {
     );
   }
 
-  const devHome = resolveDevHome({ cwd: repoRoot, explicitHome: values.home });
-  const dataHome = demo && !values.home ? NodePath.join(devHome ?? otterHome(), "demo") : devHome;
+  const dataHome = desktop ? desktopDataHome(data, values.home) : undefined;
   const configuredDebugPort = process.env.OTTER_REMOTE_DEBUGGING_PORT?.trim();
   const debugPort = !desktop
     ? 0
@@ -342,11 +260,11 @@ async function main(): Promise<void> {
         ? port + 1000
         : await findFreePort(port + 1000);
   console.log(`[dev] ${devServerUrl} (${portSource})`);
-  if (mode === "dev:fake") console.log("[dev] Made-up mailbox (?reset-demo starts it over)");
-  if (relay) console.log(`[dev] Relay: ${relayUrl}`);
-  if (desktop) {
-    console.log(`[dev] Data: ${dataHome ? NodePath.join(dataHome, "userdata") : "~/.otter/dev"}`);
+  if (app === "web" && data === "fake") {
+    console.log("[dev] Made-up mailbox (?reset-demo starts it over)");
   }
+  if (relay) console.log(`[dev] Relay: ${relayUrl}`);
+  if (desktop) console.log(`[dev] Data (${data}): ${desktopStateDir(dataHome)}`);
   if (debugPort > 0) console.log(`[dev] DevTools: http://127.0.0.1:${debugPort}`);
   if (values["dry-run"]) {
     for (const task of tasks) {
@@ -363,16 +281,11 @@ async function main(): Promise<void> {
     NodeFS.writeFileSync(relayConfig, localConfig());
     prepareRelay(wrangler);
   }
-  const mailboxes = demo ? await demoMailboxes(mode, values.login) : [];
-  if (mode === "dev:desktop" && values.seed) {
-    const stateDir = devStateDir(dataHome);
-    if (needsSeed(stateDir) && NodeFS.existsSync(installedStateDir())) {
-      console.log(
-        `[dev] Seeding ${stateDir} from ${installedStateDir()} (one way; --no-seed skips it). Sign the mailboxes in again to sync.`,
-      );
-      seedDevHome(stateDir);
-    }
-  }
+  const dataEnv = await prepareData(app, data, {
+    home: values.home,
+    reset: values.reset,
+    login: values.login,
+  });
   if (desktop) {
     ensureTranslator();
     // A stale bundle would let Electron start before the first fresh build.
@@ -382,21 +295,22 @@ async function main(): Promise<void> {
     });
   }
 
-  const trustDevMail = mode !== "dev:fake" && NodeFS.existsSync(devMailCa);
+  const trustImapServer = data !== "fake" && NodeFS.existsSync(imapServerCa);
 
   const env: NodeJS.ProcessEnv = {
     ...process.env,
-    OTTER_HOME: dataHome,
+    // Only the data's own home: an inherited one could be the installed app's.
+    OTTER_HOME: undefined,
+    OTTER_MAIL_HOME: undefined,
+    ...dataEnv,
     OTTER_REMOTE_DEBUGGING_PORT: String(debugPort),
     PORT: String(port),
     VITE_DEV_SERVER_URL: devServerUrl,
     ...(relay ? { VITE_RELAY_URL: relayUrl } : {}),
-    ...(mode === "dev:fake" ? { VITE_DEMO: "1" } : {}),
-    ...(demo ? { [DEMO_MAILBOXES_ENV]: JSON.stringify(mailboxes) } : {}),
-    ...(trustDevMail
+    ...(trustImapServer
       ? {
-          VITE_DEV_MAIL_CA: NodeFS.readFileSync(devMailCa, "utf8"),
-          NODE_EXTRA_CA_CERTS: devMailCa,
+          VITE_DEV_MAIL_CA: NodeFS.readFileSync(imapServerCa, "utf8"),
+          NODE_EXTRA_CA_CERTS: imapServerCa,
         }
       : {}),
     FORCE_COLOR: process.env.FORCE_COLOR ?? (process.stdout.isTTY ? "1" : "0"),

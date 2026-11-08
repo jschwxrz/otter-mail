@@ -15,8 +15,19 @@
       "previewUrl": "http://localhost:5833"
     },
     {
+      "name": "Fake (web)",
+      "command": "pnpm dev:fake",
+      "icon": "play",
+      "previewUrl": "http://localhost:5833"
+    },
+    {
       "name": "Dev (Mac app)",
       "command": "pnpm dev:desktop",
+      "icon": "play"
+    },
+    {
+      "name": "Fake (Mac app)",
+      "command": "pnpm dev:desktop:fake",
       "icon": "play"
     },
     {
@@ -27,7 +38,7 @@
     },
     {
       "name": "Demo (Mac app)",
-      "command": "pnpm dev:demo:desktop",
+      "command": "pnpm dev:desktop:demo",
       "icon": "play"
     },
     {

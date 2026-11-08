@@ -77,6 +77,7 @@ jobs:
               node scripts/build-desktop-artifact.ts --help > /dev/null
               node scripts/dev-runner.ts dev --dry-run
               node scripts/dev-runner.ts dev:desktop --dry-run
+              node scripts/dev-runner.ts dev:desktop:fake --dry-run
           - name: Typecheck
             run: vp run typecheck
           - name: Test

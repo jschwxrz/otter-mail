@@ -3,11 +3,15 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
+import { devDataFrom } from "@otter/contracts/dev-data";
+
 /** Must run before `ready` and before anything reads app paths. */
 export function configureAppPaths(): string {
   // Electron names the Keychain (macOS) and libsecret (Linux) key after the name the app has when
   // its startup code is done: this one, the name its secrets were sealed under. `nameApp` renames it at ready.
-  app.setName(app.isPackaged ? "Otter Mail" : "Otter Mail (Dev)");
+  // A dev run on a copy of the installed app's data (`pnpm dev:desktop:real`) opens them with its key.
+  const installedKey = app.isPackaged || devDataFrom(process.env) === "real";
+  app.setName(installedKey ? "Otter Mail" : "Otter Mail (Dev)");
   const configuredHome = (process.env.OTTER_HOME ?? process.env.OTTER_MAIL_HOME)?.trim();
   const home = configuredHome ? path.resolve(configuredHome) : otterHome();
   const useDevDir = !app.isPackaged && !configuredHome;

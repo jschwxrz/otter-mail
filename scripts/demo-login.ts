@@ -1,4 +1,4 @@
-// `pnpm dev:demo:desktop --login` (and `pnpm dev:demo --login`): signs the demo
+// `pnpm dev:desktop:demo --login` (and `pnpm dev:demo --login`): signs the demo
 // Gmail mailboxes in to Google, and the demo Outlook mailboxes in to
 // Microsoft, once, as the app would, and saves each sign-in in .env.local's
 // OTTER_DEMO_MAILBOXES for the demo runs to use

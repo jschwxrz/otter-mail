@@ -3,21 +3,21 @@
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
 import * as NodeNet from "node:net";
-import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
 import { otterHome } from "../apps/desktop/scripts/dev-home.mjs";
 import type { DemoImapMailbox } from "../packages/contracts/src/demo.ts";
 
 const repoRoot = NodePath.resolve(import.meta.dirname, "..");
+// Named before the command was `pnpm imap-server`: every checkout already trusts this CA.
 const certDir = NodePath.join(otterHome(), "dev-mail");
-const compose = ["compose", "-f", NodePath.join(repoRoot, "scripts/dev-mail/compose.yaml")];
+const compose = ["compose", "-f", NodePath.join(repoRoot, "scripts/imap-server/compose.yaml")];
 const DOVECOT = "dovecot/dovecot:2.4.5";
 const USER = "me@otter.test";
 
-export const devMailCa = NodePath.join(certDir, "ca.pem");
+export const imapServerCa = NodePath.join(certDir, "ca.pem");
 
-export const devMailbox: DemoImapMailbox = {
+export const imapServerMailbox: DemoImapMailbox = {
   provider: "imap",
   email: USER,
   password: "pass",
@@ -238,7 +238,7 @@ function seed(): void {
   );
 }
 
-export async function startDevMail(): Promise<void> {
+export async function startImapServer(): Promise<void> {
   makeCertificates();
   docker([...compose, "up", "-d"]);
   await waitForImap();
@@ -250,7 +250,7 @@ if (import.meta.main) {
     docker([...compose, "down"]);
     process.exit(0);
   }
-  await startDevMail();
+  await startImapServer();
   console.log(`Dovecot is up, with a seeded mailbox. Add it in the app with:
 
   Email     ${USER}  (any user @otter.test works; each starts empty but this one)
@@ -260,5 +260,5 @@ if (import.meta.main) {
 
 What it sends lands in Mailpit: http://localhost:8025
 Its certificate is from ~/.otter/dev-mail/ca.pem, which only the dev runs trust.
-Stop it with \`pnpm dev:mail down\`.`);
+Stop it with \`pnpm imap-server down\`.`);
 }
