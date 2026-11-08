@@ -55,6 +55,7 @@ type RunEntry = {
   model?: string;
   delivered?: boolean;
   deliveryStatus?: string;
+  deliverySuppressionReason?: string;
 };
 
 const ADMIN = "operator.admin";
@@ -168,8 +169,8 @@ export function taskOf(
     ...(managed ? { managedBy: managed } : {}),
     ...(paused ? { autoPaused: paused } : {}),
     ...(job.configRevision ? { revision: job.configRevision } : {}),
-    // The gateway sends only an isolated run's result to a channel.
-    ...(job.sessionTarget && job.sessionTarget !== "isolated" ? { undeliverable: true } : {}),
+    // The gateway sends a main-session run's result to no channel.
+    ...(job.sessionTarget === "main" ? { undeliverable: true } : {}),
   };
 }
 
@@ -270,7 +271,7 @@ export async function saveTask(
       schedule,
       ...(input.schedule.kind === "at" ? { deleteAfterRun: true } : {}),
       payload: { kind: "agentTurn", message: input.prompt },
-      delivery: input.deliverToOtter ? otterDelivery : { mode: "none" },
+      delivery: input.resultsTo === "new-chat" ? otterDelivery : { mode: "none" },
     });
     return added.id ?? added.job?.id ?? "";
   }
@@ -303,10 +304,12 @@ export async function saveTask(
         ? { ...job.payload, message: input.prompt }
         : { ...job.payload, text: input.prompt };
   if (input.agent && input.agent !== job.agentId && !job.sessionKey) patch.agentId = input.agent;
-  const toOtter = job.delivery?.mode === "announce" && job.delivery.channel === "otter";
-  if (input.deliverToOtter === true && !toOtter)
+  const delivery = job.delivery;
+  const newChat =
+    delivery?.mode === "announce" && delivery.channel === "otter" && delivery.to === NEW_CHAT;
+  if (input.resultsTo === "new-chat" && !newChat)
     patch.delivery = { ...otterDelivery, ...elsewhereCleared };
-  if (input.deliverToOtter === false && toOtter)
+  if (input.resultsTo === "off" && delivery && delivery.mode !== "none")
     patch.delivery = { mode: "none", channel: null, to: null, ...elsewhereCleared };
   if (Object.keys(patch).length > 0)
     await call(g, "cron.update", {
@@ -353,9 +356,12 @@ export async function taskRuns(g: CronGateway, id: string, limit: number): Promi
       : {}),
     ...(entry.summary ? { summary: entry.summary } : {}),
     ...(entry.model ? { model: entry.model } : {}),
-    ...(entry.deliveryStatus === "delivered" || entry.deliveryStatus === "not-delivered"
-      ? { delivered: entry.deliveryStatus === "delivered" }
-      : {}),
+    // "silent": the agent chose to send nothing, not a failure.
+    ...(entry.deliverySuppressionReason === "silent"
+      ? { silent: true as const }
+      : entry.deliveryStatus === "delivered" || entry.deliveryStatus === "not-delivered"
+        ? { delivered: entry.deliveryStatus === "delivered" }
+        : {}),
   }));
 }
 

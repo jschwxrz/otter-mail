@@ -94,7 +94,7 @@ function useAgentName() {
 
 function deliveryText(delivery: TaskDelivery): string {
   if (delivery.kind === "otter")
-    return delivery.chat === "new" ? "A new chat in Otter each time" : "One chat in Otter";
+    return delivery.chat === "new" ? "A new chat in Otter each time" : "Its chat in Otter";
   if (delivery.kind === "none") return "Kept on the agent: not sent anywhere";
   return `Sent to ${delivery.label}`;
 }
@@ -801,7 +801,9 @@ function RunTranscript({ task, run }: { task: ScheduledTask; run: TaskRun }) {
   return (
     <div className="ms-7 me-2 mb-2 flex flex-col gap-2 border-s border-border/70 ps-3 pt-1 text-sm">
       {run.error ? <p className="text-destructive-foreground">{run.error}</p> : null}
-      {run.delivered === false ? (
+      {run.silent ? (
+        <p className="text-xs text-muted-foreground">It chose to send nothing this time.</p>
+      ) : run.delivered === false ? (
         <p className="text-xs text-muted-foreground">Its result wasn't delivered.</p>
       ) : null}
       {transcript.isLoading ? (
@@ -834,6 +836,9 @@ const REPEATS: { value: Repeat; label: string }[] = [
   { value: "cron", label: "Custom (cron)" },
 ];
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+/** Where results go: as they do now ("This chat", another channel), a new chat each run, or nowhere. */
+type ResultsTo = "keep" | "new-chat" | "off";
+
 /** The select's value for a schedule with no zone of its own: the agent's. */
 const AGENT_ZONE = "agent";
 const TIMED = new Set<Repeat>(["daily", "weekdays", "weekly", "monthly"]);
@@ -911,8 +916,16 @@ function TaskEditor({
   const [when, setWhen] = useState<WhenForm>(
     () => (task && whenFormOf(task.schedule)) || newWhenForm(),
   );
-  const [toOtter, setToOtter] = useState(
-    task ? task.delivery.kind === "otter" : Boolean(can?.deliverToOtter),
+  const [resultsTo, setResultsTo] = useState<ResultsTo>(() =>
+    !task
+      ? can?.deliverToOtter
+        ? "new-chat"
+        : "off"
+      : task.delivery.kind === "none"
+        ? "off"
+        : task.delivery.kind === "otter" && task.delivery.chat === "new"
+          ? "new-chat"
+          : "keep",
   );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -948,7 +961,7 @@ function TaskEditor({
         ...(asksPrompt ? { prompt: prompt.trim() } : {}),
         schedule: schedule(),
         ...(!task && agent ? { agent } : {}),
-        ...(can?.deliverToOtter ? { deliverToOtter: toOtter } : {}),
+        ...(can?.deliverToOtter && resultsTo !== "keep" ? { resultsTo } : {}),
         ...(task?.revision ? { revision: task.revision } : {}),
       });
       await qc.invalidateQueries({ queryKey: TASKS_KEY });
@@ -984,7 +997,7 @@ function TaskEditor({
               onChange={(value) => {
                 setOwner(value);
                 const next = agents.find((a) => a.provider === value.split("|")[0]);
-                setToOtter(Boolean(next?.can.deliverToOtter));
+                setResultsTo(next?.can.deliverToOtter ? "new-chat" : "off");
               }}
               options={choices.map((o) => ({ value: ownerKey(o), label: o.label }))}
             />
@@ -1115,19 +1128,28 @@ function TaskEditor({
         </Field>
         {task?.undeliverable ? null : can?.deliverToOtter ? (
           <Field
-            orientation="horizontal"
-            label="Send results to Otter"
+            label="Send results to"
             description={
-              toOtter
-                ? task?.delivery.kind === "otter" && task.delivery.chat === "one"
-                  ? "Each run's result arrives in the same chat, and notifies you."
-                  : "Each run's result arrives as a new chat, and notifies you."
-                : task && task.delivery.kind === "elsewhere"
-                  ? `Results go to ${task.delivery.label}.`
-                  : "Results stay on the agent."
+              resultsTo === "off"
+                ? "Results stay on the agent."
+                : "Each run's result arrives in Otter, and notifies you."
             }
           >
-            <Switch checked={toOtter} onCheckedChange={setToOtter} />
+            <SelectField
+              label="Send results to"
+              value={resultsTo}
+              onChange={(value) => setResultsTo(value as ResultsTo)}
+              className="self-start"
+              options={[
+                ...(task?.delivery.kind === "otter" && task.delivery.chat === "one"
+                  ? [{ value: "keep", label: "This chat" }]
+                  : task?.delivery.kind === "elsewhere"
+                    ? [{ value: "keep", label: task.delivery.label }]
+                    : []),
+                { value: "new-chat", label: "A new chat each time" },
+                { value: "off", label: "Off" },
+              ]}
+            />
           </Field>
         ) : provider === "openclaw" ? (
           <p className="text-xs text-muted-foreground">

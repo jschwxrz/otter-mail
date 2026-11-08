@@ -164,6 +164,9 @@ describe("taskOf", () => {
 
   it("knows a task in a shared session can't send its results anywhere", () => {
     expect(taskOf({ ...brief, sessionTarget: "main" } as never, "main").undeliverable).toBe(true);
+    expect(
+      taskOf({ ...brief, sessionTarget: "current" } as never, "main").undeliverable,
+    ).toBeUndefined();
     expect(taskOf(brief as never, "main").undeliverable).toBeUndefined();
   });
 
@@ -218,7 +221,7 @@ describe("saveTask", () => {
       prompt: "Summarise",
       agent: "rowan",
       schedule: { kind: "cron", expr: "0 8 * * *", tz: "Europe/London" },
-      deliverToOtter: true,
+      resultsTo: "new-chat",
     });
     expect(calls).toEqual([
       {
@@ -256,7 +259,7 @@ describe("saveTask", () => {
       name: "Morning brief",
       prompt: "Summarise my inbox and calendar",
       schedule: { kind: "cron", expr: "0 8 * * 1-5", tz: "Europe/Paris" },
-      deliverToOtter: false,
+      resultsTo: "off",
     });
     expect(calls[1]).toEqual({
       method: "cron.update",
@@ -319,6 +322,29 @@ describe("saveTask", () => {
     expect(later.calls[1].params.patch).toMatchObject({ deleteAfterRun: false });
   });
 
+  it("keeps a chat's own delivery unless asked to change it", async () => {
+    const inChat = {
+      ...brief,
+      sessionTarget: "current",
+      sessionKey: "agent:main:abc",
+      delivery: { mode: "announce", channel: "otter", to: "chat:agent:main:abc" },
+    };
+    const { g, calls } = fakeGateway((method) => (method === "cron.get" ? inChat : {}));
+    await saveTask(g, "brief", {
+      name: "Morning brief",
+      schedule: { kind: "cron", expr: "0 8 * * 1-5", tz: "Europe/Paris" },
+    });
+    expect(calls.map((c) => c.method)).toEqual(["cron.get"]);
+    await saveTask(g, "brief", {
+      name: "Morning brief",
+      schedule: { kind: "cron", expr: "0 8 * * 1-5", tz: "Europe/Paris" },
+      resultsTo: "new-chat",
+    });
+    expect(calls.at(-1)?.params.patch).toMatchObject({
+      delivery: { channel: "otter", to: "chat:new" },
+    });
+  });
+
   it("keeps a stagger of zero", async () => {
     const exact = { ...brief, schedule: { ...brief.schedule, staggerMs: 0 } };
     const { g, calls } = fakeGateway((method) => (method === "cron.get" ? exact : {}));
@@ -356,7 +382,7 @@ describe("saveTask", () => {
     await saveTask(g, "brief", {
       name: "Morning brief",
       schedule: { kind: "cron", expr: "0 8 * * 1-5", tz: "Europe/Paris" },
-      deliverToOtter: true,
+      resultsTo: "new-chat",
     });
     expect(calls[1].params.patch).toEqual({
       delivery: {
@@ -394,7 +420,7 @@ describe("saveTask", () => {
       name: "Morning brief",
       prompt: "Summarise my inbox",
       schedule: { kind: "cron", expr: "0 8 * * 1-5", tz: "Europe/Paris" },
-      deliverToOtter: true,
+      resultsTo: "new-chat",
     });
     expect(calls.map((c) => c.method)).toEqual(["cron.get"]);
   });
@@ -445,6 +471,14 @@ describe("runs", () => {
           summary: "All quiet",
           deliveryStatus: "unknown",
         },
+        {
+          ts: 3,
+          jobId: "brief",
+          action: "finished",
+          status: "ok",
+          deliveryStatus: "not-delivered",
+          deliverySuppressionReason: "silent",
+        },
       ],
     }));
     expect(await taskRuns(g, "brief", 20)).toEqual([
@@ -458,6 +492,7 @@ describe("runs", () => {
         delivered: false,
       },
       { id: "at:5", at: 5, status: "ok", summary: "All quiet" },
+      { id: "at:3", at: 3, status: "ok", silent: true },
     ]);
     expect(calls[0].params).toEqual({ id: "brief", limit: 20, sortDir: "desc" });
   });

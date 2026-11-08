@@ -86,7 +86,7 @@ export function scheduledTaskInputOf(raw: unknown, editing = false): ScheduledTa
     ...(prompt !== undefined ? { prompt } : {}),
     schedule,
     ...(str(p?.agent) ? { agent: str(p?.agent) } : {}),
-    ...(typeof p?.deliverToOtter === "boolean" ? { deliverToOtter: p.deliverToOtter } : {}),
+    ...(p?.resultsTo === "new-chat" || p?.resultsTo === "off" ? { resultsTo: p.resultsTo } : {}),
     ...(str(p?.revision) ? { revision: str(p?.revision) } : {}),
   };
 }

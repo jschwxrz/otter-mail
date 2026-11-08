@@ -89,7 +89,7 @@ describe("a task as the app sends it", () => {
         prompt: " Go ",
         schedule: { kind: "cron", expr: " 0 8 * * 1-5 ", tz: "Europe/Paris" },
         agent: "rowan",
-        deliverToOtter: true,
+        resultsTo: "new-chat",
         extra: "ignored",
       }),
     ).toEqual({
@@ -97,7 +97,7 @@ describe("a task as the app sends it", () => {
       prompt: "Go",
       schedule: { kind: "cron", expr: "0 8 * * 1-5", tz: "Europe/Paris" },
       agent: "rowan",
-      deliverToOtter: true,
+      resultsTo: "new-chat",
     });
     expect(scheduledTaskInputOf({ name: "x", schedule: { kind: "at", at: future } })).toEqual({
       name: "x",

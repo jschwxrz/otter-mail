@@ -64,8 +64,8 @@ export interface ScheduledTaskInput {
   prompt?: string;
   schedule: Exclude<TaskSchedule, { kind: "other" }>;
   agent?: string;
-  /** Unset leaves it where it goes. */
-  deliverToOtter?: boolean;
+  /** Where its results go: a new Otter chat each run, or nowhere. Unset leaves them where they go (this chat, another channel). */
+  resultsTo?: "new-chat" | "off";
   /** The version edited (`ScheduledTask.revision`). */
   revision?: string;
 }
@@ -79,4 +79,6 @@ export interface TaskRun {
   summary?: string;
   model?: string;
   delivered?: boolean;
+  /** The agent chose to send nothing this time. */
+  silent?: true;
 }
