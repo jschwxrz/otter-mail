@@ -700,8 +700,11 @@ describe("what an agent delivers to Otter", () => {
   it("is caught up on in a watched chat when the gateway says it changed, with no pointer", async () => {
     const now = Date.now();
     let messages: unknown[] = [sent, row("req-1", [{ type: "text", text: "Scheduled." }])];
+    let updatedAt = now - 1;
     gateway((method) => {
-      if (method === "sessions.list") return { sessions: [{ key: "s", lastActivityAt: now }] };
+      // As the gateway keeps it: the result moves the session's updatedAt, not its lastActivityAt.
+      if (method === "sessions.list")
+        return { sessions: [{ key: "s", lastActivityAt: now - 1, updatedAt }] };
       if (method === "chat.history") return { messages };
       return undefined;
     });
@@ -715,6 +718,7 @@ describe("what an agent delivers to Otter", () => {
 
     // A scheduled job's result, kept in the chat when it had no channel to go to.
     messages = [...messages, delivered("d-changed", "ping from the 1-minute automation", now)];
+    updatedAt = now;
     event("sessions.changed", {});
     await vi.waitFor(
       () =>

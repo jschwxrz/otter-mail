@@ -1363,7 +1363,8 @@ async function catchUpSessions(g: Gateway): Promise<void> {
     const since =
       watched === undefined ? Date.now() - DELIVERED_BACKLOG_MS : fresh.has(key) ? 0 : watched;
     const active = (row.activeRunIds as string[] | undefined) ?? [];
-    const activity = Number(row.lastActivityAt ?? row.updatedAt) || 0;
+    // A job's result written into a chat moves its updatedAt only, not its lastActivityAt.
+    const activity = Math.max(Number(row.lastActivityAt) || 0, Number(row.updatedAt) || 0);
     if (active.length === 0 && activity <= since) continue;
     const { messages } = await g.client.request<{ messages?: Record<string, unknown>[] }>(
       "chat.history",
