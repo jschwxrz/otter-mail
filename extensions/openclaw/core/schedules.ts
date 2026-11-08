@@ -445,11 +445,16 @@ export function deliveryPatch(
         (wanted.mode !== "announce" ||
           (str(now.accountId) ?? null) === (str(wanted.accountId) ?? null))));
   if (same) return null;
+  // A topic belongs to its chat: it goes with a new chat, not with a new account.
+  const sameChat =
+    now.mode === wanted.mode &&
+    str(now.channel) === str(wanted.channel) &&
+    str(now.to) === str(wanted.to);
   return {
     channel: null,
     to: null,
     accountId: null,
-    threadId: null,
+    ...(sameChat ? {} : { threadId: null }),
     ...(wanted.mode === "announce" ? {} : { completionDestination: null }),
     ...wanted,
   };
@@ -568,7 +573,9 @@ export async function taskRuns(g: CronGateway, id: string, limit: number): Promi
       ? { silent: true as const }
       : entry.deliveryStatus === "delivered" || entry.deliveryStatus === "not-delivered"
         ? { delivered: entry.deliveryStatus === "delivered" }
-        : {}),
+        : typeof entry.delivery?.resolved?.ok === "boolean"
+          ? { delivered: entry.delivery.resolved.ok }
+          : {}),
   }));
 }
 

@@ -831,7 +831,11 @@ function RunTranscript({
         run.sentTo.channel === "otter"
           ? "Otter"
           : (agent.channels.find((c) => c.id === run.sentTo!.channel)?.label ?? run.sentTo.channel),
-        run.sentTo.channel === "otter" ? null : run.sentTo.to,
+        run.sentTo.channel === "otter"
+          ? null
+          : run.sentTo.to && /^https?:\/\//i.test(run.sentTo.to)
+            ? hostOf(run.sentTo.to)
+            : run.sentTo.to,
       ]
         .filter(Boolean)
         .join(" ")
@@ -908,12 +912,15 @@ function destinationOf(task: ScheduledTask | null, agent?: AgentScheduledTasks):
   const none = { to: "", account: "", url: "" };
   if (!task) return { ...none, pick: agent?.can.deliverToOtter ? "new-chat" : "off" };
   const d = task.delivery;
+  // A chat it can't post to (or Otter's, gone from the gateway) stays as it is: "keep".
+  const chats = !task.undeliverable;
   if (d.kind === "none") return { ...none, pick: "off" };
-  if (d.kind === "otter" && d.chat === "new") return { ...none, pick: "new-chat" };
-  if (d.kind === "webhook") return { ...none, pick: "webhook", url: d.url };
+  if (d.kind === "otter" && d.chat === "new" && chats && agent?.can.deliverToOtter)
+    return { ...none, pick: "new-chat" };
+  if (d.kind === "webhook" && agent?.can.webhooks) return { ...none, pick: "webhook", url: d.url };
   // A channel left to resolve its own recipient keeps going there until you name one.
-  if (d.kind === "channel" && d.to && agent?.channels.some((c) => c.id === d.channel))
-    return { ...none, pick: `channel:${d.channel}`, to: d.to ?? "", account: d.accountId ?? "" };
+  if (d.kind === "channel" && d.to && chats && agent?.channels.some((c) => c.id === d.channel))
+    return { ...none, pick: `channel:${d.channel}`, to: d.to, account: d.accountId ?? "" };
   return { ...none, pick: "keep" };
 }
 
@@ -959,12 +966,7 @@ function ResultsField({
     staleTime: 60_000,
   });
   const d = task?.delivery;
-  const keep =
-    d?.kind === "otter" && d.chat === "one"
-      ? "This chat"
-      : d?.kind === "channel" || d?.kind === "elsewhere"
-        ? deliveryText(d)
-        : null;
+  const keep = !d ? null : d.kind === "otter" && d.chat === "one" ? "This chat" : deliveryText(d);
   const options = [
     ...(keep && destinationOf(task, agent).pick === "keep" ? [{ value: "keep", label: keep }] : []),
     ...(chats && agent.can.deliverToOtter
@@ -975,8 +977,9 @@ function ResultsField({
     { value: "off", label: "Off" },
   ];
   const set = (patch: Partial<Destination>) => onChange({ ...value, ...patch });
+  const account = value.account || channel?.defaultAccount || channel?.accounts[0];
   const suggestions = (targets.data ?? []).filter(
-    (t) => !value.account || !t.accountId || t.accountId === value.account,
+    (t) => !account || !t.accountId || t.accountId === account,
   );
   const listId = `targets-${agent.provider}-${channel?.id ?? ""}`;
   return (
@@ -1000,12 +1003,17 @@ function ResultsField({
           value={value.pick}
           onChange={(pick) => {
             const next = agent.channels.find((c) => `channel:${c.id}` === pick);
+            const same = d?.kind === "channel" && `channel:${d.channel}` === pick;
             onChange({
               ...value,
               pick,
-              to: d?.kind === "channel" && `channel:${d.channel}` === pick ? (d.to ?? "") : "",
+              to: same ? (d.to ?? "") : "",
               account:
-                next && next.accounts.length > 1 ? (next.defaultAccount ?? next.accounts[0]) : "",
+                same && d.accountId
+                  ? d.accountId
+                  : next && next.accounts.length > 1
+                    ? (next.defaultAccount ?? next.accounts[0])
+                    : "",
             });
           }}
           options={options}

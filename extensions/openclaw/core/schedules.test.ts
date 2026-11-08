@@ -506,6 +506,28 @@ describe("saveTask", () => {
     });
   });
 
+  it("keeps a forum topic when only the account changes", async () => {
+    const topic = {
+      ...brief,
+      delivery: {
+        mode: "announce",
+        channel: "telegram",
+        to: "-100123",
+        threadId: 7,
+        accountId: "a",
+      },
+    };
+    const { g, calls } = fakeGateway((method) => (method === "cron.get" ? topic : {}));
+    await saveTask(g, "brief", {
+      name: "Morning brief",
+      schedule: { kind: "cron", expr: "0 8 * * 1-5", tz: "Europe/Paris" },
+      resultsTo: { kind: "channel", channel: "telegram", to: "-100123", accountId: "b" },
+    });
+    expect(calls[1].params.patch).toEqual({
+      delivery: { mode: "announce", channel: "telegram", to: "-100123", accountId: "b" },
+    });
+  });
+
   it("leaves results alone when they already go there", async () => {
     const slack = {
       ...brief,
@@ -609,6 +631,13 @@ describe("runs", () => {
           deliveryStatus: "unknown",
         },
         {
+          ts: 4,
+          jobId: "brief",
+          action: "finished",
+          status: "ok",
+          delivery: { resolved: { channel: "telegram", to: "@me", ok: true } },
+        },
+        {
           ts: 3,
           jobId: "brief",
           action: "finished",
@@ -631,6 +660,13 @@ describe("runs", () => {
         delivered: false,
       },
       { id: "at:5", at: 5, status: "ok", summary: "All quiet" },
+      {
+        id: "at:4",
+        at: 4,
+        status: "ok",
+        sentTo: { channel: "telegram", to: "@me" },
+        delivered: true,
+      },
       { id: "at:3", at: 3, status: "ok", silent: true },
     ]);
     expect(calls[0].params).toEqual({ id: "brief", limit: 20, sortDir: "desc" });
