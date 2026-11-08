@@ -1,5 +1,5 @@
 import type { UiExtension } from "@otter/web/extension-kit";
-import { CheckIcon, ListTodoIcon } from "lucide-react";
+import { CheckIcon, ListPlusIcon } from "lucide-react";
 
 import { manifest } from "../manifest";
 import { todoistApi } from "./api";
@@ -15,7 +15,7 @@ export default {
       id: "todoist:add",
       label: "Add to Todoist",
       menuLabel: "Add to Todoist…",
-      Icon: ListTodoIcon,
+      Icon: ListPlusIcon,
       toolbar: true,
       run: addEmailToTodoist,
     },

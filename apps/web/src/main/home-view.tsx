@@ -1850,6 +1850,16 @@ function MailHome() {
                 onClearQuote={() => setPendingQuote(null)}
                 onOpenChange={openChatChange}
                 onOpenWorkspace={openWorkspace}
+                onOpenTask={(key) => {
+                  setChatWindow(false);
+                  go({
+                    mailbox: CHATS_SPACE,
+                    label: SCHEDULED_TASKS,
+                    messageId: key,
+                    account: null,
+                    focusId: null,
+                  });
+                }}
                 onMinimize={() => setChatWindow(false)}
                 onShelve={closeChat}
                 inputRef={chatInputRef}
