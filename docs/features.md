@@ -246,6 +246,7 @@ chats read the same everywhere and continue on that Mac.
 | Tabs: pages it read, events it made, links clicked in it                | ✓                   | — (links: a new tab) | —                                          |
 | The tab showing is the next message's context                           | ✓                   | ✓                    | —                                          |
 | Tabs: reorder by dragging, Control + Tab for the last one, × closes     | ✓                   | ✓                    | —                                          |
+| Chat details: agent, session, what it made and read (closed tabs too)   | ✓                   | ✓                    | —                                          |
 | Synced through the Otter account: chats, transcripts, tabs              | ✓ (offline: queued) | ✓                    | ✓ (no tabs)                                |
 | Claude and Codex chats: read everywhere, continued on their Mac         | ✓                   | ✓ (read)             | ✓ (read)                                   |
 | Another agent's chat (Hermes, OpenClaw, OpenRouter): continued          | ✓                   | ✓                    | ✓ (that agent picked)                      |
