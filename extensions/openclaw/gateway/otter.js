@@ -1,4 +1,5 @@
 // What the plugin does, apart from OpenClaw's SDK, so Otter's tests can run it.
+import { randomUUID } from "node:crypto";
 
 /** Who sends what you type in Otter: the gateway's owner once `commands.ownerAllowFrom` lists `otter:owner`. */
 export const OWNER = "owner";
@@ -106,6 +107,45 @@ export async function tell(account, pointer, { fetch = globalThis.fetch, signal 
   if (!response.ok) throw new Error(`Otter's relay answered ${response.status}`);
   return true;
 }
+
+/** A delivery to Otter: kept on the gateway even when the relay can't be told of it. */
+export async function deliver(ctx, payload, { warn, fetch } = {}) {
+  const pointer = pointerOf({ sessionKey: ctx.sessionKey, to: ctx.to, payload });
+  try {
+    await tell(accountOf(ctx.cfg), pointer, { fetch, signal: ctx.signal });
+  } catch (error) {
+    if (ctx.signal?.aborted) throw error;
+    warn?.(`otter: couldn't tell Otter's devices of a delivery: ${String(error)}`);
+  }
+  return { channel: "otter", messageId: randomUUID(), timestamp: pointer.at };
+}
+
+/**
+ * Runs `prepare`, then `run` with what it made, in `detach(work, fail)`: settles once prepared,
+ * with `prepare`'s error or `detach`'s; what `run` throws goes to `warn`.
+ */
+export const startDetached = (detach, prepare, run, warn) =>
+  new Promise((resolve, reject) => {
+    const work = async () => {
+      let ready;
+      try {
+        ready = await prepare();
+      } catch (error) {
+        return reject(error);
+      }
+      resolve();
+      try {
+        await run(ready);
+      } catch (error) {
+        warn?.(error);
+      }
+    };
+    try {
+      detach(work, reject);
+    } catch (error) {
+      reject(error);
+    }
+  });
 
 /** A message sent from Otter, checked: where it goes and what it carries. */
 export function messageOf(params) {

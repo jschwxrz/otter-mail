@@ -81,12 +81,17 @@ function send() {
 
 const sendsWith = (method: string) =>
   vi.waitFor(() =>
-    expect(fixture.request).toHaveBeenCalledWith(method, {
-      sessionKey: "s",
-      message: "Get my check-ins automation",
-      idempotencyKey: "req-1",
-    }),
+    expect(fixture.request).toHaveBeenCalledWith(
+      method,
+      {
+        sessionKey: "s",
+        message: "Get my check-ins automation",
+        idempotencyKey: "req-1",
+      },
+      expect.anything(),
+    ),
   );
+const methods = () => fixture.request.mock.calls.map(([method]) => method);
 
 describe("what you send from Otter", () => {
   it("goes through the Otter channel, as its owner, when the gateway has the plugin", async () => {
@@ -94,7 +99,7 @@ describe("what you send from Otter", () => {
     answer();
     send();
     await sendsWith("otter.chat.send");
-    expect(fixture.request).not.toHaveBeenCalledWith("chat.send", expect.anything());
+    expect(methods()).not.toContain("chat.send");
   });
 
   it("is chat.send when the gateway doesn't list Otter as an owner, or has no plugin", async () => {
@@ -108,7 +113,7 @@ describe("what you send from Otter", () => {
     answer();
     send();
     await sendsWith("chat.send");
-    expect(fixture.request).not.toHaveBeenCalledWith("otter.chat.send", expect.anything());
+    expect(methods()).not.toContain("otter.chat.send");
   });
 
   it("is chat.send from a device without full access, which the plugin's method needs", async () => {
@@ -116,7 +121,7 @@ describe("what you send from Otter", () => {
     answer();
     send();
     await sendsWith("chat.send");
-    expect(fixture.request).not.toHaveBeenCalledWith("otter.chat.send", expect.anything());
+    expect(methods()).not.toContain("otter.chat.send");
   });
 
   it("isn't sent twice when the plugin fails for another reason", async () => {
@@ -124,7 +129,7 @@ describe("what you send from Otter", () => {
     answer((method) => (method === "otter.chat.send" ? new Error("unreachable") : undefined));
     const events = send();
     await vi.waitFor(() => expect(events.some((e) => e.type === "error")).toBe(true));
-    expect(fixture.request).not.toHaveBeenCalledWith("chat.send", expect.anything());
+    expect(methods()).not.toContain("chat.send");
   });
 
   it("is still this device's send when it comes back under the channel's own key", () => {

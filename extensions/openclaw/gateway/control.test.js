@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { CONTROL_TTL_MS, cdpInput, createBrowserControl } from "./control.js";
 
-const fixture = async ({ answerDialog } = {}) => {
+const fixture = async ({ answerDialog, connect } = {}) => {
   let time = 1000;
   const sent = [];
   const calls = [];
@@ -25,7 +25,7 @@ const fixture = async ({ answerDialog } = {}) => {
   const control = createBrowserControl({
     cdpUrlFor: async () => "http://127.0.0.1:18800/",
     answerDialog,
-    connect: async () => page,
+    connect: connect ?? (async () => page),
     now: () => time,
     uploads,
   });
@@ -158,6 +158,29 @@ describe("taking control of the agent's browser", () => {
     expect(params.backendNodeId).toBe(42);
     expect(path.basename(params.files[0])).toBe("lease.pdf");
     expect(await readFile(params.files[0], "utf8")).toBe("%PDF");
+  });
+
+  it("still asks for the file after an upload it refused", async () => {
+    const { control, emit, calls } = await fixture();
+    await control.take("tab");
+    emit("Page.fileChooserOpened", { backendNodeId: 42, mode: "selectSingle" });
+    const huge = "A".repeat(14 * 1024 * 1024);
+    await expect(control.upload("tab", undefined, [{ name: "a", data: huge }])).rejects.toThrow(
+      /too large/,
+    );
+    await control.upload("tab", undefined, [{ name: "a.txt", data: btoa("a") }]);
+    expect(calls.at(-1)[1].backendNodeId).toBe(42);
+    await expect(control.upload("tab", undefined, [])).rejects.toThrow(/isn't asking/);
+  });
+
+  it("lets the agent act again when taking a tab fails", async () => {
+    const { control } = await fixture({
+      connect: async () => {
+        throw new Error("That tab has closed.");
+      },
+    });
+    await expect(control.take("tab")).rejects.toThrow(/closed/);
+    expect(control.allows({ action: "act" })).toBe(true);
   });
 
   it("sends keys and clicks as a person's", () => {

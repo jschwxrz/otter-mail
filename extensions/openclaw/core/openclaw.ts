@@ -36,6 +36,7 @@ import { OPENCLAW_DEFAULTS, type OpenClawSettings } from "./settings.js";
 import {
   GatewayBrowserDeviceAuthLifecycle,
   GatewayProtocolClient,
+  GatewayProtocolRequestError,
   type EventFrame,
   type GatewayBrowserDeviceAuthPlan,
   type GatewayBrowserDeviceIdentity,
@@ -54,6 +55,11 @@ import {
 } from "./schedules.js";
 
 const CONNECT_TIMEOUT_MS = 8_000;
+/** What a request waits for unless it says otherwise; without one, a request on a dead socket waits forever. */
+const REQUEST_TIMEOUT_MS = 30_000;
+const FILE_TIMEOUT_MS = 120_000;
+/** The gateway's limit on one message (25 MB), less room for the frame around it. */
+const MAX_MESSAGE_BYTES = 24 * 1024 * 1024;
 /**
  * What this device asks for: what OpenClaw's own apps hold. The gateway counts
  * a chat's turns as the owner's (its `nodes` tool, its own settings) only from a
@@ -163,6 +169,7 @@ const OTTER_OWNER = "otter:owner";
 
 let fullAccess: boolean | null = null;
 let fullAccessRequest: string | null = null;
+let fullAccessChanged = () => {};
 
 export function openClawFullAccess(): { allowed: boolean | null; request: string | null } {
   return { allowed: fullAccess, request: fullAccessRequest };
@@ -171,6 +178,8 @@ export function openClawFullAccess(): { allowed: boolean | null; request: string
 const holdsAll = (scopes: string[]) => SCOPES.every((scope) => scopes.includes(scope));
 
 let current: { url: string; ready: Promise<Gateway> } | null = null;
+/** Connections reset for new credentials: what was retrying for the old ones stops. */
+let resets = 0;
 const listeners = new Set<(event: EventFrame) => void>();
 const closeListeners = new Set<(client: Gateway["client"]) => void>();
 
@@ -199,6 +208,29 @@ function open(url: string, { token, bootstrapToken }: Credentials): Promise<Gate
     let settled = false;
     let scopes: string[] = [];
     let methods: string[] = [];
+    let lastActivity = Date.now();
+    let tickWatch: ReturnType<typeof setInterval> | undefined;
+    const dropped = () => {
+      clearInterval(tickWatch);
+      if (current?.url === url) current = null;
+      settle(new Error("Can't reach the gateway."));
+      for (const listener of closeListeners) listener(client);
+    };
+    // The gateway ticks every `tickIntervalMs`. A socket that goes quiet (the Mac
+    // slept, the network changed) can stay open for minutes without a close, and
+    // closing it waits on the dead connection too, so after two missed ticks it's
+    // dropped at once, as OpenClaw's own clients do.
+    const watchTicks = (intervalMs: number) => {
+      clearInterval(tickWatch);
+      lastActivity = Date.now();
+      tickWatch = setInterval(() => {
+        if (!client.connected) return clearInterval(tickWatch);
+        if (Date.now() - lastActivity <= intervalMs * 2) return;
+        logger.info("agent", "openclaw gateway went quiet", { url });
+        client.stop();
+        dropped();
+      }, intervalMs);
+    };
     const settle = (error: Error | null) => {
       if (settled) return;
       settled = true;
@@ -261,26 +293,34 @@ function open(url: string, { token, bootstrapToken }: Credentials): Promise<Gate
         scopes = hello.auth?.scopes ?? [];
         methods = (hello as { features?: { methods?: string[] } }).features?.methods ?? [];
         fullAccess = holdsAll(scopes);
+        watchTicks(hello.policy?.tickIntervalMs ?? 30_000);
         if (bootstrapToken) void clearOpenClawBootstrapToken();
         settle(null);
+        if (fullAccess) fullAccessRequest = null;
+        else waitForFullAccess(url, client);
+        // A watch waiting out its backoff needn't: the gateway is back.
+        if (rewatchPending) scheduleWatch(0);
       },
       onConnectFailure: (error) => {
         const details = (error as { details?: { code?: string; requestId?: string } }).details;
-        if (details?.code === "PAIRING_REQUIRED") pairingRequest = details.requestId ?? null;
+        pairingRequest = details?.code === "PAIRING_REQUIRED" ? (details.requestId ?? null) : null;
         settle(error);
         return { closeCode: 1000, closeReason: "connect failed", stop: true, error };
       },
-      onConnectError: (error) => settle(error),
-      resolveClose: () => ({ retry: false, notify: false }),
-      onClose: () => {
-        if (current?.url === url) current = null;
-        settle(new Error("Can't reach the gateway."));
-        for (const listener of closeListeners) listener(client);
+      onConnectError: (error) => {
+        pairingRequest = null;
+        settle(error);
       },
+      resolveClose: () => ({ retry: false, notify: false }),
+      onActivity: () => {
+        lastActivity = Date.now();
+      },
+      onClose: dropped,
       onEvent: (event) => {
         for (const listener of listeners) listener(event);
       },
       handshake: { mode: "require-challenge", timeoutMs: CONNECT_TIMEOUT_MS },
+      requestTimeoutMs: REQUEST_TIMEOUT_MS,
       reconnect: { initialMs: 1_000, multiplier: 2, maxMs: 30_000 },
     });
     client.start();
@@ -314,7 +354,12 @@ function disconnect(): void {
     .catch(() => {});
 }
 
-export async function resetOpenClawConnection(): Promise<void> {
+/** Before connecting to `url` with new credentials: nothing goes on reaching the gateway it had. */
+export async function resetOpenClawConnection(url: string): Promise<void> {
+  resets++;
+  if (watching) watching.settings = { ...watching.settings, url };
+  for (const [requestId, turn] of turns)
+    turn.finish({ requestId, type: "error", message: "detached" });
   disconnect();
   pairingRequest = null;
   fullAccess = null;
@@ -340,8 +385,21 @@ export async function allowOpenClawFullAccess(
     { scopes: [...new Set([...g.scopes, ...SCOPES])] },
   );
   fullAccessRequest = requestId;
+  fullAccessChanged = changed;
   changed();
-  g.client
+  waitForFullAccess(g.url, g.client);
+}
+
+/** Waits on the pending upgrade on this connection; one that drops leaves it pending for the next. */
+function waitForFullAccess(url: string, client: Gateway["client"]): void {
+  const requestId = fullAccessRequest;
+  if (!requestId) return;
+  const done = () => {
+    if (fullAccessRequest !== requestId) return;
+    fullAccessRequest = null;
+    fullAccessChanged();
+  };
+  client
     .request<{ status: string; deviceToken?: string; scopes?: string[] }>(
       "device.scopes.waitUpgrade",
       { requestId },
@@ -349,18 +407,16 @@ export async function allowOpenClawFullAccess(
     )
     .then(async (result) => {
       logger.info("agent", "openclaw full access upgrade", { status: result.status });
+      done();
       if (result.status !== "approved" || !result.deviceToken) return;
       await setOpenClawDeviceToken(
         JSON.stringify({ token: result.deviceToken, scopes: result.scopes ?? [] }),
       );
-      if (current?.url === g.url) disconnect();
+      if (current?.url === url) disconnect();
     })
-    .catch((error: unknown) =>
-      logger.info("agent", "openclaw full access upgrade failed", { error: String(error) }),
-    )
-    .finally(() => {
-      if (fullAccessRequest === requestId) fullAccessRequest = null;
-      changed();
+    .catch((error: unknown) => {
+      logger.info("agent", "openclaw full access upgrade failed", { error: String(error) });
+      if (error instanceof GatewayProtocolRequestError) done();
     });
 }
 
@@ -906,7 +962,8 @@ async function watch(turn: Turn): Promise<void> {
 
 function catchUp(turn: Turn, state: RunState): void {
   turn.resynced = true;
-  turn.emit({ requestId: turn.requestId, type: "transcript", messages: state.messages });
+  if (state.found)
+    turn.emit({ requestId: turn.requestId, type: "transcript", messages: state.messages });
   turn.text.replay();
 }
 
@@ -921,7 +978,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 async function follow(
   turn: Turn,
   settings: OpenClawSettings,
-  start: () => Promise<void>,
+  start: (going: () => boolean) => Promise<void>,
 ): Promise<void> {
   const { requestId, sessionKey, emit } = turn;
   let ended: (() => void) | null = null;
@@ -944,7 +1001,8 @@ async function follow(
     if (turn.resynced || open.size > 0 || bare.size > 0) {
       try {
         state ??= await runState(turn);
-        if (ended) emit({ requestId, type: "transcript", messages: state.messages });
+        // Its message scrolled out of the history read: what streamed stays.
+        if (ended && state.found) emit({ requestId, type: "transcript", messages: state.messages });
       } catch (error) {
         logger.info("agent", "openclaw transcript unavailable", { error: String(error) });
       }
@@ -959,7 +1017,7 @@ async function follow(
     // The runs before it yielded: they're over.
     for (const id of [turn.runId, ...turn.steers]) turn.finals.add(id);
     turn.steers.add(runId);
-    announced.add(runId);
+    remember(announced, runId);
     turn.yielded = false;
     turn.text.nextRun();
   };
@@ -985,10 +1043,21 @@ async function follow(
     }
   };
 
+  let reconnecting = false;
   const reconnect = async () => {
+    if (reconnecting) return;
+    reconnecting = true;
     clearTimeout(quiet);
-    for (const delay of RECONNECT_DELAYS_MS) {
-      await sleep(delay);
+    try {
+      await pickUp();
+    } finally {
+      reconnecting = false;
+    }
+  };
+  // Until the gateway is back, however long that takes (a sleep, a slow restart).
+  const pickUp = async () => {
+    for (let attempt = 0; ; attempt++) {
+      await sleep(RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)]);
       if (!ended) return;
       try {
         turn.gateway = await gateway(settings);
@@ -1006,12 +1075,14 @@ async function follow(
         if (state.active.length === 0 && !turn.yielded) return await settle(state);
         catchUp(turn, state);
         await watch(turn);
+        if (lost === turn.gateway.client) continue;
         return hush();
       } catch (error) {
+        if (error instanceof Error && error.message === "not_configured")
+          return turn.finish({ requestId, type: "error", message: "detached" });
         logger.info("agent", "openclaw reconnect failed", { requestId, error: String(error) });
       }
     }
-    turn.finish({ requestId, type: "error", message: "detached" });
   };
 
   const seen = new Set<string>();
@@ -1154,14 +1225,21 @@ async function follow(
         break;
     }
   };
+  // Until it has started, `start` deals with a dropped socket itself (a send it may have to repeat).
+  let started = false;
+  /** The last connection that closed: one that closes while subscribing is picked up after. */
+  let lost: Gateway["client"] | null = null;
   const onClose = (client: Gateway["client"]) => {
-    if (client === turn.gateway.client) void reconnect();
+    lost = client;
+    if (started && client === turn.gateway.client) void reconnect();
   };
   listeners.add(onEvent);
   closeListeners.add(onClose);
   try {
     hush();
-    await start();
+    await start(() => ended !== null);
+    started = true;
+    if (lost === turn.gateway.client) void reconnect();
     await finished;
   } catch (error) {
     logger.info("agent", "openclaw turn failed", { requestId, error: String(error) });
@@ -1203,10 +1281,16 @@ type Watching = {
 let watching: Watching | null = null;
 let watchedClient: Gateway["client"] | null = null;
 let rewatch: ReturnType<typeof setTimeout> | undefined;
+let rewatchPending = false;
 /** Runs already reported, or another device's continuation. */
 const announced = new Set<string>();
 /** Runs of messages sent to a watched session, from any device. */
 const sent = new Set<string>();
+/** Keeps the latest ids only: the app runs for weeks. */
+function remember(ids: Set<string>, id: string): void {
+  ids.add(id);
+  if (ids.size > 5_000) ids.delete(ids.values().next().value!);
+}
 /** Sessions whose run yielded: the run that starts next is its continuation, followed where it was sent. */
 const continuing = new Set<string>();
 
@@ -1215,10 +1299,14 @@ const continuing = new Set<string>();
  * keys) with its model; ours ask the same model.
  */
 async function writeTitle(g: Gateway, sessionKey: string, message: string) {
-  const { title } = await g.client.request<{ title?: string | null }>("sessions.title.prepare", {
-    agentId: sessionKey.split(":")[1],
-    message: message.slice(0, 1000),
-  });
+  const { title } = await g.client.request<{ title?: string | null }>(
+    "sessions.title.prepare",
+    {
+      agentId: sessionKey.split(":")[1],
+      message: message.slice(0, 1000),
+    },
+    { timeoutMs: 90_000 },
+  );
   return title || null;
 }
 
@@ -1263,7 +1351,7 @@ function announce(
   if (!delivery)
     for (const turn of turns.values())
       if (turn.sessionKey === sessionKey && (!turn.ending || ownsRun(turn, runId))) return;
-  announced.add(runId);
+  remember(announced, runId);
   logger.info("agent", "openclaw run of its own", { runId });
   watching.started({
     sessionId: sessionKey,
@@ -1287,7 +1375,7 @@ listeners.add(({ event, payload }) => {
   const row = p.message as Record<string, unknown> | undefined;
   const key = event === "session.message" && row?.role === "user" ? sendKeyOf(row) : undefined;
   if (key) {
-    sent.add(key);
+    remember(sent, key);
     // A message sent from elsewhere after a yield ends the turn waiting on it, as one sent here does.
     for (const turn of turns.values())
       if (turn.sessionKey === p.sessionKey && turn.yielded && !ownsRun(turn, key)) {
@@ -1301,7 +1389,7 @@ listeners.add(({ event, payload }) => {
   if (typeof p.runId !== "string") return;
   // Only the first run after a yield can be its continuation, whatever it is.
   const continues = continuing.delete(p.sessionKey) && !sent.has(p.runId);
-  if (continues) announced.add(p.runId);
+  if (continues) remember(announced, p.runId);
   else announce(p.sessionKey, p.runId);
 });
 
@@ -1313,7 +1401,11 @@ closeListeners.add((client) => {
 
 function scheduleWatch(delay: number): void {
   clearTimeout(rewatch);
-  rewatch = setTimeout(() => void ensureWatching(delay), delay);
+  rewatchPending = true;
+  rewatch = setTimeout(() => {
+    rewatchPending = false;
+    void ensureWatching(delay);
+  }, delay);
 }
 
 async function ensureWatching(delay = 0): Promise<void> {
@@ -1638,12 +1730,14 @@ async function sendAsOwner(
 ): Promise<{ runId?: string }> {
   if (g.methods.includes(OTTER_SEND) && holdsAll(g.scopes)) {
     try {
-      return await g.client.request<{ runId?: string }>(OTTER_SEND, send);
+      return await g.client.request<{ runId?: string }>(OTTER_SEND, send, {
+        timeoutMs: FILE_TIMEOUT_MS,
+      });
     } catch (error) {
       if (!/otter_not_owner/.test(String(error))) throw error;
     }
   }
-  return g.client.request<{ runId?: string }>("chat.send", send);
+  return g.client.request<{ runId?: string }>("chat.send", send, { timeoutMs: FILE_TIMEOUT_MS });
 }
 
 const CONNECT_PROBLEMS: Record<string, string> = {
@@ -1698,8 +1792,10 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
         message: "Paste a setup code to connect.",
       };
     }
+    let connected = false;
     try {
       const g = await gateway(settings);
+      connected = true;
       const [{ defaultId, agents }, me] = await Promise.all([listAgents(g), whoAmI(g)]);
       return {
         ...base,
@@ -1718,6 +1814,15 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
     } catch (error) {
       const code = connectError(error);
       logger.info("agent", "openclaw check failed", { code, error: String(error) });
+      // Connected, but the gateway refused what was asked (restarting, a missing scope).
+      if (connected && error instanceof GatewayProtocolRequestError)
+        return {
+          ...base,
+          installed: true,
+          status: "error",
+          auth: { status: "authenticated" },
+          message: `The gateway answered: ${error.message}`,
+        };
       return {
         ...base,
         installed: code !== "unreachable",
@@ -1730,7 +1835,7 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
               ? "The gateway doesn't allow this site yet."
               : code === "unauthorized"
                 ? "The gateway refused the setup code or token — make a new setup code."
-                : "Can't reach the gateway — are you on Tailscale?",
+                : "Can't reach the gateway.",
       };
     }
   },
@@ -1779,8 +1884,36 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
       idempotencyKey: requestId,
       ...(attachments.length > 0 ? { attachments } : {}),
     };
-    await follow(turn, settings, async () => {
-      const sent = await sendAsOwner(g, send);
+    // The gateway closes the connection on a bigger message, and every chat on it with it.
+    if (JSON.stringify(send).length > MAX_MESSAGE_BYTES)
+      return emit({
+        requestId,
+        type: "error",
+        message: "agent_error: Those files are too large for OpenClaw: about 18 MB per message.",
+      });
+    await follow(turn, settings, async (going) => {
+      let sent: { runId?: string } | undefined;
+      try {
+        sent = await sendAsOwner(g, send);
+      } catch (error) {
+        if (error instanceof GatewayProtocolRequestError) throw error;
+        // The socket went before the gateway answered, which may have the message already.
+        logger.info("agent", "openclaw send lost its connection", { requestId });
+        for (let attempt = 0; !sent; attempt++) {
+          await sleep(RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)]);
+          if (!going()) return;
+          try {
+            turn.gateway = await gateway(settings);
+            const { found } = await runState(turn);
+            if (!going()) return;
+            sent = found ? {} : await sendAsOwner(turn.gateway, send);
+          } catch (retry) {
+            if (retry instanceof GatewayProtocolRequestError) throw retry;
+            if (retry instanceof Error && retry.message === "not_configured") throw retry;
+            logger.info("agent", "openclaw send retry failed", { requestId, error: String(retry) });
+          }
+        }
+      }
       turn.runId = sent.runId ?? requestId;
       await watch(turn);
     });
@@ -1833,7 +1966,7 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
     for (const id of state.active)
       if (id !== turn.runId) {
         turn.steers.add(id);
-        announced.add(id);
+        remember(announced, id);
       }
     if (!state.active.includes(turn.runId)) turn.finals.add(turn.runId);
     if (state.active.length === 0 && !state.waiting)
@@ -1847,15 +1980,34 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
     // Waiting on a yield, no run is going to report it stopped, or continue it.
     const waiting = turn.yielded;
     if (waiting) continuing.delete(turn.sessionKey);
-    void turn.gateway.client
-      .request("chat.abort", {
+    const abort = (client: Gateway["client"]) =>
+      client.request("chat.abort", {
         sessionKey: turn.sessionKey,
         ...(turn.steers.size > 0 || waiting ? {} : { runId: turn.runId }),
-      })
-      .then(
-        () => waiting && turn.finish({ requestId, type: "error", message: "cancelled" }),
-        () => turn.finish({ requestId, type: "error", message: "cancelled" }),
-      );
+      });
+    const stopped = () => turn.finish({ requestId, type: "error", message: "cancelled" });
+    const { url } = turn.gateway;
+    const reset = resets;
+    void abort(turn.gateway.client).then(
+      () => waiting && stopped(),
+      async (error: unknown) => {
+        stopped();
+        if (error instanceof GatewayProtocolRequestError) return;
+        // On a connection that just dropped, the run goes on: ask again once the gateway is back.
+        for (let attempt = 0; attempt < 120; attempt++) {
+          await sleep(RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)]);
+          if (reset !== resets) return;
+          try {
+            const g = await gateway({ ...OPENCLAW_DEFAULTS, url });
+            if (reset !== resets) return;
+            return void (await abort(g.client));
+          } catch (retry) {
+            if (retry instanceof GatewayProtocolRequestError) return;
+            if (retry instanceof Error && retry.message === "not_configured") return;
+          }
+        }
+      },
+    );
   },
 
   async steer(requestId, input) {
@@ -1964,10 +2116,14 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
         data?: string;
         encoding?: string;
         url?: string;
-      }>("artifacts.download", {
-        sessionKey: sessionId,
-        artifactId: decodeURIComponent(href.slice("otter-artifact:".length)),
-      });
+      }>(
+        "artifacts.download",
+        {
+          sessionKey: sessionId,
+          artifactId: decodeURIComponent(href.slice("otter-artifact:".length)),
+        },
+        { timeoutMs: FILE_TIMEOUT_MS },
+      );
       if (result.encoding === "base64" && result.data)
         return chatFile(result.artifact.title, fromBase64(result.data), result.artifact.mimeType);
       if (result.url) {
@@ -2011,10 +2167,14 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
     // It shares only images and text, up to 256 KB: the Otter plugin sends the rest (a PDF).
     if (result.file && result.file.content === undefined) {
       const whole = await g.client
-        .request<{ file: { name: string; content: string } }>("otter.files.get", {
-          sessionKey: sessionId,
-          path,
-        })
+        .request<{ file: { name: string; content: string } }>(
+          "otter.files.get",
+          {
+            sessionKey: sessionId,
+            path,
+          },
+          { timeoutMs: FILE_TIMEOUT_MS },
+        )
         .catch((error: unknown) => {
           throw /unknown method/i.test(String(error))
             ? new Error(
@@ -2189,6 +2349,7 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
     clearTimeout(catchingUp);
     watchedClient = null;
     clearTimeout(rewatch);
+    rewatchPending = false;
     for (const [requestId, turn] of turns)
       turn.finish({ requestId, type: "error", message: "detached" });
     disconnect();

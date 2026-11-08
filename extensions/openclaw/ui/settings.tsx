@@ -24,7 +24,7 @@ const gatewayHost = (address: string) =>
   address
     .trim()
     .replace(/^[a-z]+:\/\//i, "")
-    .replace(/[/:].*$/, "");
+    .replace(/\/.*$/, "");
 
 function setupCodeUrl(code: string): string {
   try {

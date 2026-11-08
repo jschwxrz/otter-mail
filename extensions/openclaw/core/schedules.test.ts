@@ -87,6 +87,10 @@ describe("taskOf", () => {
     ]);
     expect(taskOf(job(`chat:${made}`) as never, "main").chats).toEqual([made]);
     expect(taskOf(job("chat:new") as never, "main").chats).toEqual([made]);
+    expect(taskOf(job("otter:chat:agent:main:otter-mail:c-2") as never, "main").chats).toEqual([
+      made,
+      "agent:main:otter-mail:c-2",
+    ]);
     expect(taskOf(brief as never, "main").chats).toBeUndefined();
   });
 
@@ -128,6 +132,15 @@ describe("taskOf", () => {
     const at = (delivery: unknown, preview?: { label?: string; detail?: string }) =>
       taskOf({ ...brief, delivery } as never, "main", preview, labels).delivery;
     expect(at({ mode: "announce", channel: "otter", to: "chat:agent:main:abc" })).toEqual({
+      kind: "otter",
+      chat: "one",
+    });
+    for (const to of ["chat:new", "otter:chat:new", "owner", "otter:owner"])
+      expect(at({ mode: "announce", channel: "otter", to })).toEqual({
+        kind: "otter",
+        chat: "new",
+      });
+    expect(at({ mode: "announce", channel: "otter", to: "otter:chat:agent:main:abc" })).toEqual({
       kind: "otter",
       chat: "one",
     });
@@ -204,6 +217,14 @@ describe("taskOf", () => {
         },
       ).deliveryProblem,
     ).toBe('Unknown target "x" for Telegram.');
+    for (const to of [undefined, "inbox", "chat:not-a-session"]) {
+      const unnamed = taskOf(
+        { ...brief, delivery: { mode: "announce", channel: "otter", to } } as never,
+        "main",
+      );
+      expect(unnamed.delivery.kind).toBe("elsewhere");
+      expect(unnamed.deliveryProblem).toMatch(/no Otter chat/);
+    }
     expect(task.failureAlerts).toBe("Slack channel:COPS");
     expect(
       taskOf(
