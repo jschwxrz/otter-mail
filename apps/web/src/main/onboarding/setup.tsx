@@ -84,7 +84,7 @@ import {
   saveStep,
   startSetup,
 } from "./onboarding";
-import otterIconUrl from "../assets/otter-mail-icon.png";
+import otterIconUrl from "../assets/otter-icon.png";
 
 const STEPS = ["welcome", "mailbox", "look", "habits", "agent", "keys", "done"] as const;
 type Step = (typeof STEPS)[number];

@@ -10,15 +10,18 @@ const catalog = "apps/ios/OtterMail/Assets.xcassets";
 
 const IVORY = "#f8f5ec";
 const CHARCOAL = "#2c2f31";
-const mark = /<path[^>]* d="([^"]+)"/.exec(
-  NodeFS.readFileSync(at("assets/prod/otter-mail-symbol.svg"), "utf8"),
-)![1]!;
+const pathOf = (file: string) =>
+  /<path[^>]* d="([^"]+)"/.exec(NodeFS.readFileSync(at(file), "utf8"))![1]!;
+/** The desktop and web app's mark; the iPhone app is still Otter Mail and keeps its own. */
+const OTTERWARE = pathOf("assets/prod/otterware-symbol.svg");
+const MAIL = pathOf("assets/prod/otter-mail-symbol.svg");
 
-type Art = { background: string; color: string; defs?: string };
+type Art = { background: string; color: string; defs?: string; mark?: string };
 
 const svg = (body: string, defs = "") =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs>${defs}</defs>${body}</svg>`;
-const glyph = ({ color }: Art) => `<path fill="${color}" fill-rule="evenodd" d="${mark}"/>`;
+const glyph = ({ color, mark = OTTERWARE }: Art) =>
+  `<path fill="${color}" fill-rule="evenodd" d="${mark}"/>`;
 const art = (a: Art) => a.background + glyph(a);
 
 const square = (a: Art) => svg(art(a), a.defs);
@@ -40,7 +43,7 @@ const flat = (background: string, color: string): Art => ({
   color,
 });
 const light = flat(IVORY, CHARCOAL);
-const dark = flat(CHARCOAL, IVORY);
+const iphone = (a: Art): Art => ({ ...a, mark: MAIL });
 
 function blueprint(): Art {
   let lines = "";
@@ -147,10 +150,10 @@ try {
   }
 
   const dev = blueprint();
-  write("assets/prod/otter-mail-macos-1024.png", await png(mac(light), 1024));
-  write("assets/prod/otter-mail-ios-1024.png", await png(square(light), 1024));
+  write("assets/prod/otter-macos-1024.png", await png(mac(light), 1024));
+  write("assets/prod/otter-mail-ios-1024.png", await png(square(iphone(light)), 1024));
   write("assets/dev/blueprint-macos-1024.png", await png(mac(dev), 1024));
-  write("assets/dev/blueprint-ios-1024.png", await png(square(dev), 1024));
+  write("assets/dev/blueprint-ios-1024.png", await png(square(iphone(dev)), 1024));
   write("apps/desktop/resources/icon.icns", await icns((size) => png(mac(light), size)));
   write("apps/desktop/resources/icon-dev.icns", await icns((size) => png(mac(dev), size)));
   write("apps/desktop/resources/icon.png", await png(tile(light), 512));
@@ -177,19 +180,22 @@ try {
     "apps/web/public/favicon.svg",
     svg(
       `<style>.tile{fill:${IVORY}}.mark{fill:${CHARCOAL}}@media (prefers-color-scheme: dark){.tile{fill:${CHARCOAL}}.mark{fill:${IVORY}}}</style>` +
-        `<rect class="tile" width="1024" height="1024" rx="230"/><path class="mark" fill-rule="evenodd" d="${mark}"/>`,
+        `<rect class="tile" width="1024" height="1024" rx="230"/><path class="mark" fill-rule="evenodd" d="${OTTERWARE}"/>`,
     ),
   );
   const favicons = [];
   for (const size of [16, 32, 48]) favicons.push({ size, data: await png(tile(light), size) });
   write("apps/web/public/favicon.ico", ico(favicons));
   write("apps/web/public/apple-touch-icon.png", await png(square(light), 180));
-  write("apps/web/src/main/assets/otter-mail-icon.png", await png(square(light), 192));
+  write("apps/web/src/main/assets/otter-icon.png", await png(square(light), 192));
 
   const appIcon = `${catalog}/AppIcon.appiconset`;
-  write(`${appIcon}/icon-1024.png`, await png(square(light), 1024));
-  write(`${appIcon}/icon-dark-1024.png`, await png(square(dark), 1024));
-  write(`${appIcon}/icon-tinted-1024.png`, await png(square(flat("#000000", "#ffffff")), 1024));
+  write(`${appIcon}/icon-1024.png`, await png(square(iphone(light)), 1024));
+  write(`${appIcon}/icon-dark-1024.png`, await png(square(iphone(flat(CHARCOAL, IVORY))), 1024));
+  write(
+    `${appIcon}/icon-tinted-1024.png`,
+    await png(square(iphone(flat("#000000", "#ffffff"))), 1024),
+  );
   json(`${appIcon}/Contents.json`, {
     images: [
       ["icon-1024.png"],
@@ -204,10 +210,10 @@ try {
     })),
     info,
   });
-  write(`${catalog}/OtterMark.imageset/otter-mark.png`, await png(square(light), 512));
+  write(`${catalog}/OtterMark.imageset/otter-mark.png`, await png(square(iphone(light)), 512));
 
   const devIcon = `${catalog}/AppIconDev.appiconset`;
-  write(`${devIcon}/icon-1024.png`, await png(square(dev), 1024));
+  write(`${devIcon}/icon-1024.png`, await png(square(iphone(dev)), 1024));
   json(`${devIcon}/Contents.json`, {
     images: [{ filename: "icon-1024.png", idiom: "universal", platform: "ios", size: "1024x1024" }],
     info,
@@ -215,4 +221,6 @@ try {
 } finally {
   await browser.close();
 }
-console.log(`Icons exported from assets/prod/otter-mail-symbol.svg (stable, nightly and dev).`);
+console.log(
+  "Icons exported: the desktop and web app from assets/prod/otterware-symbol.svg, the iPhone from otter-mail-symbol.svg.",
+);
