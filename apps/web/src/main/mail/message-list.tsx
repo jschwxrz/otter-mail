@@ -86,6 +86,7 @@ import { pickAdvanceTarget } from "./advance-direction";
 import { beginUndoGroup, clearUndo } from "./undo";
 import { isMoveSourceLabel, setThreadDragImage, writeThreadDrag } from "./thread-drag";
 import { isModClick } from "../keybindings/keys";
+import { onePerConversation } from "./list-keys";
 
 type ResolveLabel = (accountId: string | undefined, labelId: string) => MailLabel | undefined;
 
@@ -984,16 +985,8 @@ export function MessageList({
 
   const allMessages: MessageSummary[] = useMemo(() => {
     const pages: { messages: MessageSummary[] }[] = messagesQuery.data?.pages ?? [];
-    const rows = pages.flatMap((p) => p.messages);
-    if (!globalSearching) return rows;
-    const seen = new Set<string>();
-    return rows.filter((m) => {
-      const key = `${m.accountId ?? ""}:${m.threadId || m.id}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }, [messagesQuery.data, globalSearching]);
+    return onePerConversation(pages.flatMap((p) => p.messages));
+  }, [messagesQuery.data]);
   // In Unread mode, clicking a message marks it read (optimistically), which
   // would normally drop it from this filter instantly. Keep the currently
   // selected row pinned in place — Gmail-style — so it only disappears once the
