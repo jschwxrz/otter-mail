@@ -2,16 +2,19 @@ import { describe, expect, it, vi } from "vite-plus/test";
 
 import worker from "./worker.ts";
 
-const FILES = new Set(["/", "/assets/app.js", "/todoist-callback/"]);
+const FILES = new Set(["/", "/assets/app.js", "/version.json", "/todoist-callback/"]);
 
-function serve(url: string, accept?: string) {
+/** The nightly Worker's env: the stable one also has NIGHTLY. */
+function serve(url: string, accept?: string, stable = false, mode?: string) {
   const fetch = vi.fn(async (request: Request) => {
     const file = FILES.has(new URL(request.url).pathname);
     return new Response(file ? "asset" : "not found", { status: file ? 200 : 404 });
   });
-  const env = { ASSETS: { fetch } as unknown as Fetcher };
+  const nightly = { fetch: vi.fn(async () => new Response("nightly")) } as unknown as Fetcher;
+  const env = { ASSETS: { fetch } as unknown as Fetcher, ...(stable && { NIGHTLY: nightly }) };
   const headers = new Headers();
   if (accept) headers.set("accept", accept);
+  if (mode) headers.set("sec-fetch-mode", mode);
   const response = worker.fetch(new Request(url, { headers }), env);
   return { response, fetch };
 }
@@ -27,16 +30,42 @@ describe("site domain migration", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it.each(["/app?view=inbox", "/privacy/", "/assets/app.js?version=2", "/missing"])(
-    "redirects the old domain's %s before serving assets",
-    async (path) => {
-      const { response, fetch } = serve(`https://mail.otterware.dev${path}`);
-      const result = await response;
-      expect(result.status).toBe(308);
-      expect(result.headers.get("location")).toBe(`https://mail.otterware.app${path}`);
-      expect(fetch).not.toHaveBeenCalled();
-    },
-  );
+  it.each([
+    "https://mail.otterware.app/",
+    "https://mail.otterware.app/you@gmail.com/INBOX/18f3a2?account=a@b.c",
+    "https://mail.otterware.dev/app?view=inbox",
+    "https://mail.otterware.dev/missing",
+  ])("sends the page %s to otter.otterware.app", async (url) => {
+    const { response, fetch } = serve(url, html, true, "navigate");
+    const result = await response;
+    expect(result.status).toBe(308);
+    const { pathname, search } = new URL(url);
+    expect(result.headers.get("location")).toBe(`https://otter.otterware.app${pathname}${search}`);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("treats an HTML GET without Sec-Fetch-Mode as a page", async () => {
+    const result = await serve("https://mail.otterware.app/all/inbox", html, true).response;
+    expect(result.headers.get("location")).toBe("https://otter.otterware.app/all/inbox");
+  });
+
+  it.each([
+    ["/assets/app.js", "*/*", "no-cors"],
+    ["/version.json", "*/*", "cors"],
+  ])("keeps serving %s on the old host to tabs still open there", async (path, accept, mode) => {
+    const { response } = serve(`https://mail.otterware.app${path}`, accept, true, mode);
+    expect((await response).status).toBe(200);
+  });
+
+  it("sends the old domain's moved pages straight to otterware.app", async () => {
+    const result = await serve("https://mail.otterware.dev/privacy/", html, true).response;
+    expect(result.headers.get("location")).toBe("https://otterware.app/mail/privacy/");
+  });
+
+  it("lets the nightly build serve the old host the stable Worker still hands it", async () => {
+    const { response } = serve("https://mail.otterware.app/all/inbox", html);
+    expect((await response).status).toBe(200);
+  });
 });
 
 describe("pages that moved to otterware.app", () => {
@@ -62,22 +91,22 @@ describe("pages that moved to otterware.app", () => {
 });
 
 describe("the app's pages", () => {
-  it.each(["/", "/app", "/you@gmail.com/INBOX/18f3a2", "/all/inbox", "/settings/appearance"])(
+  it.each(["/", "/app", "/mail/you@gmail.com/INBOX/18f3a2", "/agents/new", "/settings/appearance"])(
     "serves the app at %s",
     async (path) => {
-      const { response, fetch } = serve(`https://mail.otterware.app${path}`, html);
+      const { response, fetch } = serve(`https://otter.otterware.app${path}`, html, true);
       expect((await response).status).toBe(200);
-      expect(fetch.mock.calls.at(-1)![0].url).toBe("https://mail.otterware.app/");
+      expect(fetch.mock.calls.at(-1)![0].url).toBe("https://otter.otterware.app/");
     },
   );
 
   it("serves the app's files", async () => {
-    const { response } = serve("https://mail.otterware.app/assets/app.js", "*/*");
+    const { response } = serve("https://otter.otterware.app/assets/app.js", "*/*", true);
     expect((await response).status).toBe(200);
   });
 
   it("keeps a missing file missing", async () => {
-    const { response, fetch } = serve("https://mail.otterware.app/assets/gone.js", "*/*");
+    const { response, fetch } = serve("https://otter.otterware.app/assets/gone.js", "*/*", true);
     expect((await response).status).toBe(404);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
@@ -97,14 +126,14 @@ describe("release channels", () => {
   }
 
   it("serves stable unless the browser chose nightly", async () => {
-    const { response, nightly } = route("https://mail.otterware.app/all/inbox", "theme=dark");
+    const { response, nightly } = route("https://otter.otterware.app/all/inbox", "theme=dark");
     expect(await (await response).text()).toBe("stable");
     expect(nightly).not.toHaveBeenCalled();
   });
 
   it("hands a browser that chose nightly to the nightly build", async () => {
     const { response, assets } = route(
-      "https://mail.otterware.app/all/inbox",
+      "https://otter.otterware.app/all/inbox",
       "a=1; otter_mail_channel=nightly",
     );
     expect(await (await response).text()).toBe("nightly");
@@ -112,14 +141,14 @@ describe("release channels", () => {
   });
 
   it("sets and clears the choice, then goes back to Settings", async () => {
-    const nightly = await route("https://mail.otterware.app/__otter-mail/channel?channel=nightly")
+    const nightly = await route("https://otter.otterware.app/__otter-mail/channel?channel=nightly")
       .response;
     expect(nightly.status).toBe(303);
     expect(nightly.headers.get("location")).toBe("/settings/general");
     expect(nightly.headers.get("set-cookie")).toContain("otter_mail_channel=nightly;");
 
     const stable = await route(
-      "https://mail.otterware.app/__otter-mail/channel?channel=stable",
+      "https://otter.otterware.app/__otter-mail/channel?channel=stable",
       "otter_mail_channel=nightly",
     ).response;
     expect(stable.headers.get("set-cookie")).toContain("otter_mail_channel=; Path=/; Max-Age=0");

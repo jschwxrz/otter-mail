@@ -15,6 +15,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { useMatch, useNavigate, useRouter } from "@tanstack/react-router";
+import { placeHref as hrefOf } from "./places";
 import { ArrowLeftIcon } from "lucide-react";
 import { EmptyState } from "~/components/ui/empty-state";
 import { useQueryClient } from "@tanstack/react-query";
@@ -163,8 +164,15 @@ const sameLoc = (a: MailLoc, b: MailLoc | null) =>
   a.focusId === b.focusId;
 
 function useRouteMailLoc(): MailLoc | null {
-  const message = useMatch({ from: "/mail/$mailbox/$label/$messageId", shouldThrow: false });
-  const list = useMatch({ from: "/mail/$mailbox/$label", shouldThrow: false });
+  const mailboxMessage = useMatch({
+    from: "/mail/mail/$mailbox/$label/$messageId",
+    shouldThrow: false,
+  });
+  const spaceItem = useMatch({ from: "/mail/$space/$label/$messageId", shouldThrow: false });
+  const mailboxList = useMatch({ from: "/mail/mail/$mailbox/$label", shouldThrow: false });
+  const spaceList = useMatch({ from: "/mail/$space/$label", shouldThrow: false });
+  const message = mailboxMessage ?? spaceItem;
+  const list = mailboxList ?? spaceList;
   if (message) {
     const { mailbox, label, messageId } = message.params;
     const { account, message: focusId } = message.search;
@@ -467,20 +475,11 @@ function MailHome() {
   const go = (to: Partial<MailLoc>, replace = false) => {
     if (!mailLoc) return;
     const next = { ...mailLoc, ...to };
-    const params = { mailbox: next.mailbox, label: next.label };
-    if (!next.messageId) {
-      void navigate({ to: "/$mailbox/$label", params, replace });
-      return;
-    }
-    void navigate({
-      to: "/$mailbox/$label/$messageId",
-      params: { ...params, messageId: next.messageId },
-      search: {
-        account: next.account && next.account !== next.mailbox ? next.account : undefined,
-        message: next.focusId ?? undefined,
-      },
-      replace,
+    const href = hrefOf(next.mailbox, next.label, next.messageId, {
+      account: next.account && next.account !== next.mailbox ? next.account : undefined,
+      message: next.focusId ?? undefined,
     });
+    void navigate({ href, replace });
   };
   const closeMessage = () => go({ messageId: null });
   const correct = (to: Partial<MailLoc>) => {
@@ -1492,10 +1491,7 @@ function MailHome() {
     const mailbox =
       space?.kind === "mailbox" || space?.kind === "alias" ? space.id : firstRealAccountId;
     if (!mailbox) return;
-    const { href } = router.buildLocation({
-      to: "/$mailbox/$label",
-      params: { mailbox, label: "INBOX" },
-    });
+    const href = hrefOf(mailbox, "INBOX");
     addTab(href);
     showWindowTab(href);
   };

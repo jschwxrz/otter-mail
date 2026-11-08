@@ -11,6 +11,12 @@ function wantsNightly(request: Request): boolean {
   return cookies.split(/;\s*/).includes(`${CHANNEL_COOKIE}=nightly`);
 }
 
+function isNavigation(request: Request): boolean {
+  const mode = request.headers.get("sec-fetch-mode");
+  if (mode) return mode === "navigate";
+  return request.method === "GET" && Boolean(request.headers.get("accept")?.includes("text/html"));
+}
+
 function chooseChannel(url: URL): Response {
   const nightly = url.searchParams.get("channel") === "nightly";
   const cookie = nightly
@@ -24,6 +30,10 @@ function chooseChannel(url: URL): Response {
 
 const SITE = "https://otterware.app/mail";
 
+/** Otter's web app. Before the rename it was mail.otterware.app (and before that .dev). */
+const APP = "https://otter.otterware.app";
+const OLD_HOSTS = new Set(["mail.otterware.app", "mail.otterware.dev"]);
+
 const CHANGELOG_VERSION = /^\/changelog\/(\d+\.\d+\.\d+)\/?$/;
 
 const MOVED = /^\/(?:changelog|privacy|terms)(?:\/|$)/;
@@ -31,13 +41,8 @@ const MOVED = /^\/(?:changelog|privacy|terms)(?:\/|$)/;
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.hostname === "mail.otterware.dev") {
-      if (url.pathname === "/") return Response.redirect(`${SITE}/`, 301);
-      url.protocol = "https:";
-      url.hostname = "mail.otterware.app";
-      url.port = "";
-      return Response.redirect(url.toString(), 308);
-    }
+    if (url.hostname === "mail.otterware.dev" && url.pathname === "/")
+      return Response.redirect(`${SITE}/`, 301);
     const version = CHANGELOG_VERSION.exec(url.pathname)?.[1];
     if (version) return Response.redirect(`${SITE}/changelog/#${version}`, 301);
     if (MOVED.test(url.pathname)) {
@@ -47,6 +52,12 @@ export default {
           : `${url.pathname}/`;
       return Response.redirect(`${SITE}${path}`, 301);
     }
+    // Only the stable Worker (the one with NIGHTLY) redirects: until a stable release moves it, it
+    // hands nightly browsers on mail.otterware.app to the nightly build, which serves them there.
+    // Only pages move: a tab still open on the old host keeps loading its files and version.json,
+    // so it offers "Reload to update", and the reload lands on the new host.
+    if (env.NIGHTLY && OLD_HOSTS.has(url.hostname) && isNavigation(request))
+      return Response.redirect(`${APP}${url.pathname}${url.search}`, 308);
     if (url.pathname === CHANNEL_PATH) return chooseChannel(url);
     // Both channels serve this origin so they share the browser's mail cache and sign-in.
     if (env.NIGHTLY && wantsNightly(request)) return env.NIGHTLY.fetch(request);

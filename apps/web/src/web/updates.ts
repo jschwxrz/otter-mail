@@ -38,7 +38,7 @@ async function check(): Promise<UpdateState> {
           message: null,
         });
   } catch {
-    return set({ status: "error", message: "Couldn't reach mail.otterware.app." });
+    return set({ status: "error", message: "Couldn't reach otter.otterware.app." });
   }
 }
 

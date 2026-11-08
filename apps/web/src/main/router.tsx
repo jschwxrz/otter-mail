@@ -11,9 +11,17 @@ import { RootView } from "./root-view";
 import { QueryClient } from "@tanstack/react-query";
 import { ErrorBoundaryView } from "~/components/ui/error-boundary-view";
 import type { SettingsPane } from "./mail/api";
-import { SEARCH_MAILBOX } from "./mail/gmail-query";
-import { isWorkspaceSegment, workspaceSpace } from "./extensions/workspaces";
-import { CALENDAR_SPACE, CHATS_SPACE } from "./mail/spaces";
+import {
+  fromLabel,
+  fromSpace,
+  isSpaceId,
+  placeHref,
+  searchString,
+  toLabel,
+  toSpace,
+  type MessageSearch,
+} from "./places";
+import { firstLabelOf } from "./mail/spaces";
 
 const rootRoute = createRootRouteWithContext<{
   queryClient: QueryClient;
@@ -99,45 +107,89 @@ const settingsItemRoute = createRoute({
   component: () => null,
 });
 
-const SPACE_SEGMENTS: Record<string, string> = { chats: CHATS_SPACE, calendar: CALENDAR_SPACE };
-const toMailbox = (segment: string) =>
-  SPACE_SEGMENTS[segment] ?? (isWorkspaceSegment(segment) ? workspaceSpace(segment) : segment);
-const fromMailbox = (id: string) => /^__([a-z]+)__$/.exec(id)?.[1] ?? id;
-const toLabel = (segment: string) => (segment === "search" ? SEARCH_MAILBOX : segment);
-const fromLabel = (id: string) => /^__([a-z]+)__$/.exec(id)?.[1] ?? id;
-type MailParams = { mailbox: string; label: string };
-const parseMail = (params: MailParams): MailParams => {
-  return { mailbox: toMailbox(params.mailbox), label: toLabel(params.label) };
-};
-const stringifyMail = (params: MailParams): MailParams => ({
-  mailbox: fromMailbox(params.mailbox),
-  label: fromLabel(params.label),
+const validateMessageSearch = (search: Record<string, unknown>): MessageSearch => ({
+  account: typeof search.account === "string" ? search.account : undefined,
+  message: typeof search.message === "string" ? search.message : undefined,
 });
 
 const labelRoute = createRoute({
   getParentRoute: () => mailRoute,
-  path: "$mailbox/$label",
-  params: { parse: parseMail, stringify: stringifyMail },
+  path: "mail/$mailbox/$label",
+  params: {
+    parse: ({ mailbox, label }) => ({ mailbox, label: toLabel(label) }),
+    stringify: ({ mailbox, label }) => ({ mailbox, label: fromLabel(label) }),
+  },
   component: () => null,
 });
-
-export type MessageSearch = { account?: string; message?: string };
 
 const messageRoute = createRoute({
   getParentRoute: () => mailRoute,
-  path: "$mailbox/$label/$messageId",
+  path: "mail/$mailbox/$label/$messageId",
   params: {
-    parse: ({ messageId, ...params }) => ({ ...parseMail(params), messageId }),
-    stringify: ({ messageId, ...params }) => ({ ...stringifyMail(params), messageId }),
+    parse: ({ mailbox, label, messageId }) => ({ mailbox, label: toLabel(label), messageId }),
+    stringify: ({ mailbox, label, messageId }) => ({
+      mailbox,
+      label: fromLabel(label),
+      messageId,
+    }),
   },
-  validateSearch: (search: Record<string, unknown>): MessageSearch => ({
-    account: typeof search.account === "string" ? search.account : undefined,
-    message: typeof search.message === "string" ? search.message : undefined,
-  }),
+  validateSearch: validateMessageSearch,
   component: () => null,
 });
 
-/** mail.otterware.app/app, the app's address before it moved to /. */
+/** Sends an address from before the /mail prefix, or /chats, to where it is now. */
+const toCurrentPlace = (
+  { mailbox, label, messageId }: { mailbox: string; label: string; messageId?: string },
+  location: { pathname: string; searchStr: string },
+) => {
+  if (isSpaceId(mailbox) && location.pathname.split("/")[1] === fromSpace(mailbox)) return;
+  throw redirect({
+    href: placeHref(mailbox, label, messageId) + location.searchStr,
+    replace: true,
+  });
+};
+
+/** A mode on its own (/agents, /calendar, /drive) opens where it starts; /mail, its first mailbox. */
+const modeRoute = createRoute({
+  getParentRoute: () => mailRoute,
+  path: "$space",
+  beforeLoad: ({ params }) => {
+    const id = toSpace(params.space);
+    // No mailbox named: the app opens its first one in place of "-".
+    const mail = params.space === "mail" ? placeHref("-", "INBOX") : "/";
+    throw redirect({ href: isSpaceId(id) ? placeHref(id, firstLabelOf(id)) : mail, replace: true });
+  },
+});
+
+const spaceRoute = createRoute({
+  getParentRoute: () => mailRoute,
+  path: "$space/$label",
+  params: {
+    parse: ({ space, label }) => ({ space, mailbox: toSpace(space), label: toLabel(label) }),
+    stringify: ({ space, label }) => ({ space, label: fromLabel(label) }),
+  },
+  beforeLoad: ({ params, location }) => toCurrentPlace(params, location),
+  component: () => null,
+});
+
+const spaceItemRoute = createRoute({
+  getParentRoute: () => mailRoute,
+  path: "$space/$label/$messageId",
+  params: {
+    parse: ({ space, label, messageId }) => ({
+      space,
+      mailbox: toSpace(space),
+      label: toLabel(label),
+      messageId,
+    }),
+    stringify: ({ space, label, messageId }) => ({ space, label: fromLabel(label), messageId }),
+  },
+  validateSearch: validateMessageSearch,
+  beforeLoad: ({ params, location }) => toCurrentPlace(params, location),
+  component: () => null,
+});
+
+/** /app, the web app's address before it moved to /. */
 const appRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "app",
@@ -154,6 +206,9 @@ const routeTree = rootRoute.addChildren([
     settingsItemRoute,
     labelRoute,
     messageRoute,
+    modeRoute,
+    spaceRoute,
+    spaceItemRoute,
   ]),
   appRoute,
 ]);
@@ -170,11 +225,7 @@ const router = createRouter({
   // The query holds only strings (ids, addresses): plainly, where the default
   // would quote the ids that look like numbers.
   parseSearch: (search) => Object.fromEntries(new URLSearchParams(search)),
-  stringifySearch: (search) => {
-    const entries = Object.entries(search).filter(([, value]) => value !== undefined);
-    const query = new URLSearchParams(entries).toString().replaceAll("%40", "@");
-    return query ? `?${query}` : "";
-  },
+  stringifySearch: (search) => searchString(search as Record<string, string | undefined>),
   defaultPreloadStaleTime: 0,
   scrollRestoration: true,
   context: {

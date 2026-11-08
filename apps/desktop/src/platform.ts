@@ -122,7 +122,7 @@ export function desktopPlatform(): Platform {
     google: googleAuth,
     microsoft: microsoftAuth,
     todoistSignIn,
-    relayUrl: process.env.OTTER_RELAY_URL?.trim() || "https://relay.mail.otterware.app",
+    relayUrl: process.env.OTTER_RELAY_URL?.trim() || "https://relay.otterware.app",
     relaySession: "bearer",
     deviceName: backendOS.deviceName(),
 

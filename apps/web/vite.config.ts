@@ -33,7 +33,7 @@ function demoMailboxes(): Plugin {
 
 export default defineConfig(({ command }) => ({
   // Built files are loaded by the Electron shell (ottermail://app/) and served
-  // at mail.otterware.app by the site Worker, both from the root. Absolute
+  // at otter.otterware.app by the site Worker, both from the root. Absolute
   // paths, so a page loaded at a deep route (/you@gmail.com/INBOX/…) finds them.
   base: "/",
   plugins: [

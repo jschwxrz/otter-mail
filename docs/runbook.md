@@ -12,7 +12,7 @@ breaks. The details behind each step are in `docs/release.md`, `infra/relay/READ
 
 ## Relay
 
-Cloudflare Workers Builds deploys `infra/relay` (https://relay.mail.otterware.app) on every
+Cloudflare Workers Builds deploys `infra/relay` (https://relay.otterware.app) on every
 push to `main` that touches it. The relay's database and secrets stay with the existing
 workers. The old mail site redirects to `.app`;
 the old relay still serves installed apps. See [domain migration](domain-migration.md) for
@@ -38,7 +38,7 @@ the Google and GitHub settings that go with these URLs. D1 migrations run before
    themselves ("Restart to update" in the sidebar), and their icon follows the installed build.
 5. The same run deploys the web app: a nightly once its checks pass, beside the desktop builds
    (job "Deploy the web app (nightly)"), to the `otter-mail-site-nightly` Worker; stable after
-   the GitHub Release (job "Deploy the web app") to `otter-mail-site` (mail.otterware.app). Both answer at mail.otterware.app, so they share the browser's cache
+   the GitHub Release (job "Deploy the web app") to `otter-mail-site` (otter.otterware.app). Both answer at otter.otterware.app, so they share the browser's cache
    and sign-in; Settings → General there sets a cookie that has the stable Worker hand requests
    to the nightly one. Open tabs check `version.json` and offer "Reload to update". It needs the
    `CLOUDFLARE_API_TOKEN` secret and `CLOUDFLARE_ACCOUNT_ID` variable. Roll back: Cloudflare →

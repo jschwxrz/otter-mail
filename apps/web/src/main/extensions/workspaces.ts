@@ -5,6 +5,7 @@
  */
 
 import { useNavigate } from "@tanstack/react-router";
+import { placeHref } from "../places";
 import { useCallback, useMemo } from "react";
 
 import { availableExtensions, extensionEnabled, useDisabledExtensions } from "./registry";
@@ -54,14 +55,8 @@ export function useOpenWorkspace(): (
     (id, to = {}, replace = false) => {
       const workspace = allWorkspaces().find((w) => w.id === id);
       if (!workspace) return;
-      const params = { mailbox: workspaceSpace(id), label: to.location ?? workspace.home };
-      if (to.item)
-        void navigate({
-          to: "/$mailbox/$label/$messageId",
-          params: { ...params, messageId: to.item },
-          replace,
-        });
-      else void navigate({ to: "/$mailbox/$label", params, replace });
+      const href = placeHref(workspaceSpace(id), to.location ?? workspace.home, to.item);
+      void navigate({ href, replace });
     },
     [navigate],
   );
