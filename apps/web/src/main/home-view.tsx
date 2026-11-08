@@ -1576,10 +1576,6 @@ function MailHome() {
       }}
       onNewView={() => openViewEditor("new")}
       onEditView={openViewEditor}
-      onOpenPalette={() => {
-        sidebarPeek.close();
-        setPaletteOpen(true);
-      }}
       onOpenSettings={(pane = lastPaneRef.current) => openSettings({ pane })}
       searches={searchTabs
         .filter((t) => t.mailbox === searchMailbox && t.parent)

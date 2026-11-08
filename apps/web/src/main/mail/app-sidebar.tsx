@@ -1,5 +1,5 @@
 import { useState, type ComponentType } from "react";
-import { PlusIcon, SearchIcon, SettingsIcon, SquarePenIcon } from "lucide-react";
+import { PlusIcon, SettingsIcon, SquarePenIcon } from "lucide-react";
 
 import { CalendarSidebar } from "../calendar/calendar-sidebar";
 import type { WorkspaceProps } from "../extensions/types";
@@ -57,7 +57,6 @@ export function AppSidebar({
   onCompose,
   onNewView,
   onEditView,
-  onOpenPalette,
   onOpenSettings,
   searches,
   onSelectSearch,
@@ -80,7 +79,6 @@ export function AppSidebar({
   onCompose: () => void;
   onNewView: () => void;
   onEditView: (viewId: string) => void;
-  onOpenPalette: () => void;
   onOpenSettings: (pane?: SettingsPane) => void;
   searches: SidebarSearch[];
   onSelectSearch: (id: string) => void;
@@ -112,7 +110,6 @@ export function AppSidebar({
       ) : (
         <>
           <div className="flex shrink-0 flex-col pt-(--sidebar-content-inset)">
-            <NewRow icon={<SearchIcon />} label="Search or ask" onClick={onOpenPalette} />
             <NewRow
               icon={<SquarePenIcon />}
               label="New message"
