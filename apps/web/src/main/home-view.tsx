@@ -1801,6 +1801,7 @@ function MailHome() {
                           onPanelOpen={setChatPanelOpen}
                           onNavigate={openChatChange}
                           onSelectChat={(id) => go({ label: id }, true)}
+                          onOpenTask={(key) => go({ label: SCHEDULED_TASKS, messageId: key })}
                         />
                       ) : null
                     ) : readerAccount ? (

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  ClockIcon,
   CopyIcon,
   FileIcon,
   FilePenLineIcon,
@@ -8,10 +9,13 @@ import {
   MailIcon,
 } from "lucide-react";
 import type { ChatTab } from "@otter/contracts/chats";
+import type { ScheduledTask } from "@otter/contracts/scheduled";
 
 import { Popover, PopoverPopup, PopoverTrigger } from "~/components/ui/popover";
 import { AgentAvatar, openClawAgentId, useChatProvider } from "./agent-providers";
+import { keyOf, useScheduledTasks } from "./agent-scheduled";
 import { isOpenTab, type Conversation } from "./chat-store";
+import { scheduleText, untilText } from "./scheduled-text";
 import { toast } from "./toast";
 import { HintTooltip, cn } from "./ui";
 
@@ -32,9 +36,12 @@ const SHOWN = 5;
 export function ChatContextButton({
   convo,
   onOpen,
+  onOpenTask,
 }: {
   convo: Conversation;
   onOpen: (tab: ChatTab) => void;
+  /** Opens one of the agent's scheduled tasks in Scheduled. */
+  onOpenTask: (key: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const chatAgent = useChatProvider(convo);
@@ -102,6 +109,15 @@ export function ChatContextButton({
               </button>
             </div>
           ) : null}
+          {convo.sessionId ? (
+            <ScheduledSection
+              sessionId={convo.sessionId}
+              onOpen={(key) => {
+                setOpen(false);
+                onOpenTask(key);
+              }}
+            />
+          ) : null}
           <TabSection title="Outputs" empty="Nothing made yet" tabs={outputs} onOpen={choose} />
           <TabSection title="Sources" empty="Nothing read yet" tabs={sources} onOpen={choose} />
         </div>
@@ -157,4 +173,46 @@ function TabSection({
       ) : null}
     </section>
   );
+}
+
+/** What the agent runs on a schedule for this chat: made in it, or posting to it. */
+function ScheduledSection({
+  sessionId,
+  onOpen,
+}: {
+  sessionId: string;
+  onOpen: (key: string) => void;
+}) {
+  const { data } = useScheduledTasks(true);
+  const tasks = (data ?? []).flatMap((agent) =>
+    agent.tasks.filter((task) => task.chats?.includes(sessionId)),
+  );
+  if (tasks.length === 0) return null;
+  const now = Date.now();
+  return (
+    <section className="flex flex-col gap-0.5 border-t pt-2">
+      <h3 className="px-1 pb-1 text-xs font-medium text-muted-foreground">Scheduled</h3>
+      {tasks.map((task) => (
+        <button
+          key={keyOf(task)}
+          type="button"
+          onClick={() => onOpen(keyOf(task))}
+          className="flex min-w-0 cursor-pointer items-start gap-2 rounded-md px-1 py-1 text-left outline-none hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-focus-ring"
+        >
+          <ClockIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate text-foreground">{task.name}</span>
+            <span className="truncate text-xs text-muted-foreground">{taskLine(task, now)}</span>
+          </span>
+        </button>
+      ))}
+    </section>
+  );
+}
+
+function taskLine(task: ScheduledTask, now: number): string {
+  const when = scheduleText(task.schedule);
+  if (!task.enabled) return `${when} · Paused`;
+  if (task.running) return `${when} · Running now`;
+  return task.nextRunAt ? `${when} · next ${untilText(task.nextRunAt, now)}` : when;
 }

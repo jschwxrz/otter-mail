@@ -213,6 +213,13 @@ function autoPaused(job: Job): string | undefined {
     : "Paused by OpenClaw: its schedule kept failing";
 }
 
+/** The Otter chats a job belongs to: the session it was made in, and the chat it posts to. */
+function chatsOf(job: Job): string[] {
+  const to = job.delivery?.channel === "otter" ? str(job.delivery.to) : undefined;
+  const posts = to?.startsWith("chat:") && to !== NEW_CHAT ? to.slice("chat:".length) : undefined;
+  return [...new Set([job.sessionKey, posts].filter((key): key is string => !!key))];
+}
+
 export function taskOf(
   job: Job,
   defaultAgent: string,
@@ -230,6 +237,7 @@ export function taskOf(
   const managed = managedBy(job);
   const paused = autoPaused(job);
   const nextRunAt = job.enabled ? (state.nextRunAtMs ?? job.nextRunAtMs) : undefined;
+  const chats = chatsOf(job);
   return {
     provider: "openclaw",
     id: job.id,
@@ -261,6 +269,7 @@ export function taskOf(
     ...(managed ? { managedBy: managed } : {}),
     ...(paused ? { autoPaused: paused } : {}),
     ...(job.configRevision ? { revision: job.configRevision } : {}),
+    ...(chats.length > 0 ? { chats } : {}),
     // Only an agent turn in a session of its own reports to a chat.
     ...(job.sessionTarget === "main" || job.payload.kind !== "agentTurn"
       ? { undeliverable: true as const }

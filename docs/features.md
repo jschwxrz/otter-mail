@@ -234,23 +234,23 @@ them, transcripts included (step outputs clipped, image thumbnails left on the d
 them); without an Otter account they stay on the device. Claude and Codex run on one Mac: their
 chats read the same everywhere and continue on that Mac.
 
-| Feature                                                                 | Mac                 | Web                  | iPhone                                     |
-| ----------------------------------------------------------------------- | ------------------- | -------------------- | ------------------------------------------ |
-| Small window over the mail (⌘I), the mail on screen as its context      | ✓                   | ✓                    | — (a sheet)                                |
-| Bottom bar: minimized chats as tabs (working, waiting, finished), Agent | ✓                   | ✓                    | —                                          |
-| Chat history from the bottom bar                                        | ✓                   | ✓                    | the Agent tab (chats: swipe from the left) |
-| AI workspace (Agent in the sidebar): recent chats, the chat, its tabs   | ✓                   | ✓                    | the Agent tab                              |
-| Chats sorted like Otter Code's: Snoozed, Settled (synced)               | ✓                   | ✓                    | —                                          |
-| Open the small window's chat in the workspace (⌘⇧F, and back)           | ✓                   | ✓                    | —                                          |
-| Tabs: conversations and drafts it was given, read or made; files        | ✓                   | ✓                    | —                                          |
-| Tabs: pages it read, events it made, links clicked in it                | ✓                   | — (links: a new tab) | —                                          |
-| The tab showing is the next message's context                           | ✓                   | ✓                    | —                                          |
-| Tabs: reorder by dragging, Control + Tab for the last one, × closes     | ✓                   | ✓                    | —                                          |
-| Chat details: agent, session, what it made and read (closed tabs too)   | ✓                   | ✓                    | —                                          |
-| Synced through the Otter account: chats, transcripts, tabs              | ✓ (offline: queued) | ✓                    | ✓ (no tabs)                                |
-| Claude and Codex chats: read everywhere, continued on their Mac         | ✓                   | ✓ (read)             | ✓ (read)                                   |
-| Another agent's chat (Hermes, OpenClaw, OpenRouter): continued          | ✓                   | ✓                    | ✓ (that agent picked)                      |
-| ⌘K: go to a chat, new chat; Recently viewed                             | ✓                   | ✓                    | —                                          |
+| Feature                                                                  | Mac                 | Web                  | iPhone                                     |
+| ------------------------------------------------------------------------ | ------------------- | -------------------- | ------------------------------------------ |
+| Small window over the mail (⌘I), the mail on screen as its context       | ✓                   | ✓                    | — (a sheet)                                |
+| Bottom bar: minimized chats as tabs (working, waiting, finished), Agent  | ✓                   | ✓                    | —                                          |
+| Chat history from the bottom bar                                         | ✓                   | ✓                    | the Agent tab (chats: swipe from the left) |
+| AI workspace (Agent in the sidebar): recent chats, the chat, its tabs    | ✓                   | ✓                    | the Agent tab                              |
+| Chats sorted like Otter Code's: Snoozed, Settled (synced)                | ✓                   | ✓                    | —                                          |
+| Open the small window's chat in the workspace (⌘⇧F, and back)            | ✓                   | ✓                    | —                                          |
+| Tabs: conversations and drafts it was given, read or made; files         | ✓                   | ✓                    | —                                          |
+| Tabs: pages it read, events it made, links clicked in it                 | ✓                   | — (links: a new tab) | —                                          |
+| The tab showing is the next message's context                            | ✓                   | ✓                    | —                                          |
+| Tabs: reorder by dragging, Control + Tab for the last one, × closes      | ✓                   | ✓                    | —                                          |
+| Chat details: agent, session, its Scheduled tasks, what it made and read | ✓                   | ✓                    | —                                          |
+| Synced through the Otter account: chats, transcripts, tabs               | ✓ (offline: queued) | ✓                    | ✓ (no tabs)                                |
+| Claude and Codex chats: read everywhere, continued on their Mac          | ✓                   | ✓ (read)             | ✓ (read)                                   |
+| Another agent's chat (Hermes, OpenClaw, OpenRouter): continued           | ✓                   | ✓                    | ✓ (that agent picked)                      |
+| ⌘K: go to a chat, new chat; Recently viewed                              | ✓                   | ✓                    | —                                          |
 
 ## Composing & sending
 
@@ -512,8 +512,8 @@ so a scheduled job's result written straight into it shows up without a pointer.
 remembers how far it has read its session (by the gateway's row numbers), so what arrived while
 no device was looking shows up, in its place, even after you've written in the chat since; a
 chat read for the first time catches up on the day's deliveries. What no
-message of yours started carries a one-line header: "Automation · Morning brief · 9:00 AM" (its
-schedule on hover, while the job exists; a finished one-shot is just "Automation"), or "Sent by
+message of yours started carries a one-line header: "Scheduled · Morning brief · 9:00 AM" (its
+schedule on hover, while the job exists; a finished one-shot is just "Scheduled"), or "Sent by
 Rowan" for what the agent sent with its message tool; its notification names the automation.
 Something new from the agent in a settled or snoozed chat (an automation still running) brings
 the chat back.

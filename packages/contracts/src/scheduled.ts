@@ -72,6 +72,8 @@ export interface ScheduledTask {
   revision?: string;
   /** Its results can't go to a chat (OpenClaw: only an agent turn in a session of its own can). */
   undeliverable?: true;
+  /** The chats it belongs to (their sessions): the one it was made in, the one its results go to. */
+  chats?: string[];
 }
 
 /** One agent's tasks, or why they couldn't be read. */

@@ -76,7 +76,8 @@ export function useScheduledTasks(live = false) {
 
 const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-const keyOf = (task: Pick<ScheduledTask, "provider" | "id">) => `${task.provider}:${task.id}`;
+export const keyOf = (task: Pick<ScheduledTask, "provider" | "id">) =>
+  `${task.provider}:${task.id}`;
 
 function useAgentName() {
   const providers = useAgentProviders().data?.providers ?? [];

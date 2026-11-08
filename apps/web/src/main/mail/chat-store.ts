@@ -1104,7 +1104,7 @@ async function followAgentRun(run: AgentRun): Promise<void> {
       title: convo.title,
       subtitle:
         run.delivery?.kind === "automation"
-          ? (run.delivery.name ?? "Automation")
+          ? (run.delivery.name ?? "Scheduled")
           : "Sent you a message",
     });
   const wait = () => {

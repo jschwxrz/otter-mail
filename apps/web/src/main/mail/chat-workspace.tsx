@@ -117,6 +117,7 @@ export function ChatWorkspace({
   onPanelOpen,
   onNavigate,
   onSelectChat,
+  onOpenTask,
 }: {
   closeTabRef: MutableRefObject<(() => boolean) | null>;
   panelRef: MutableRefObject<ChatPanelControl | null>;
@@ -127,6 +128,7 @@ export function ChatWorkspace({
   inputRef: RefObject<HTMLTextAreaElement | null>;
   onNavigate: (change: ChatChange) => Promise<void>;
   onSelectChat: (chatId: string) => void;
+  onOpenTask: (key: string) => void;
 }) {
   const convo = useChats((s) => s.conversations.find((c) => c.id === chatId));
   const activeTab = useChats((s) => s.activeTabs[chatId]);
@@ -351,6 +353,7 @@ export function ChatWorkspace({
               <span className="flex-1" />
               <ChatContextButton
                 convo={convo}
+                onOpenTask={onOpenTask}
                 onOpen={(tab) => {
                   if (tab.ref.kind === "page" && !features.browser) {
                     window.open(tab.ref.url, "_blank", "noopener");
