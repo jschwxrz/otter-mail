@@ -282,8 +282,11 @@ export async function watchSessions(kind: ProviderKind, sessions: WatchedSession
   const found = provider(kind);
   const settings = await agentSettings(kind);
   if (!found.watch || !settings.enabled) return;
-  found.watch(settings, sessions, (run) =>
-    broadcast("agent:runStarted", { provider: kind, ...run }),
+  found.watch(
+    settings,
+    sessions,
+    (run) => broadcast("agent:runStarted", { provider: kind, ...run }),
+    (sessionId, cursor) => broadcast("agent:sessionRead", { provider: kind, sessionId, cursor }),
   );
 }
 

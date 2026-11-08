@@ -195,8 +195,11 @@ export type SendTurnInput = {
 
 export type ResumeTurnInput = { requestId: string; sessionId: string };
 
-/** A chat whose session is watched for runs the agent starts itself; `since` is when its last turn ended. */
-export type WatchedSession = { id: string; since: number };
+/**
+ * A chat whose session is watched for runs the agent starts itself; `since` is when its last turn
+ * ended, `cursor` where its session was last read up to (the gateway's, for those that have one).
+ */
+export type WatchedSession = { id: string; since: number; cursor?: string };
 
 /**
  * A run the agent started on its own in a watched session: followed with `resume` under `requestId`.
@@ -287,7 +290,13 @@ export interface ChatProvider<S extends AgentSettings = AgentSettings> {
    * started: a completion the agent was woken for, a scheduled job. Each is
    * reported once, and those since a chat's `since` are caught up on.
    */
-  watch?(settings: S, sessions: WatchedSession[], started: (run: AgentRun) => void): void;
+  watch?(
+    settings: S,
+    sessions: WatchedSession[],
+    started: (run: AgentRun) => void,
+    /** A session was read up to `cursor`: the chat keeps it, and is read from there next. */
+    read?: (sessionId: string, cursor: string) => void,
+  ): void;
   /**
    * The agent's gateway says it delivered something to Otter (relay.ts's `AgentPointer`): catch
    * up now, on `sessionKey` too when no chat has it yet.

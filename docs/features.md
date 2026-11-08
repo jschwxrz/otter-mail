@@ -506,7 +506,10 @@ Like Slack's threads and channel posts, a delivery either goes to one of Otter's
 (`--to chat:new`, named for its automation and day: "Morning brief · Sat, Nov 8"); those are
 the only targets (what's sent to the owner, `otter:owner`, starts a chat too). A chat no device
 has yet starts one. A chat open in the app also catches up when the gateway says its session changed,
-so a scheduled job's result written straight into it shows up without a pointer. What no
+so a scheduled job's result written straight into it shows up without a pointer. Each chat
+remembers how far it has read its session (by the gateway's row numbers), so what arrived while
+no device was looking shows up, in its place, even after you've written in the chat since; a
+chat read for the first time catches up on the day's deliveries. What no
 message of yours started carries a one-line header: "Automation · Morning brief · 9:00 AM" (its
 schedule on hover, while the job exists; a finished one-shot is just "Automation"), or "Sent by
 Rowan" for what the agent sent with its message tool; its notification names the automation.

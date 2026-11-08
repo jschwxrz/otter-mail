@@ -97,7 +97,11 @@ export function registerAgentHandlers(): void {
   handle("agent:watch", async (params: unknown) => {
     const p = params as Params;
     const sessions = (Array.isArray(p?.sessions) ? (p.sessions as Params[]) : [])
-      .map((s) => ({ id: str(s?.id), since: Number(s?.since) || 0 }))
+      .map((s) => ({
+        id: str(s?.id),
+        since: Number(s?.since) || 0,
+        ...(typeof s?.cursor === "string" && s.cursor && { cursor: s.cursor }),
+      }))
       .filter((s) => s.id);
     await agent.watchSessions(providerOf(p), sessions);
     return { ok: true };

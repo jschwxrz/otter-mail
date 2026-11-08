@@ -32,6 +32,7 @@ import {
 } from "./api";
 import type { SentAttachment } from "./chat-attachments";
 import { mergeChatChanges } from "./chat-changes";
+import { placeDelivered } from "./chat-order";
 import type { Citation } from "./chat-cite";
 import { isChatFileLink } from "./chat-links";
 import type { FollowUpBehavior } from "./chat-queue";
@@ -398,24 +399,28 @@ async function loadChats(): Promise<void> {
   });
 }
 
-const loading = new Set<string>();
+/** Loads under way: whoever asks while one is going waits for it, so nothing is added to a chat it then replaces. */
+const loading = new Map<string, Promise<void>>();
 
-export async function loadChat(id: string): Promise<void> {
-  if (loading.has(id)) return;
-  loading.add(id);
-  try {
-    const chat = await chatsApi.get(id);
-    if (!chat) return;
-    set((s) => ({
-      conversations: s.conversations.map((c) =>
-        c.id === id && !c.loaded
-          ? asLoaded({ ...chat, loaded: true, openRequest: c.openRequest })
-          : c,
-      ),
-    }));
-  } finally {
-    loading.delete(id);
+export function loadChat(id: string): Promise<void> {
+  let load = loading.get(id);
+  if (!load) {
+    load = readChat(id).finally(() => loading.delete(id));
+    loading.set(id, load);
   }
+  return load;
+}
+
+async function readChat(id: string): Promise<void> {
+  const chat = await chatsApi.get(id);
+  if (!chat) return;
+  set((s) => ({
+    conversations: s.conversations.map((c) =>
+      c.id === id && !c.loaded
+        ? asLoaded({ ...chat, loaded: true, openRequest: c.openRequest })
+        : c,
+    ),
+  }));
 }
 
 function patchConversation(id: string, fn: (c: Conversation) => Conversation): void {
@@ -1032,6 +1037,7 @@ function watchSessions(providers: ProviderSnapshot[]): void {
         since: c.openRequest
           ? Number.MAX_SAFE_INTEGER
           : (c.turns.findLast((t) => t.finishedAt)?.finishedAt ?? c.updatedAt),
+        ...(c.cursor && { cursor: c.cursor }),
       }));
     // Watched again once it's connected: an agent's sessions with no chat yet are found then too.
     const key = JSON.stringify([host.installed, host.status, sessions]);
@@ -1247,6 +1253,10 @@ function onChatEvent(raw: unknown): void {
     return;
   }
   if (event.type === "transcript") {
+    // Its turn gone (the chat was replaced under it), it would land on another.
+    const turns = get().conversations.find((c) => c.id === s.convoId)?.turns ?? [];
+    if (!turns.some((t) => t.id === `a-${event.requestId}` || t.id === `u-${event.requestId}`))
+      return;
     patchConversation(s.convoId, (c) => ({
       ...c,
       turns: withTranscript(c.turns, event.requestId, event.messages),
@@ -1326,6 +1336,7 @@ function onChatEvent(raw: unknown): void {
       }
     }
     nextTurns[nextTurns.length - 1] = updated;
+    if (event.type === "done" && updated.delivered) placeDelivered(nextTurns);
     const lastResponseId =
       event.type === "done" && event.responseId ? event.responseId : c.lastResponseId;
     const sessionId =
@@ -1394,6 +1405,16 @@ export function useChatEvents(): void {
       window.desktopBridge.on("agent:runStarted", (params: unknown) => {
         const run = params as AgentRun | undefined;
         if (run?.provider && run.sessionId && run.requestId) void followAgentRun(run);
+      }),
+      window.desktopBridge.on("agent:sessionRead", (params: unknown) => {
+        const read = params as { provider?: ProviderKind; sessionId?: string; cursor?: string };
+        const convo = get().conversations.find(
+          (c) => c.provider === read?.provider && c.sessionId === read.sessionId,
+        );
+        if (!convo || !read.cursor || convo.cursor === read.cursor) return;
+        void loadChat(convo.id).then(() =>
+          patchConversation(convo.id, (c) => ({ ...c, cursor: read.cursor })),
+        );
       }),
       window.desktopBridge.on("chats:changed", (params: unknown) => {
         const ids = (params as { ids?: string[] } | undefined)?.ids ?? [];

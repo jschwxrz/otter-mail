@@ -1183,7 +1183,10 @@ async function follow(
 type Watching = {
   settings: OpenClawSettings;
   sessions: Map<string, number>;
+  /** Where each chat's session was last read up to (`cursorOf`). */
+  cursors: Map<string, string>;
   started: (run: AgentRun) => void;
+  read?: (sessionKey: string, cursor: string) => void;
 };
 
 let watching: Watching | null = null;
@@ -1245,8 +1248,10 @@ function announce(
   const watched = watching?.sessions.has(sessionKey);
   if (!watching || (!watched && !pointed.has(sessionKey))) return;
   if (announced.has(runId) || sent.has(runId)) return;
-  for (const turn of turns.values())
-    if (turn.sessionKey === sessionKey && (!turn.ending || ownsRun(turn, runId))) return;
+  // A turn going in the chat follows its own runs; what was delivered meanwhile waits for it to end.
+  if (!delivery)
+    for (const turn of turns.values())
+      if (turn.sessionKey === sessionKey && (!turn.ending || ownsRun(turn, runId))) return;
   announced.add(runId);
   logger.info("agent", "openclaw run of its own", { runId });
   watching.started({
@@ -1360,21 +1365,44 @@ async function catchUpSessions(g: Gateway): Promise<void> {
     const key = String(row.key);
     const watched = watching?.sessions.get(key);
     if (watched === undefined && !delivered.has(key)) continue;
-    const since =
-      watched === undefined ? Date.now() - DELIVERED_BACKLOG_MS : fresh.has(key) ? 0 : watched;
     const active = (row.activeRunIds as string[] | undefined) ?? [];
     // A job's result written into a chat moves its updatedAt only, not its lastActivityAt.
     const activity = Math.max(Number(row.lastActivityAt) || 0, Number(row.updatedAt) || 0);
-    if (active.length === 0 && activity <= since) continue;
-    const { messages } = await g.client.request<{ messages?: Record<string, unknown>[] }>(
-      "chat.history",
-      { sessionKey: key, limit: 200 },
-    );
-    const runs = agentRunsSince(messages ?? [], since, active);
+    const cursor = watched === undefined ? undefined : watching?.cursors.get(key);
+    const since =
+      watched === undefined ? Date.now() - DELIVERED_BACKLOG_MS : fresh.has(key) ? 0 : watched;
+    const backlog = Date.now() - DELIVERED_BACKLOG_MS;
+    const quiet = active.length === 0 && activity <= since;
+    if (watched === undefined && quiet) continue;
+    if (cursor !== undefined && active.length === 0 && readAt.get(key) === activity) continue;
+    // A chat first read with nothing new, nor anything lately to have missed, only needs where it's up to.
+    const startOnly = watched !== undefined && cursor === undefined && quiet && activity <= backlog;
+    const history = await g.client.request<{
+      sessionId?: string;
+      messages?: Record<string, unknown>[];
+    }>("chat.history", { sessionKey: key, limit: startOnly ? 1 : 200 });
+    const rows = history.messages ?? [];
+    readAt.set(key, activity);
+    const at = cursorOf(history.sessionId, rows);
+    if (watched !== undefined && at && at !== cursor) watching?.read?.(key, at);
+    if (startOnly) continue;
+    let runs: string[];
+    if (cursor !== undefined)
+      runs = newRuns(key, rowsAfter(rows, cursor, history.sessionId), active);
+    else {
+      runs = agentRunsSince(rows, since, active);
+      // A chat read for the first time catches up on what was delivered to it while it was missed.
+      if (watched !== undefined)
+        for (const id of deliveredSince(rows, backlog)) if (!runs.includes(id)) runs.push(id);
+      lastRun.set(
+        key,
+        rows.findLast((m) => runOf(m) !== undefined && !isDelivery(m)),
+      );
+    }
     if (runs.length > 0) names ??= await agentNames(g);
     for (const id of runs) {
-      const at = deliveredAt(messages, id);
-      const delivery = await deliveryOf(g, messages ?? [], id, names?.get(agentOf(key)));
+      const at = deliveredAt(rows, id);
+      const delivery = await deliveryOf(g, rows, id, names?.get(agentOf(key)));
       // A chat a delivery starts is named for the automation that sent it, and when.
       const title =
         watched !== undefined
@@ -1389,6 +1417,69 @@ async function catchUpSessions(g: Gateway): Promise<void> {
   }
   for (const key of caught) fresh.delete(key);
   for (const key of delivered) pointed.delete(key);
+}
+
+/** The gateway's session timestamp when this device last read it, so an unchanged one isn't read again. */
+const readAt = new Map<string, number>();
+/** The last row of a run read in each session: what follows it in a later read continues that run. */
+const lastRun = new Map<string, Record<string, unknown> | undefined>();
+
+const seqOf = (m: Record<string, unknown>) =>
+  Number((m.__openclaw as { seq?: unknown } | undefined)?.seq);
+
+/**
+ * Where a session is read up to: its transcript (a reset starts another) and the last row's
+ * number in it, as the gateway numbers them.
+ */
+export function cursorOf(
+  sessionId: string | undefined,
+  rows: Record<string, unknown>[],
+): string | undefined {
+  const seq = rows.map(seqOf).findLast(Number.isFinite);
+  return sessionId && seq !== undefined ? `${sessionId}:${seq}` : undefined;
+}
+
+/** The rows written after `cursor`: all of them in a transcript other than the one it was in. */
+export function rowsAfter(
+  rows: Record<string, unknown>[],
+  cursor: string,
+  sessionId: string | undefined,
+): Record<string, unknown>[] {
+  const split = cursor.lastIndexOf(":");
+  if (cursor.slice(0, split) !== sessionId) return rows;
+  const seq = Number(cursor.slice(split + 1));
+  return rows.slice(rows.findLastIndex((m) => seqOf(m) <= seq) + 1);
+}
+
+/**
+ * The runs in what was written to a session since it was last read that no message started:
+ * what was delivered (wherever it falls), and runs of the agent's own after the last message.
+ * A run whose start was read before continues it.
+ */
+export function newRuns(
+  sessionKey: string,
+  rows: Record<string, unknown>[],
+  active: string[] = [],
+): string[] {
+  const before = lastRun.get(sessionKey);
+  const continued = before ? runOf(before) : undefined;
+  if (rows.length > 0)
+    lastRun.set(
+      sessionKey,
+      rows.findLast((m) => runOf(m) !== undefined && !isDelivery(m)) ?? before,
+    );
+  const runs = agentRunsSince(rows, 0, active).filter((id) => id !== continued);
+  for (const id of deliveredSince(rows, 0)) if (!runs.includes(id)) runs.push(id);
+  return runs;
+}
+
+/** Deliveries written after `since`. */
+function deliveredSince(rows: Record<string, unknown>[], since: number): string[] {
+  return rows.flatMap((m) => {
+    if (!isDelivery(m) || !transcript([m]).some((t) => t.role === "assistant")) return [];
+    const at = Number((m.__openclaw as { recordTimestampMs?: unknown })?.recordTimestampMs);
+    return at > since ? [String(runOf(m))] : [];
+  });
 }
 
 const agentOf = (sessionKey: string) => sessionKey.split(":")[1] ?? "";
@@ -2008,8 +2099,9 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
     await g.client.request("sessions.delete", { key: sessionId });
   },
 
-  watch(settings, sessions, started) {
+  watch(settings, sessions, started, read) {
     const next = new Map(sessions.map((s) => [s.id, s.since]));
+    const cursors = new Map(sessions.flatMap((s) => (s.cursor ? [[s.id, s.cursor] as const] : [])));
     const before = watching?.sessions;
     // A chat watched after the first, or whose turn was picked up again (it caught up on nothing meanwhile).
     for (const [id, since] of next) {
@@ -2017,7 +2109,7 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
       if (before && (was === undefined || (was === Number.MAX_SAFE_INTEGER && since !== was)))
         fresh.add(id);
     }
-    watching = { settings, sessions: next, started };
+    watching = { settings, sessions: next, cursors, started, read };
     if (fresh.size > 0 && watchedClient)
       void current?.ready.then(catchUpSessions).catch(() => {
         watchedClient = null;
@@ -2041,6 +2133,8 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
     watching = null;
     fresh.clear();
     pointed.clear();
+    readAt.clear();
+    lastRun.clear();
     clearTimeout(catchingUp);
     watchedClient = null;
     clearTimeout(rewatch);
