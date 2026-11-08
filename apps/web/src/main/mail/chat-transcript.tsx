@@ -19,7 +19,8 @@ import { IconBtn, HintTooltip } from "./ui";
 import { WorkLog } from "./work-log";
 import type { ChatChange } from "./api";
 import type { ContextKind, ContextMeta } from "./chat-context";
-import type { ChatTurn } from "./chat-store";
+import { findTokenRanges, messageTokens } from "@otter/shared/chat-search";
+import { useChats, type ChatTurn } from "./chat-store";
 import { ChatMarkdown } from "./chat-markdown";
 import { ChatChanges } from "./chat-changes";
 import { SentAttachments } from "./chat-attachments";
@@ -268,6 +269,28 @@ function CopyMessageButton({ text }: { text: string }) {
   );
 }
 
+/** Marks the query's words in a message, as Otter Code's find does for a search result. */
+function highlightFound(turnId: string, query: string): (() => void) | undefined {
+  const message = document.querySelector(`[data-message-id="${CSS.escape(turnId)}"]`);
+  if (!message || !("highlights" in CSS)) return;
+  const tokens = messageTokens(query);
+  const ranges: Range[] = [];
+  const walker = document.createTreeWalker(message, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    for (const { start, end } of findTokenRanges(node.textContent ?? "", tokens)) {
+      const range = new Range();
+      range.setStart(node, start);
+      range.setEnd(node, end);
+      ranges.push(range);
+    }
+  }
+  const highlight = new Highlight(...ranges);
+  CSS.highlights.set("chat-found", highlight);
+  return () => {
+    if (CSS.highlights.get("chat-found") === highlight) CSS.highlights.delete("chat-found");
+  };
+}
+
 export function ChatTranscript({
   turns,
   streaming,
@@ -291,12 +314,26 @@ export function ChatTranscript({
   onFork?: (turnId: string) => void;
 }) {
   const [expandedFolds, setExpandedFolds] = useState<Set<string>>(() => new Set());
-  const { scrollToEnd } = useMessageScroller();
+  const { scrollToEnd, scrollToMessage } = useMessageScroller();
+  const found = useChats((s) => s.found);
+  const foundHere = found && turns.some((turn) => turn.id === found.turnId) ? found : null;
+  // A match can be in the work a reply folds away: open it before the jump below.
+  const [unfoldedFor, setUnfoldedFor] = useState<typeof foundHere>(null);
+  if (foundHere && unfoldedFor !== foundHere) {
+    setUnfoldedFor(foundHere);
+    setExpandedFolds((prev) => new Set(prev).add(foundHere.turnId));
+  }
   const sent = turns.filter((turn) => turn.role === "user").length;
   useEffect(() => {
     scrollToEnd();
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Each message sent jumps to the end, even scrolled up.
   }, [sent, scrollToEnd]);
+  // After the jump to the end above, so a chat opened from a search lands on its message.
+  useEffect(() => {
+    if (!foundHere) return;
+    scrollToMessage(foundHere.turnId, { align: "center" });
+    return highlightFound(foundHere.turnId, foundHere.query);
+  }, [foundHere, scrollToMessage]);
   const toggleFold = (id: string) =>
     setExpandedFolds((prev) => {
       const next = new Set(prev);

@@ -1138,3 +1138,7 @@ html[data-theme-token-probe] *::after {
   opacity: 0.92;
   vector-effect: non-scaling-stroke;
 }
+
+::highlight(chat-found) {
+  background-color: color-mix(in srgb, var(--color-warning) 40%, transparent);
+}

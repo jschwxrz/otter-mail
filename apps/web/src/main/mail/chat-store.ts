@@ -8,6 +8,7 @@ import {
   type ChatTab,
   type ChatTabRef,
   type ChatDelivery,
+  type ChatMessageMatch,
   type ChatTurn,
 } from "@otter/contracts/chats";
 
@@ -84,6 +85,8 @@ type ChatsState = {
   hydrating: string | null;
   drafts: Record<string, string>;
   citations: Record<string, Citation[]>;
+  /** The message a chat search opened the chat on, until the next search. */
+  found: { turnId: string; query: string } | null;
 };
 
 const ACTIVE_KEY = "gmail:chat-active";
@@ -264,6 +267,7 @@ export const useChats = create<ChatsState>(() => ({
   hydrating: null,
   drafts: readJson<Record<string, string>>(DRAFTS_KEY, {}),
   citations: {},
+  found: null,
 }));
 
 const { getState: get, setState: set } = useChats;
@@ -271,10 +275,15 @@ const { getState: get, setState: set } = useChats;
 const chatsApi = {
   list: () => ipc<{ chats: Omit<Chat, "turns">[]; device: Device }>("chats:list"),
   get: (id: string) => ipc<Chat | null>("chats:get", { id }),
+  search: (query: string) => ipc<ChatMessageMatch[]>("chats:search", { query }),
   /** `settled`: no turn runs in it, so other devices can have it now (else in a while). */
   save: (chat: Chat, settled: boolean) => ipc<void>("chats:save", { chat, settled }),
   delete: (id: string) => ipc<void>("chats:delete", { id }),
 };
+
+export const searchChatMessages = chatsApi.search;
+
+export const showFoundMessage = (found: ChatsState["found"]) => set({ found });
 
 /** The turns in flight when the app last quit, read before anything writes the key again. */
 const savedOpenRequests = readJson<Record<string, string>>(OPEN_REQUESTS_KEY, {});
