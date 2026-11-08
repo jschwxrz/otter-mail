@@ -118,11 +118,6 @@ const noContext = <T>(): AsyncContext<T> => ({ run: (_value, fn) => fn(), get: (
 
 export async function webPlatform(page: Page): Promise<Platform> {
   const database = await openDatabase();
-  const demo = __DEMO__ ? await import("./demo/gmail") : null;
-  const demoOutlook = __DEMO__ ? await import("./demo/outlook") : null;
-  if (demo) await demo.installFakeGmail(files);
-  if (demoOutlook) await demoOutlook.installFakeOutlook(files);
-  const relayUrl = demo ? demo.DEMO_RELAY_URL : RELAY_URL;
   const platform: Platform = {
     kind: "web",
     supportDiagnostics: async () => ({ environment: navigator.userAgent }),
@@ -134,9 +129,7 @@ export async function webPlatform(page: Page): Promise<Platform> {
     },
 
     database: () => database,
-    connect: demo
-      ? () => Promise.reject(new Error("The demo can't connect to mail servers."))
-      : (host, port, opts) => connectMailSocket(relayUrl, host, port, opts),
+    connect: (host, port, opts) => connectMailSocket(RELAY_URL, host, port, opts),
     files,
     secrets: webSecrets(files),
     userFiles: {
@@ -156,12 +149,9 @@ export async function webPlatform(page: Page): Promise<Platform> {
         await page.request("todoistSignIn", { close: true });
       }
     },
-    google: demo ? demo.demoGoogleAuth() : webGoogleAuth({ relayUrl, page, files }),
-    microsoft: demoOutlook
-      ? demoOutlook.demoMicrosoftAuth()
-      : webMicrosoftAuth({ relayUrl, page, files }),
-    relayUrl,
-    agentServerUrl: demo ? `${self.location.origin}/api/agent` : undefined,
+    google: webGoogleAuth({ relayUrl: RELAY_URL, page, files }),
+    microsoft: webMicrosoftAuth({ relayUrl: RELAY_URL, page, files }),
+    relayUrl: RELAY_URL,
     relaySession: "cookie",
 
     broadcast: page.broadcast,
@@ -177,5 +167,10 @@ export async function webPlatform(page: Page): Promise<Platform> {
       translate: (texts, source, target) => page.request("translate", { texts, source, target }),
     },
   };
-  return platform;
+  if (!__DEMO__) return platform;
+  const { withFakeServices } = await import("@otter/core/fake");
+  return {
+    ...(await withFakeServices(platform)),
+    agentServerUrl: `${self.location.origin}/api/agent`,
+  };
 }

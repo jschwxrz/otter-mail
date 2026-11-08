@@ -211,13 +211,13 @@ export function ScheduledMailButton() {
   const entries = query.data ?? [];
   return (
     <>
-      {entries.length > 0 && (
-        <NewRow
-          icon={<ClockIcon />}
-          label={`Scheduled & snoozed (${entries.length})`}
-          onClick={() => setOpen(true)}
-        />
-      )}
+      <NewRow
+        icon={<ClockIcon />}
+        label={
+          entries.length > 0 ? `Scheduled & snoozed (${entries.length})` : "Scheduled & snoozed"
+        }
+        onClick={() => setOpen(true)}
+      />
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent showCloseButton>
           <DialogHeader>

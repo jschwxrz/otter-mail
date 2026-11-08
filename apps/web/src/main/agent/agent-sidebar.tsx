@@ -699,10 +699,9 @@ function Highlighted({ text, ranges }: { text: string; ranges: readonly SearchRa
   );
 }
 
-/** Every agent's scheduled tasks, for an app with an agent that runs any. */
+/** Every agent's scheduled tasks. */
 function ScheduledRow({ selected, onSelect }: { selected: boolean; onSelect: () => void }) {
-  const agents = useScheduledTasks().data;
-  if (!agents?.length) return null;
+  const agents = useScheduledTasks().data ?? [];
   const tasks = agents.flatMap((a) => a.tasks);
   const active = tasks.filter((t) => t.enabled && !t.managedBy).length;
   const failing =

@@ -1,3 +1,4 @@
+# The project name from before `pnpm imap-server`: a new one would leave running containers behind.
 name: otter-mail-dev-mail
 services:
   dovecot:
@@ -11,8 +12,8 @@ services:
       - "127.0.0.1:31587:31587" # SMTP submission, STARTTLS
     volumes:
       - ./dovecot.conf:/etc/dovecot/conf.d/otter-mail-dev.conf:ro
-      - ${OTTER_DEV_MAIL_CERTS:?run pnpm dev:mail}/tls.crt:/etc/dovecot/ssl/tls.crt:ro
-      - ${OTTER_DEV_MAIL_CERTS:?run pnpm dev:mail}/tls.key:/etc/dovecot/ssl/tls.key:ro
+      - ${OTTER_DEV_MAIL_CERTS:?run pnpm imap-server}/tls.crt:/etc/dovecot/ssl/tls.crt:ro
+      - ${OTTER_DEV_MAIL_CERTS:?run pnpm imap-server}/tls.key:/etc/dovecot/ssl/tls.key:ro
   mailpit:
     image: axllent/mailpit:latest
     ports:

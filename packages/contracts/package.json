@@ -13,7 +13,8 @@
     "./mail": "./src/mail.ts",
     "./todoist": "./src/todoist.ts",
     "./openrouter": "./src/openrouter.ts",
-    "./extensions": "./src/extensions.ts"
+    "./extensions": "./src/extensions.ts",
+    "./dev-data": "./src/dev-data.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

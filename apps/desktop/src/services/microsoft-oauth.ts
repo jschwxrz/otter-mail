@@ -271,7 +271,7 @@ async function addDemoAccount(mailbox: DemoOutlookMailbox): Promise<MicrosoftSig
   const refreshToken = mailbox.refreshTokens.desktop;
   if (!refreshToken) {
     throw new Error(
-      `${mailbox.email} has no Mac app sign-in yet: run \`pnpm dev:demo:desktop --login\`.`,
+      `${mailbox.email} has no Mac app sign-in yet: run \`pnpm dev:desktop:demo --login\`.`,
     );
   }
   return keepSignIn(

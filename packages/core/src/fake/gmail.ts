@@ -1,27 +1,22 @@
-import { fakeTodoist } from "./todoist";
+import { fakeTodoist } from "./todoist.js";
 
-import {
-  accountStore,
-  fromBase64,
-  toBase64,
-  type MailAccount,
-  type GoogleAuth,
-  type Platform,
-} from "@otter/core";
+import * as accountStore from "../services/account-store.js";
+import { fromBase64, toBase64 } from "../bytes.js";
+import type { GoogleAuth, Platform } from "../platform.js";
+import type { MailAccount } from "../types.js";
 
 import { DEMO_ACCOUNTS, type SeedAccount } from "@otter/shared/demo-mailboxes";
-import { EXTRA_DEMO_ACCOUNTS } from "./extra-mailboxes";
+import { EXTRA_DEMO_ACCOUNTS } from "./extra-mailboxes.js";
 
 const SEEDS = [...DEMO_ACCOUNTS, ...EXTRA_DEMO_ACCOUNTS];
-import { fakeCalendar } from "./calendar";
+import { fakeCalendar } from "./calendar.js";
+import { FAKE_RELAY_URL } from "./relay.js";
 
 const attachmentData = (content: string) =>
   toBase64(new TextEncoder().encode(content))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
-
-export const DEMO_RELAY_URL = "https://relay.demo.invalid";
 
 type Header = { name: string; value: string };
 
@@ -748,7 +743,10 @@ function gmail(box: Mailbox, method: string, url: URL, body: Record<string, unkn
       return json({
         id,
         historyId: String(box.historyId),
-        messages: messages.map((m) => messageResource(box, m, new URL("x:?format=minimal"))),
+        // Like Gmail: a GET honours `format`; what a change returns is minimal.
+        messages: messages.map((m) =>
+          messageResource(box, m, action ? new URL("x:?format=minimal") : url),
+        ),
       });
     }
 
@@ -822,7 +820,7 @@ function gmail(box: Mailbox, method: string, url: URL, body: Record<string, unkn
 }
 
 function answer(url: URL, method: string, headers: Headers, rawBody: unknown): Response | null {
-  if (url.origin === DEMO_RELAY_URL) {
+  if (url.origin === FAKE_RELAY_URL) {
     return json({ error: "Demo mode has no Otter account." }, 401);
   }
   if (url.hostname === "gmail.googleapis.com" && url.pathname.startsWith("/gmail/v1/users/me")) {

@@ -294,7 +294,7 @@ async function addDemoAccount(mailbox: DemoGmailMailbox): Promise<MailAccount> {
   const refreshToken = mailbox.refreshTokens.desktop;
   if (!refreshToken) {
     throw new Error(
-      `${mailbox.email} has no Mac app sign-in yet: run \`pnpm dev:demo:desktop --login\`.`,
+      `${mailbox.email} has no Mac app sign-in yet: run \`pnpm dev:desktop:demo --login\`.`,
     );
   }
   const response = await tokenRequest({ grant_type: "refresh_token", refresh_token: refreshToken });

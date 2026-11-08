@@ -1,9 +1,9 @@
 /**
- * The demo mailboxes `pnpm dev:demo` and `pnpm dev:demo:desktop` open with
+ * The demo mailboxes `pnpm dev:demo` and `pnpm dev:desktop:demo` open with
  * (docs/development.md): real mailboxes for development, never the user's own.
  * One variable, OTTER_DEMO_MAILBOXES, holds them as a JSON list in the
  * main checkout's ignored `.env.local`; the dev runner adds the local IMAP
- * server's (`pnpm dev:mail`) and hands the list to the app, which adds the
+ * server's (`pnpm imap-server`) and hands the list to the app, which adds the
  * ones it doesn't have yet. Development runs only: never in a build.
  */
 

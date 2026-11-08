@@ -30,7 +30,7 @@ const offline = async () =>
 async function install() {
   vi.resetModules();
   vi.stubGlobal("fetch", offline);
-  const fake = await import("./outlook");
+  const fake = await import("@otter/core/fake");
   await fake.installFakeOutlook(memoryFiles());
   return fake;
 }
@@ -278,7 +278,7 @@ async function boot() {
   };
   vi.spyOn(console, "log").mockImplementation(() => {});
   // After resetModules: the extensions must share this test's fresh core.
-  const { webExtensions } = await import("../extensions");
+  const { webExtensions } = await import("./extensions");
   await core.startCore(platform, webExtensions);
   const invoke = <T>(channel: string, params?: unknown) =>
     core.registeredHandlers().get(channel)!(params) as Promise<T>;
@@ -287,7 +287,8 @@ async function boot() {
 
 type Row = { id: string; threadId: string; subject: string; labelIds: string[] };
 
-describe("core's Outlook provider on the demo mailbox", () => {
+// Each test boots core cold, which CI's runners take seconds over.
+describe("core's Outlook provider on the demo mailbox", { timeout: 20_000 }, () => {
   it("saves draft edits and same-named replacement attachments without duplicating drafts", async () => {
     const { invoke } = await boot();
     const file = (text: string) => ({

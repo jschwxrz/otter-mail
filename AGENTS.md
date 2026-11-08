@@ -146,28 +146,38 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
 
 ## Dev
 
-- `pnpm install`, then `pnpm dev`: the web app on :5833 with a local relay on :8787 (open it in
-  a browser, e.g. the T3 preview). `pnpm dev:desktop` runs the desktop app (Vite dev server +
-  main-process watcher + Electron with reload); `pnpm dev:web` the web app alone. Both apps render
-  the same `apps/web`, so UI work is checked in the browser. See docs/development.md.
+- `pnpm install`, then a dev command: an app and what it opens on (`scripts/dev-runner.ts`;
+  [What a dev run opens on](docs/development.md#what-a-dev-run-opens-on)). `pnpm dev` runs the
+  web app on :5833 with a local relay on :8787 (open it in a browser, e.g. the T3 preview);
+  `pnpm dev:desktop` the desktop app (Vite dev server + main-process watcher + Electron with
+  reload). Both render the same `apps/web`, so UI work is checked in the browser. Their data:
+  - (nothing): an empty sandbox.
+  - `:fake` (`pnpm dev:fake`, `pnpm dev:desktop:fake`): made-up mailboxes from pretend Gmail,
+    Outlook and Todoist (`packages/core/src/fake`), no accounts, no network. Build and test
+    against it; see the `test-otter` skill (`.agents/skills`).
+  - `:demo` (`pnpm dev:demo`, `pnpm dev:desktop:demo`): the demo accounts, already added: the
+    dedicated `otterware.demo@gmail.com` Google account, an Outlook one and the local IMAP
+    server's (`pnpm imap-server`, started for you). For real Gmail, Google OAuth, Contacts, Calendar
+    or IMAP checks. They come from `OTTER_DEMO_MAILBOXES` in the main checkout's ignored
+    `.env.local` (shared with T3 worktrees by symlink); `--login` signs them in once per machine.
+    Preserve the demo fixtures and send test mail only to the demo accounts themselves. Keep
+    credentials out of logs, commits, screenshots and app bundles. See
+    [Demo mailboxes](docs/development.md#demo-mailboxes).
+  - `:real` (`pnpm dev:desktop:real`): a copy of the user's installed desktop app, signed in to
+    their own mail, calendars and agents, without their Otter account. Run it only when the user
+    asks for it. It is their live mail: read freely, but never send, reply, delete, archive,
+    unsubscribe, RSVP, change settings on a server or anything else lasting unless they say so
+    for that action. Don't screenshot or quote their mail beyond what the task needs. See
+    [Your own data](docs/development.md#your-own-data).
 - `pnpm dev:ios`: the iPhone app in the simulator (it has the same demo mailbox, from the welcome
   screen).
-- `pnpm dev:fake`: the web app on a made-up mailbox (a pretend Gmail, no Google or Otter
-  account, no relay). Build and test against it rather than the user's real accounts; see the
-  `test-otter` skill (`.agents/skills`).
-- `pnpm dev:demo` and `pnpm dev:demo:desktop`: `pnpm dev` and `pnpm dev:desktop` opening on the
-  demo mailboxes, already added: the dedicated `otterware.demo@gmail.com` Google account and the
-  local IMAP server's (`pnpm dev:mail`, started for you). For real Gmail, Google OAuth, Contacts,
-  Calendar or IMAP checks. They come from `OTTER_DEMO_MAILBOXES` in the main checkout's
-  ignored `.env.local` (shared with T3 worktrees by symlink); `--login` signs them in to Google
-  once per machine. Preserve the demo fixtures and send test mail only to the demo account itself.
-  Keep credentials out of logs, commits, screenshots and app bundles. See
-  [Demo mailboxes](docs/development.md#demo-mailboxes).
 - `pnpm start` runs the built app unpackaged; `pnpm dist:desktop:dmg` builds a DMG in `release/`
   (on a Mac), `pnpm dist:desktop:deb` a .deb (on Linux).
 - Data homes (`apps/desktop/src/paths.ts`, as in T3 Code): the installed app uses
-  `~/.otter/userdata` (`~/.otter-mail/userdata` for installs from before the rename, never moved); dev runs use `~/.otter/dev`, or `<worktree>/.otter` in a
-  linked worktree. `pnpm dev:desktop --home <dir>` overrides. Never point dev at the installed app's home.
+  `~/.otter/userdata` (`~/.otter-mail/userdata` for installs from before the rename, never
+  moved); dev runs use `~/.otter/dev`, or `<worktree>/.otter` in a linked worktree, and a
+  `<kind>/` home beside it for `:fake`, `:demo` and `:real`. `--home <dir>` overrides and
+  `--reset` starts one over. Never point dev at the installed app's home (the runner refuses).
 - Main-process logs: the terminal, and `logs/main.log` in the state directory.
 
 ## Releases

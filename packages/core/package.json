@@ -9,7 +9,8 @@
     "./agent-server": "./src/services/agent/server.ts",
     "./agent-instructions": "./src/services/agent/instructions.ts",
     "./imap": "./src/protocols/imap/client.ts",
-    "./extension-kit": "./src/extension-kit.ts"
+    "./extension-kit": "./src/extension-kit.ts",
+    "./fake": "./src/fake/index.ts"
   },
   "scripts": {
     "test": "vp test run --passWithNoTests",

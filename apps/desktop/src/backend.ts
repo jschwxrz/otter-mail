@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/electron/utility";
 
 import { DEMO_MAILBOXES_ENV } from "@otter/contracts/demo";
+import { devDataFrom } from "@otter/contracts/dev-data";
 import {
   addDemoMailboxes,
   callHandler,
@@ -31,8 +32,7 @@ if (appInfo().errorReports) {
 }
 
 async function start(): Promise<void> {
-  const platform = desktopPlatform();
-  await startCore(platform, desktopExtensions);
+  await startCore(await platform(), desktopExtensions);
   registerBackendHandlers();
   serverUrl().catch((error: unknown) =>
     logger.error("backend", "MCP server failed to start", error),
@@ -45,6 +45,13 @@ async function start(): Promise<void> {
     );
   }
   postToMain({ type: "ready", channels: [...registeredHandlers().keys()] });
+}
+
+/** `pnpm dev:desktop:fake` signs in to made-up services instead of Google's and Microsoft's. */
+async function platform() {
+  if (appInfo().packaged || devDataFrom(process.env) !== "fake") return desktopPlatform();
+  const { withFakeServices } = await import("@otter/core/fake");
+  return withFakeServices(desktopPlatform());
 }
 
 async function invoke(id: number, channel: string, params: unknown): Promise<void> {

@@ -35,7 +35,7 @@ import { ChatBar } from "./agent/chat-bar";
 import { ChatWindow } from "./agent/chat-window";
 import { ChatWorkspace, type ChatPanelControl } from "./agent/chat-workspace";
 import { SCHEDULED_TASKS, ScheduledTasksView } from "./agent/agent-scheduled";
-import { CALENDAR_MODES, CalendarView, calendarAccounts } from "./calendar/calendar-view";
+import { CALENDAR_MODES, CalendarView } from "./calendar/calendar-view";
 import type { CalendarMode } from "./calendar/dates";
 import { newChat, showChat, useChatEvents, useChats } from "./agent/chat-store";
 import { useMailChatContext } from "./agent/chat-context";
@@ -988,10 +988,7 @@ function MailHome() {
     },
     "agent.newChat": () => startNewChat(),
     "mode.mail": () => switchMode("mail"),
-    "mode.calendar": () => {
-      if (calendarAccounts(accounts).length === 0) return false;
-      switchMode("calendar");
-    },
+    "mode.calendar": () => switchMode("calendar"),
     "mode.agent": () => switchMode("agent"),
     "browser.toggle": () => toggleBrowser(),
     "browser.newTab": () => {
@@ -1487,8 +1484,7 @@ function MailHome() {
       space?.kind === "mailbox" || space?.kind === "alias" ? space.id : firstRealAccountId;
     let href: string;
     if (place === "agents") href = hrefOf(CHATS_SPACE, NEW_CHAT);
-    else if (place === "calendar" && calendarAccounts(accounts).length > 0)
-      href = hrefOf(CALENDAR_SPACE, lastCalendarMode.current);
+    else if (place === "calendar") href = hrefOf(CALENDAR_SPACE, lastCalendarMode.current);
     else if (mailbox) href = hrefOf(mailbox, "INBOX");
     else return;
     addTab(href);
@@ -1566,7 +1562,6 @@ function MailHome() {
       settingsOpen={settingsRoute !== null}
       composing={composeOpen}
       onGo={goToSpace}
-      onMoveTab={mailboxes.move}
       onMode={switchMode}
       onSelectChat={(id) => go({ label: id }, true)}
       onNewChat={startNewChat}
@@ -1576,10 +1571,6 @@ function MailHome() {
       }}
       onNewView={() => openViewEditor("new")}
       onEditView={openViewEditor}
-      onOpenPalette={() => {
-        sidebarPeek.close();
-        setPaletteOpen(true);
-      }}
       onOpenSettings={(pane = lastPaneRef.current) => openSettings({ pane })}
       searches={searchTabs
         .filter((t) => t.mailbox === searchMailbox && t.parent)
