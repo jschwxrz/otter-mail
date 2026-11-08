@@ -639,14 +639,14 @@ describe("what an agent delivers to Otter", () => {
     ]);
   });
 
-  it("starts a chat named for the agent when it has none, with what's new, and catches up when told", async () => {
+  it("starts a chat named for the agent for a session the gateway delivered to, with what's new, and catches up when told", async () => {
     const now = Date.now();
     let messages = [delivered("d-old", "Old news.", now - 2 * 24 * 60 * 60 * 1000)];
     gateway((method) => {
       if (method === "sessions.list")
         return {
           sessions: [
-            { key: "agent:main:otter:inbox", lastActivityAt: now },
+            { key: "agent:main:otter-mail:n-1", lastActivityAt: now },
             { key: "agent:main:main", lastActivityAt: now },
           ],
         };
@@ -664,11 +664,11 @@ describe("what an agent delivers to Otter", () => {
     expect(started).toEqual([]);
 
     messages = [...messages, delivered("d-new", "Waiting on your approval.", now)];
-    openClawProvider.delivered!(settings);
+    openClawProvider.delivered!(settings, "agent:main:otter-mail:n-1");
     await vi.waitFor(() =>
       expect(started).toEqual([
         {
-          sessionId: "agent:main:otter:inbox",
+          sessionId: "agent:main:otter-mail:n-1",
           requestId: "run:delivery:d-new",
           chat: { title: "Rowan" },
           deliveredAt: now,
@@ -682,14 +682,14 @@ describe("what an agent delivers to Otter", () => {
     });
 
     // Once the chat exists it's watched like any other, from its last turn.
-    openClawProvider.watch!(settings, [{ id: "agent:main:otter:inbox", since: now }], (run) =>
+    openClawProvider.watch!(settings, [{ id: "agent:main:otter-mail:n-1", since: now }], (run) =>
       started.push(run),
     );
     messages = [...messages, delivered("d-next", "Done.", now + 1)];
     openClawProvider.delivered!(settings);
     await vi.waitFor(() =>
       expect(started.at(-1)).toEqual({
-        sessionId: "agent:main:otter:inbox",
+        sessionId: "agent:main:otter-mail:n-1",
         requestId: "run:delivery:d-next",
         deliveredAt: now + 1,
         delivery: { kind: "automation" },
@@ -852,7 +852,7 @@ describe("what an agent delivers to Otter", () => {
     gateway();
     const events: ChatEvent[] = [];
     await openClawProvider.resume!(
-      { requestId: "run:delivery:d-1", sessionId: "agent:main:otter:inbox" },
+      { requestId: "run:delivery:d-1", sessionId: "agent:main:otter-mail:n-1" },
       settings,
       (e) => events.push(e),
     );
@@ -875,7 +875,7 @@ describe("what an agent delivers to Otter", () => {
     gateway();
     const events: ChatEvent[] = [];
     await openClawProvider.resume!(
-      { requestId: "run:delivery:d-1", sessionId: "agent:main:otter:inbox" },
+      { requestId: "run:delivery:d-1", sessionId: "agent:main:otter-mail:n-1" },
       settings,
       (e) => events.push(e),
     );

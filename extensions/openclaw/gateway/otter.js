@@ -1,10 +1,5 @@
 // What the plugin does, apart from OpenClaw's SDK, so Otter's tests can run it.
 
-/** Where an agent's deliveries to Otter are kept: one session per agent, read by Otter's apps. */
-export const inboxKey = (agentId) => `agent:${agentId}:otter:inbox`;
-
-export const OTTER_TARGET = "inbox";
-
 /** Who sends what you type in Otter: the gateway's owner once `commands.ownerAllowFrom` lists `otter:owner`. */
 export const OWNER = "owner";
 export const OWNER_ENTRY = `otter:${OWNER}`;
@@ -13,17 +8,22 @@ export const OWNER_ENTRY = `otter:${OWNER}`;
 export const chatTarget = (sessionKey) => `chat:${sessionKey}`;
 
 /** Like posting to a Slack channel rather than in a thread: each delivery starts a chat of its own. */
-export const NEW_CHAT_TARGET = "new";
+export const NEW_CHAT_TARGET = "chat:new";
 
-export const isNewChat = (to) =>
-  typeof to === "string" && to.trim().replace(/^otter:/, "") === NEW_CHAT_TARGET;
+const bare = (to) => (typeof to === "string" ? to.trim().replace(/^otter:/, "") : "");
 
-/** A target as the channel keeps it: one of Otter's chats, a new one each time, or the inbox. */
+/** What's sent to the gateway's owner (`otter:owner`) starts a chat, as it names none. */
+export const isNewChat = (to) => bare(to) === NEW_CHAT_TARGET || bare(to) === OWNER;
+
+/** A target as the channel keeps it: one of Otter's chats, or a new one each time; else none. */
 export function targetOf(to) {
   const chat = chatOf(to);
   if (chat) return chatTarget(chat);
-  return isNewChat(to) ? NEW_CHAT_TARGET : OTTER_TARGET;
+  return isNewChat(to) ? NEW_CHAT_TARGET : undefined;
 }
+
+export const TARGETS_HINT =
+  '"chat:<session key>" for one of Otter\'s chats, or "chat:new" for a new one';
 
 /** A session for a new chat, an Otter chat like one you start. */
 export const newChatKey = (agentId, id) => `agent:${agentId}:otter-mail:${id}`;
@@ -35,10 +35,9 @@ export const newChatKey = (agentId, id) => `agent:${agentId}:otter-mail:${id}`;
 export function otterTargetsNote(sessionKey) {
   const here = agentOf(sessionKey) ? chatTarget(sessionKey) : "chat:<session key>";
   return [
-    "Otter delivery targets (channel `otter`), like a thread or a new post in Slack:",
+    "Otter delivery targets (channel `otter`), like replying in a thread or a new post in Slack:",
     `- "${here}": this chat. Any Otter chat is "chat:<its session key>".`,
-    '- "new": a new Otter chat for each delivery (an automation that should post a fresh chat every run, such as a morning brief).',
-    '- "inbox": the agent\'s single Otter inbox chat.',
+    '- "chat:new": a new Otter chat for each delivery (an automation that should post a fresh chat every run, such as a morning brief or an alert).',
   ].join("\n");
 }
 
@@ -49,14 +48,11 @@ export const agentOf = (sessionKey) =>
 
 /** The chat a target names, if it names one. */
 export function chatOf(to) {
-  const target = typeof to === "string" ? to.trim().replace(/^otter:/, "") : "";
+  const target = bare(to);
   if (!target.startsWith("chat:")) return undefined;
   const sessionKey = target.slice("chat:".length);
   return agentOf(sessionKey) ? sessionKey : undefined;
 }
-
-/** The session a delivery to this target is kept in. */
-export const sessionOf = (to, agentId) => chatOf(to) ?? inboxKey(agentId);
 
 export const isOwnerConfigured = (cfg) =>
   Array.isArray(cfg?.commands?.ownerAllowFrom) &&
@@ -77,7 +73,7 @@ export function pointerOf({ sessionKey, to, payload, at = Date.now() }) {
   return {
     kind: approval ? "approval" : question ? "question" : "message",
     agentId,
-    sessionKey: approval || question ? (session ?? null) : (chat ?? inboxKey(agentId)),
+    sessionKey: approval || question ? (session ?? null) : (chat ?? session ?? null),
     ...(approval && {
       approvalId: String(approval.approvalId),
       approvalKind: approval.approvalKind === "plugin" ? "plugin" : "exec",

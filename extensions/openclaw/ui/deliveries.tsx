@@ -83,7 +83,7 @@ export function OpenClawDeliveries() {
           {made ? (
             <SettingsRow
               title="Run these on the gateway's computer"
-              description="The token is shown only now. Then send a job here with --announce --channel otter --to inbox."
+              description="The token is shown only now. Then send a job here with --announce --channel otter --to chat:new (a new chat each time), or --to chat:<session key> for one chat."
             >
               <Command value={`openclaw plugins install ${PLUGIN}`} />
               <Command
@@ -92,7 +92,7 @@ export function OpenClawDeliveries() {
                   token: made.token,
                 })}'`}
               />
-              <Command value="openclaw cron edit <job> --announce --channel otter --to inbox" />
+              <Command value="openclaw cron edit <job> --announce --channel otter --to chat:new" />
             </SettingsRow>
           ) : (
             <SettingsRow

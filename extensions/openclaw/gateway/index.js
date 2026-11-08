@@ -15,6 +15,7 @@ import { runDetachedWebhookWork } from "openclaw/plugin-sdk/webhook-request-guar
 import { readWorkspaceFile } from "./files.js";
 import {
   accountOf,
+  chatOf,
   chatTarget,
   isNewChat,
   isOwnerConfigured,
@@ -23,8 +24,8 @@ import {
   otterTargetsNote,
   OWNER,
   pointerOf,
-  sessionOf,
   targetOf,
+  TARGETS_HINT,
   tell,
 } from "./otter.js";
 
@@ -63,15 +64,14 @@ export const otterChannel = createChatChannelPlugin({
     messaging: {
       targetResolver: {
         looksLikeId: () => true,
-        hint: '"chat:<session key>" for one of Otter\'s chats, "new" for a new chat, or "inbox"',
+        hint: TARGETS_HINT,
       },
-      // A delivery to a chat is kept in its session; to "new", in a chat it starts (the gateway
-      // routes each delivery once, and sends it to that session); any other, in the inbox.
+      // A delivery to a chat is kept in its session; to "chat:new", in a chat it starts (the gateway
+      // routes each delivery once, and sends it to that session).
       resolveOutboundSessionRoute: ({ agentId, target }) => {
         const to = targetOf(target);
-        const sessionKey = isNewChat(to)
-          ? newChatKey(agentId, randomUUID())
-          : sessionOf(target, agentId);
+        if (!to) return null;
+        const sessionKey = isNewChat(to) ? newChatKey(agentId, randomUUID()) : chatOf(to);
         return {
           sessionKey,
           baseSessionKey: sessionKey,
@@ -86,7 +86,12 @@ export const otterChannel = createChatChannelPlugin({
   },
   outbound: {
     deliveryMode: "direct",
-    resolveTarget: (params) => ({ ok: true, to: targetOf(params?.to) }),
+    resolveTarget: (params) => {
+      const to = targetOf(params?.to);
+      return to
+        ? { ok: true, to }
+        : { ok: false, error: new Error(`Otter's targets are ${TARGETS_HINT}.`) };
+    },
     sendText: (ctx) => deliver(ctx),
     sendPayload: (ctx) => deliver(ctx, ctx.payload),
   },
