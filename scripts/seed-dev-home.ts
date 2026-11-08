@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Copies the installed app's mail and settings into a dev data home, one way. Nothing that could
 // act as the user comes along: no sign-ins or secrets (sealed under the installed app's Keychain
-// key anyway), no Otter account (it would sync both ways), no push watches, no scheduled sends.
+// key anyway, agents' keys included), no Otter account (it would sync both ways), no push
+// watches, no scheduled sends.
 
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
@@ -18,6 +19,7 @@ const COPIED = [
   "appearance.json",
   "ui-preferences.json",
   "keybindings.json",
+  "assistant-providers.json",
 ];
 
 export const installedStateDir = (): string => NodePath.join(otterHome(), "userdata");
