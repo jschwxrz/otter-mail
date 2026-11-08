@@ -100,9 +100,10 @@ when a feature lands or goes.
   JSON request on stdin and prints JSON. Building it needs full Xcode (macOS 26 SDK).
 - `scripts/`: dev runner, desktop packaging (`build-desktop-artifact.ts`), release helpers.
 - `assets/`: app icons like Otter Code's: `prod/` for stable, `nightly/` for the night sky, and `dev/`
-  for the blueprint. The iPhone has stable and dev icons. Every icon is drawn from
-  the one mark, `prod/otter-mail-symbol.svg`: `pnpm icons:export` regenerates them all.
-  `agent/` is Otterware's agent (the face): the app draws it with `AgentIcon`
+  for the blueprint. The iPhone has stable and dev icons. The desktop and web app are drawn from
+  Otterware's mark, `prod/otterware-symbol.svg`; the iPhone app (still Otter Mail) from
+  `prod/otter-mail-symbol.svg`. `pnpm icons:export` regenerates them all.
+  `agent/` is Otterware's agent (the Pilot): the app draws it with `AgentIcon`
   (`apps/web/src/main/mail/agent-icon.tsx`), the iPhone with its `OtterAgent` image.
 - `changelog/`: notes on Mac and web releases (`<version>.md`, images in `images/`), shown on
   otterware.app/mail/changelog (the website repository copies them hourly) and on the version's
