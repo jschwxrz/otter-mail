@@ -9,6 +9,7 @@ import {
   accountStore,
   broadcast,
   GMAIL_ACCESS_MISSING_MESSAGE,
+  GOOGLE_UNAVAILABLE_MESSAGE,
   logger,
   SIGNED_OUT_MESSAGE,
   SignInCancelledError,
@@ -116,20 +117,30 @@ type TokenResponse = {
   error_description?: string;
 };
 
+// Google's own failures, which pass: a refresh retries them, sync tries again later.
+const UNAVAILABLE_ERRORS = new Set(["internal_failure", "server_error", "temporarily_unavailable"]);
+const REFRESH_RETRY_DELAYS_MS = [1000, 3000];
+
 async function tokenRequest(params: Record<string, string>): Promise<TokenResponse> {
   const { clientId, clientSecret } = await getCredentials();
-  const response = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, ...params }),
-  });
-  const json = (await response.json().catch(() => ({}))) as TokenResponse;
-  if (!response.ok || json.error) {
+  for (let attempt = 0; ; attempt++) {
+    const response = await fetch(TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, ...params }),
+    });
+    const json = (await response.json().catch(() => ({}))) as TokenResponse;
+    if (response.ok && !json.error) return json;
     const detail = json.error_description || json.error || `HTTP ${response.status}`;
     if (json.error === "invalid_grant") throw new SignInExpiredError(detail);
-    throw new Error(`Google token request failed: ${detail}`);
+    if (response.status < 500 && !UNAVAILABLE_ERRORS.has(json.error ?? "")) {
+      throw new Error(`Google token request failed: ${detail}`);
+    }
+    // An authorization code is spent on the first try; only a refresh can be repeated.
+    const delay = params.grant_type === "refresh_token" && REFRESH_RETRY_DELAYS_MS[attempt];
+    if (!delay) throw new Error(`${GOOGLE_UNAVAILABLE_MESSAGE} (${detail})`);
+    await new Promise((resolve) => setTimeout(resolve, delay));
   }
-  return json;
 }
 
 function toStored(

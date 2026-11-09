@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { GMAIL_ACCESS_MISSING_MESSAGE } from "../../google.ts";
+import { GMAIL_ACCESS_MISSING_MESSAGE, GOOGLE_UNAVAILABLE_MESSAGE } from "../../google.ts";
 import { logger } from "../../logger.ts";
 import { setPlatform, type Platform } from "../../platform.ts";
 import { describeError, errorKind, getSendAs, GmailApiError, listLabelNames } from "./api.ts";
@@ -67,5 +67,19 @@ describe("a Gmail grant without access to mail", () => {
       .catch((e: unknown) => e as Error);
     expect(err?.message).not.toBe(GMAIL_ACCESS_MISSING_MESSAGE);
     expect(err?.cause).toBeInstanceOf(GmailApiError);
+  });
+});
+
+describe("Google's token endpoint failing on its side", () => {
+  const err = new Error(`${GOOGLE_UNAVAILABLE_MESSAGE} (internal_failure)`);
+
+  it("is passing trouble for sync to retry, not a sign-in to redo", () => {
+    expect(errorKind(err)).toBe("network");
+    expect(describeError(err)).not.toMatch(/sign in/i);
+  });
+
+  it("is logged as a warning, not an error to report", () => {
+    logger.failure("handlers", "gmail:labels failed", err);
+    expect(logged).toEqual([{ level: "warn", message: "gmail:labels failed" }]);
   });
 });

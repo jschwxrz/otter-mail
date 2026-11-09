@@ -8,7 +8,11 @@
  */
 
 import { fromBase64, toBase64Url, utf8Decode, utf8Encode } from "../../bytes.js";
-import { GMAIL_ACCESS_MISSING_MESSAGE, SIGNED_OUT_MESSAGE } from "../../google.js";
+import {
+  GMAIL_ACCESS_MISSING_MESSAGE,
+  GOOGLE_UNAVAILABLE_MESSAGE,
+  SIGNED_OUT_MESSAGE,
+} from "../../google.js";
 import { logger } from "../../logger.js";
 import { platform } from "../../platform.js";
 import { mapPool } from "../../pool.js";
@@ -104,10 +108,14 @@ export function isNetworkError(err: unknown): boolean {
 
 export function errorKind(err: unknown): ErrorKind | null {
   if (isRateLimitError(err)) return "rateLimit";
-  if (isNetworkError(err)) return "network";
+  if (isNetworkError(err) || isGoogleUnavailable(err)) return "network";
   if (err instanceof GmailApiError && err.status === 404) return "notFound";
   if (isSignInError(err)) return "auth";
   return null;
+}
+
+function isGoogleUnavailable(err: unknown): boolean {
+  return String(err).includes(GOOGLE_UNAVAILABLE_MESSAGE);
 }
 
 function isSignInError(err: unknown): boolean {
@@ -125,6 +133,8 @@ function isSignInError(err: unknown): boolean {
 export function describeError(err: unknown): string {
   if (isRateLimitError(err)) return "Gmail is limiting requests right now. Retrying shortly";
   if (isNetworkError(err)) return "Can't reach Gmail. Retrying when the connection is back";
+  if (isGoogleUnavailable(err))
+    return "Google sign-in is having trouble right now. Retrying shortly";
   const text = String(err);
   if (text.includes(SIGNED_OUT_MESSAGE) || text.includes("Google sign-in expired")) {
     return SIGNED_OUT_MESSAGE;
