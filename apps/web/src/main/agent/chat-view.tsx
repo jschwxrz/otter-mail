@@ -11,12 +11,7 @@ import {
   useSetProvidersState,
 } from "./agent-providers";
 import type { MailChatContext } from "./chat-context";
-import {
-  CitationCommentEditor,
-  CiteSelectionButton,
-  rangeAnchor,
-  type Citation,
-} from "./chat-cite";
+import { CiteSelectionButton, useCitations } from "./chat-cite";
 import { AttachmentPreview, attachmentPreview, type PreviewFile } from "../mail/attachment-preview";
 import { DropOverlay, useChatAttachments, useFileDrop } from "./chat-attachments";
 import {
@@ -27,7 +22,6 @@ import {
   isElsewhere,
   loadChat,
   removeQueued,
-  setCitations,
   steerQueued,
   useChats,
   type QueuedMessage,
@@ -38,7 +32,6 @@ import { ChatComposer } from "./chat-composer";
 import { isProviderUsable } from "./agent-providers";
 import { toast } from "../mail/toast";
 
-const NO_CITATIONS: Citation[] = [];
 const NO_QUEUE: QueuedMessage[] = [];
 
 function useChatImageLoader(provider?: ProviderKind, sessionId?: string | null) {
@@ -100,7 +93,6 @@ export function ChatView({
     );
   });
   const hydrating = useChats((s) => s.hydrating === chatId);
-  const citations = useChats((s) => s.citations[chatId]) ?? NO_CITATIONS;
   const turns = convo?.turns ?? [];
   const chat = useChatProvider(convo);
   const setProvidersState = useSetProvidersState();
@@ -115,24 +107,8 @@ export function ChatView({
     inputRef.current?.focus();
   });
 
-  const [commenting, setCommenting] = useState<{
-    id: string;
-    anchor: DOMRect;
-    side: "above" | "below";
-    range?: Range;
-  } | null>(null);
-  const [shownChat, setShownChat] = useState(chatId);
-  if (shownChat !== chatId) {
-    setShownChat(chatId);
-    setCommenting(null);
-  }
   const [transcript, setTranscript] = useState<HTMLDivElement | null>(null);
-  const commentingCitation = commenting && citations.find((c) => c.id === commenting.id);
-  const cite = (text: string, range: Range) => {
-    const id = crypto.randomUUID();
-    setCitations(chatId, (list) => [...list, { id, text }]);
-    setCommenting({ id, anchor: rangeAnchor(range), side: "below", range });
-  };
+  const citing = useCitations(chatId, () => inputRef.current?.focus());
 
   const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
   const loadChatImage = useChatImageLoader(convo?.provider, convo?.sessionId);
@@ -179,8 +155,8 @@ export function ChatView({
       onClearQuote={onClearQuote}
       files={files}
       inputRef={inputRef}
-      onEditCitation={(id, anchor) => setCommenting({ id, anchor, side: "above" })}
-      onSent={() => setCommenting(null)}
+      onEditCitation={citing.edit}
+      onSent={citing.close}
       updateSettings={updateSettings}
       compact={compact}
     />
@@ -292,26 +268,11 @@ export function ChatView({
                 ) : null
               }
             />
-            <CiteSelectionButton root={transcript} onCite={cite} />
-            {commentingCitation && commenting ? (
-              <CitationCommentEditor
-                key={commenting.id}
-                citation={commentingCitation}
-                anchor={commenting.anchor}
-                side={commenting.side}
-                range={commenting.range}
-                onSave={(comment) => {
-                  setCitations(chatId, (list) =>
-                    list.map((c) =>
-                      c.id === commenting.id ? { ...c, comment: comment.trim() || undefined } : c,
-                    ),
-                  );
-                  setCommenting(null);
-                  inputRef.current?.focus();
-                }}
-                onCancel={() => setCommenting(null)}
-              />
-            ) : null}
+            <CiteSelectionButton
+              root={transcript}
+              onCite={(text, range) => citing.cite(text, range)}
+            />
+            {citing.editor}
             {/* An empty chat shows its headline in the middle of the column. */}
             {hero && !centered ? (
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-4 px-6">

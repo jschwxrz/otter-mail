@@ -193,6 +193,11 @@ export function attachBrowser(win: BrowserWindow): void {
           });
         return;
       }
+      if (input.type === "keyDown" && modOnly && !input.alt && !input.shift && key === "f") {
+        event.preventDefault();
+        if (!win.isDestroyed()) win.webContents.send("browser:find", { webContentsId: page.id });
+        return;
+      }
       if (
         input.type !== "keyDown" ||
         input.key !== "Tab" ||

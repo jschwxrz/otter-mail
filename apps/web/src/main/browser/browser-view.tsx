@@ -40,6 +40,7 @@ import {
   type BrowserTab,
 } from "./store";
 import { shortcutText } from "../keybindings/keys";
+import { FindBar, isFindKey } from "../agent/chat-find";
 
 type Webview = HTMLElement & {
   getWebContentsId(): number;
@@ -51,6 +52,8 @@ type Webview = HTMLElement & {
   reload(): void;
   stop(): void;
   openDevTools(): void;
+  findInPage(text: string, options?: { forward?: boolean; findNext?: boolean }): number;
+  stopFindInPage(action: "clearSelection" | "keepSelection" | "activateSelection"): void;
 };
 
 const PARTITION = "persist:browser";
@@ -92,6 +95,7 @@ export function BrowserPage({ tab, active }: { tab: BrowserTab; active: boolean 
   const [history, setHistory] = useState({ back: false, forward: false });
   const [failure, setFailure] = useState<string | null>(null);
   const [crashed, setCrashed] = useState(false);
+  const [find, setFind] = useState<number | null>(null);
   const addressRequest = useBrowser((s) =>
     s.addressFocus?.tabId === tab.id ? s.addressFocus.seq : 0,
   );
@@ -170,6 +174,9 @@ export function BrowserPage({ tab, active }: { tab: BrowserTab; active: boolean 
       window.desktopBridge.on("browser:closeTab", (params) => {
         if (mine(params)) closeTab(tab.id);
       }),
+      window.desktopBridge.on("browser:find", (params) => {
+        if (mine(params)) setFind((key) => (key ?? 0) + 1);
+      }),
     ];
     return () => offs.forEach((off) => off());
   }, [pageId, tab.id]);
@@ -182,7 +189,15 @@ export function BrowserPage({ tab, active }: { tab: BrowserTab; active: boolean 
 
   return (
     <>
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 px-3">
+      <div
+        className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 px-3"
+        onKeyDown={(e) => {
+          if (!view || !isFindKey(e.nativeEvent)) return;
+          e.preventDefault();
+          e.stopPropagation();
+          setFind((key) => (key ?? 0) + 1);
+        }}
+      >
         <div className="flex shrink-0 items-center rounded-full bg-foreground/[0.06] p-0.5">
           <HintTooltip label="Back" hint={shortcutText("mod+[")} side="bottom">
             <IconBtn
@@ -247,6 +262,18 @@ export function BrowserPage({ tab, active }: { tab: BrowserTab; active: boolean 
         ) : (
           <StartPage onNavigate={navigate} />
         )}
+        {view && find !== null ? (
+          <div className="absolute top-3 right-3 z-10 w-72 max-w-[calc(100%-1.5rem)]">
+            <PageFind
+              view={view}
+              focusKey={find}
+              onClose={() => {
+                setFind(null);
+                view.focus();
+              }}
+            />
+          </div>
+        ) : null}
         {failure || crashed ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-canvas p-6 text-center">
             <TriangleAlertIcon className="mb-1 size-6 text-muted-foreground" />
@@ -263,6 +290,54 @@ export function BrowserPage({ tab, active }: { tab: BrowserTab; active: boolean 
         ) : null}
       </div>
     </>
+  );
+}
+
+/** Find in the page, by Chromium (⌘F / Ctrl+F in a tab). */
+function PageFind({
+  view,
+  focusKey,
+  onClose,
+}: {
+  view: Webview;
+  focusKey: number;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [found, setFound] = useState({ at: -1, total: 0 });
+  useEffect(() => {
+    const listener = (event: Event) => {
+      const { activeMatchOrdinal, matches } = (
+        event as Event & { result: { activeMatchOrdinal: number; matches: number } }
+      ).result;
+      setFound({ at: activeMatchOrdinal - 1, total: matches });
+    };
+    view.addEventListener("found-in-page", listener);
+    return () => {
+      view.removeEventListener("found-in-page", listener);
+      view.stopFindInPage("keepSelection");
+    };
+  }, [view]);
+  return (
+    <FindBar
+      label="Find in page"
+      focusKey={focusKey}
+      query={query}
+      onQuery={(value) => {
+        setQuery(value);
+        if (value) view.findInPage(value, { findNext: true });
+        else {
+          view.stopFindInPage("clearSelection");
+          setFound({ at: -1, total: 0 });
+        }
+      }}
+      at={found.at}
+      total={found.total}
+      onStep={(by) => {
+        if (query) view.findInPage(query, { forward: by > 0, findNext: false });
+      }}
+      onClose={onClose}
+    />
   );
 }
 
