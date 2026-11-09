@@ -1,7 +1,11 @@
 import type { ReportTags } from "@otter/shared/error-reports";
 import { supportError } from "@otter/shared/support";
 
-import { GMAIL_ACCESS_MISSING_MESSAGE, SIGNED_OUT_MESSAGE } from "./google.js";
+import {
+  GMAIL_ACCESS_MISSING_MESSAGE,
+  GOOGLE_UNAVAILABLE_MESSAGE,
+  SIGNED_OUT_MESSAGE,
+} from "./google.js";
 import { OUTLOOK_SIGNED_OUT_MESSAGE } from "./microsoft.js";
 import { platform } from "./platform.js";
 import { OTTER_SIGNED_OUT_MESSAGE } from "./services/otter-account.js";
@@ -24,6 +28,7 @@ function expected(message: string, error: unknown): boolean {
     reason === OTTER_SIGNED_OUT_MESSAGE
   )
     return true;
+  if (reason.startsWith(GOOGLE_UNAVAILABLE_MESSAGE)) return true;
   const category = supportError("", "backend", `${message} ${reason}`)?.category;
   return category === "network" || category === "timeout" || category === "rate limit";
 }

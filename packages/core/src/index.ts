@@ -87,6 +87,7 @@ export type { CoreExtension, ExtensionContext } from "./extensions.js";
 export { fromBase64, toBase64 } from "./bytes.js";
 export {
   GMAIL_ACCESS_MISSING_MESSAGE,
+  GOOGLE_UNAVAILABLE_MESSAGE,
   SIGNED_OUT_MESSAGE,
   SignInCancelledError,
   SignInTimedOutError,

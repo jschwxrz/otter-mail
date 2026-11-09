@@ -4,6 +4,9 @@ export const SIGNED_OUT_MESSAGE = "Signed out of Google. Sign in to this account
 export const GMAIL_ACCESS_MISSING_MESSAGE =
   "Otter isn't allowed to read this Gmail account. Sign in to it again and allow access to your mail.";
 
+/** Google's token endpoint failed on its side; the sign-in itself is fine. */
+export const GOOGLE_UNAVAILABLE_MESSAGE = "Google sign-in is having trouble right now.";
+
 export class SignInCancelledError extends Error {
   constructor() {
     super("Sign-in was cancelled.");
