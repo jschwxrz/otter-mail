@@ -31,6 +31,7 @@ import type {
   ChatSessionMessage,
   Emit,
   ForkPoint,
+  ToolStep,
 } from "@otter/core/extension-kit";
 import { OPENCLAW_DEFAULTS, type OpenClawSettings } from "./settings.js";
 import {
@@ -667,6 +668,16 @@ export function forkEntry(rows: Record<string, unknown>[], at: ForkPoint): strin
 /** Tools the chat doesn't show as steps: a yield is the turn waiting, not something it did. */
 const UNSHOWN_TOOLS = new Set(["sessions_yield"]);
 
+const COMPACTION: ToolStep = { kind: "tool", title: "Compacting context", compaction: true };
+
+/** The row a compaction leaves in the session: OpenClaw's own, or Codex's. */
+const isCompaction = (row: Record<string, unknown>) =>
+  (row.__openclaw as { kind?: unknown } | undefined)?.kind === "compaction" ||
+  row.customType === "openclaw.context-compaction";
+
+/** A compaction is known by its item, the same in its events and its row. */
+const compactionId = (item: unknown) => `compaction:${String(item)}`;
+
 function transcript(messages: Record<string, unknown>[]): ChatSessionMessage[] {
   const unshown = new Set(
     messages.flatMap((m) => {
@@ -680,6 +691,7 @@ function transcript(messages: Record<string, unknown>[]): ChatSessionMessage[] {
     }),
   );
   return messages.flatMap((m): ChatSessionMessage[] => {
+    if (isCompaction(m)) return [{ role: "assistant", text: "", toolCalls: [COMPACTION] }];
     if (m.role === "user") return [{ role: "user", text: textOf(m) }];
     if (m.role === "toolResult")
       return unshown.has(m.toolCallId)
@@ -1114,8 +1126,36 @@ async function follow(
     }
     emit({ requestId, type: "toolResult", id, output: output || (failed ? "(failed)" : "(done)") });
   };
+  /** The session's id: a compaction that runs on its own reports as `<session id>:native-compact`, without the key. */
+  let sessionUuid: string | undefined;
+  const compacting = (id: string) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    emit({ requestId, type: "tool", id, step: COMPACTION });
+  };
+  const compacted = (id: string, output = "") => {
+    compacting(id);
+    emit({ requestId, type: "toolResult", id, output });
+  };
+  const compaction = (p: Record<string, unknown>) => {
+    const run = String(p.runId ?? "");
+    const ours =
+      p.sessionKey === undefined
+        ? sessionUuid !== undefined && run.startsWith(`${sessionUuid}:`)
+        : p.sessionKey === sessionKey;
+    if (!ours) return;
+    hush();
+    const data = (p.data ?? {}) as Record<string, unknown>;
+    const id = compactionId(data.itemId ?? run);
+    if (data.phase === "start") compacting(id);
+    else if (data.phase === "end" && (data.completed === true || data.willRetry !== true))
+      compacted(id, data.completed === true ? "" : "Context compaction failed");
+  };
   const onEvent = ({ event, payload }: EventFrame) => {
     const p = (payload ?? {}) as Record<string, unknown>;
+    // `otter.compaction`: what the Otter plugin reports of a compaction before a run.
+    if (event === "agent" && (p.stream === "compaction" || p.stream === "otter.compaction"))
+      return compaction(p);
     if (event === "session.approval") {
       if (p.sessionKey !== sessionKey) return;
       const snapshot = (p.approval ?? {}) as Record<string, unknown>;
@@ -1135,14 +1175,19 @@ async function follow(
       return;
     }
     if (p.sessionKey !== sessionKey) return;
+    if (typeof p.sessionId === "string") sessionUuid = p.sessionId;
     if (event === "session.message") {
-      if (!turn.resynced) return;
       const row = (p.message ?? {}) as Record<string, unknown>;
       const meta = (row.__openclaw ?? {}) as {
         runId?: string;
         mirrorOrigin?: unknown;
         toolOutput?: { source?: string };
+        itemId?: unknown;
+        id?: unknown;
       };
+      // A compaction before the run starts sends no events of its own, only this row.
+      if (isCompaction(row)) return compacted(compactionId(meta.itemId ?? meta.id));
+      if (!turn.resynced) return;
       if ((meta.runId && !ownsRun(turn, meta.runId)) || meta.mirrorOrigin) return;
       if (meta.toolOutput?.source === "provider-response") return;
       hush();

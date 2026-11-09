@@ -111,6 +111,7 @@ export type ToolStep = {
   title: string;
   detail?: string;
   source?: string;
+  compaction?: true;
 };
 
 export type ChatQuestion = {

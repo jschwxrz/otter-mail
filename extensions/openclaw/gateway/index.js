@@ -173,6 +173,20 @@ export default defineChannelPluginEntry({
         : undefined,
     );
 
+    // OpenClaw tells clients of a compaction inside a run, not of one before it (a transcript
+    // over its byte limit), where a chat would wait on it without a word.
+    const compaction = (phase) => (_event, ctx) => {
+      if (!ctx?.sessionKey) return;
+      api.agent?.events?.emitAgentEvent?.({
+        runId: `${ctx.sessionId ?? ctx.sessionKey}:compaction`,
+        sessionKey: ctx.sessionKey,
+        stream: "otter.compaction",
+        data: phase === "start" ? { phase } : { phase, completed: true },
+      });
+    };
+    api.on("before_compaction", compaction("start"));
+    api.on("after_compaction", compaction("end"));
+
     // What you send in an Otter chat, as the gateway's owner: `chat.send`'s run, with the authority
     // a configured channel owner has (an automation another chat made, for one).
     api.registerGatewayMethod(

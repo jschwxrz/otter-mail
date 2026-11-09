@@ -7,6 +7,7 @@ import {
   FilePenLineIcon,
   FileTextIcon,
   GlobeIcon,
+  Minimize2Icon,
   SearchIcon,
   TerminalIcon,
   WrenchIcon,
@@ -47,7 +48,10 @@ function blocksOf(items: TurnItem[]): Block[] {
     }
     const last = blocks[blocks.length - 1];
     const source = item.step.source;
-    if (source && last?.kind === "group" && last.source === source) last.items.push(item);
+    // Back-to-back compactions (OpenClaw's transcript, then Codex's thread) are one to the reader.
+    if (item.step.compaction && last?.kind === "step" && last.item.step.compaction)
+      blocks[blocks.length - 1] = { kind: "step", item };
+    else if (source && last?.kind === "group" && last.source === source) last.items.push(item);
     else if (source && last?.kind === "step" && last.item.step.source === source)
       blocks[blocks.length - 1] = { kind: "group", source, items: [last.item, item] };
     else blocks.push({ kind: "step", item });
@@ -77,6 +81,8 @@ export function WorkLog({
           </div>
         ) : block.kind === "group" ? (
           <StepGroup key={i} source={block.source} items={block.items} live={live} />
+        ) : block.item.step.compaction ? (
+          <CompactionRow key={i} output={block.item.output} live={live} />
         ) : (
           <StepRow key={i} item={block.item} live={live} />
         ),
@@ -85,6 +91,32 @@ export function WorkLog({
   );
 }
 /* oxlint-enable react/no-array-index-key */
+
+function CompactionRow({ output, live }: { output?: string; live: boolean }) {
+  const running = live && output === undefined;
+  const label = running
+    ? "Compacting context"
+    : output
+      ? "Context compaction failed"
+      : "Context compacted";
+  return (
+    <div
+      role="separator"
+      aria-label={label}
+      className={cn(
+        "flex items-center gap-3 px-1 py-2 text-xs",
+        output ? "text-destructive" : "text-muted-foreground",
+      )}
+    >
+      <span className="h-px flex-1 bg-border" />
+      <span className={cn("flex items-center gap-1.5", running && "text-shimmer")}>
+        <Minimize2Icon className="size-3 shrink-0" aria-hidden />
+        {label}
+      </span>
+      <span className="h-px flex-1 bg-border" />
+    </div>
+  );
+}
 
 function RowHead({
   icon: Icon,
