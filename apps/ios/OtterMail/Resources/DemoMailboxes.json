@@ -44,17 +44,34 @@
     ],
     "threads": [
       {
-        "subject": "Welcome to the Otter Mail demo",
+        "subject": "Welcome to the Otter demo",
         "labels": ["INBOX", "IMPORTANT", "CATEGORY_PERSONAL"],
         "messages": [
           {
             "from": {
-              "name": "Otter Mail",
+              "name": "Otter",
               "email": "team@otter.example"
             },
             "hoursAgo": 480,
             "starred": true,
-            "text": "Hi Robin,\n\nEverything in this mailbox is made up: the people, the mail, the attachments. It lives in your browser only (the demo's own storage), and nothing you do here reaches Gmail.\n\nArchive, star, label, reply, draft, search: it all works against a pretend Gmail, and sync catches up the way it does with the real one.\n\nTo start over, open the app with ?reset-demo at the end of the address.\n\nHave fun,\nThe Otter Mail team",
+            "text": "Hi Robin,\n\nEverything in this mailbox is made up: the people, the mail, the attachments. It lives in your browser only (the demo's own storage), and nothing you do here reaches Gmail.\n\nArchive, star, label, reply, draft, search: it all works against a pretend Gmail, and sync catches up the way it does with the real one.\n\nTo start over, open the app with ?reset-demo at the end of the address.\n\nHave fun,\nThe Otter team",
+            "attachments": []
+          }
+        ]
+      },
+      {
+        "subject": "Your Linden sign-in code",
+        "labels": ["INBOX", "CATEGORY_UPDATES"],
+        "messages": [
+          {
+            "from": {
+              "name": "Linden",
+              "email": "no-reply@linden.example"
+            },
+            "hoursAgo": 0.2,
+            "unread": true,
+            "text": "Hi Robin,\n\nUse this code to sign in to Linden:\n\n482913\n\nIt expires in 10 minutes. If you didn't try to sign in, you can ignore this email.\n\nLinden",
+            "html": "<!doctype html><html><body style=\"margin:0;background:#f5f5f4\">\n  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\" style=\"padding:32px 12px\">\n    <table role=\"presentation\" width=\"480\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:480px;background:#fff;border-radius:12px;font:15px/1.6 system-ui,sans-serif;color:#333\">\n      <tr><td style=\"padding:28px 32px 0;font:700 20px system-ui,sans-serif;color:#166534\">Linden</td></tr>\n      <tr><td style=\"padding:16px 32px 0\">Hi Robin,<br><br>Use this code to sign in to Linden:</td></tr>\n      <tr><td style=\"padding:20px 32px;font:600 32px/1 ui-monospace,monospace;letter-spacing:6px;color:#111\">482913</td></tr>\n      <tr><td style=\"padding:0 32px 28px;color:#666;font-size:13px\">It expires in 10 minutes. If you didn't try to sign in, you can ignore this email.</td></tr>\n    </table>\n  </td></tr></table>\n</body></html>",
             "attachments": []
           }
         ]
@@ -106,7 +123,7 @@
             },
             "hoursAgo": 26,
             "starred": true,
-            "text": "Booking reference: 7XQ2LM\n\nPassenger: ROBIN OTTER\nFlight TP 1352 · Fri 16 Oct\nDeparts 07:40 · Arrives 10:05 (local time)\nSeat 14A · 1 checked bag\n\nYour e-ticket is attached. Online check-in opens 36 hours before departure.",
+            "text": "Booking reference: 7XQ2LM\n\nPassenger: ROBIN OTTER\nFlight TP 1352 · Fri 16 Oct\nDeparts 07:40 · Arrives 10:05 (local time)\nSeat 14A · 1 checked bag\n\nYour e-ticket is attached. Online check-in opens 36 hours before departure.\n\nManage your booking:\nhttps://booking.example.com/manage?ref=7XQ2LM&passenger=ROBIN%20OTTER&token=eyJhbGciOiJIUzI1NiJ9.eyJyZWYiOiI3WFEyTE0iLCJleHAiOjE3OTk5OTk5OTl9.c2lnbmF0dXJlLW9mLWEtbWFkZS11cC1ib29raW5nLXRva2Vu",
             "attachments": [
               {
                 "filename": "e-ticket-7XQ2LM.pdf",
@@ -118,7 +135,7 @@
         ]
       },
       {
-        "subject": "Invitation: Garden planning @ Sun, Oct 4, 9:00 AM UTC (demo@otter.example)",
+        "subject": "Invitation: Garden planning @ Sat, Nov 14, 9:00 AM UTC (demo@otter.example)",
         "labels": ["INBOX", "Projects/Garden", "CATEGORY_PERSONAL"],
         "messages": [
           {
@@ -128,7 +145,7 @@
             },
             "hoursAgo": 20,
             "unread": true,
-            "text": "Jonas Müller has invited you to an event.\n\nGarden planning\nWhen: Sun, Oct 4, 9:00 AM UTC\nWhere: Community garden, plot 12\n\nLet's decide what goes in the raised beds before the frost. Bring seed catalogues!",
+            "text": "Jonas Müller has invited you to an event.\n\nGarden planning\nWhen: Sat, Nov 14, 9:00 AM UTC\nWhere: Community garden, plot 12\n\nLet's decide what goes in the raised beds before the frost. Bring seed catalogues!",
             "attachments": [
               {
                 "filename": "invite.ics",
@@ -170,7 +187,7 @@
               "email": "helen.otter@example.net"
             },
             "hoursAgo": 50,
-            "text": "Here are a couple from Sunday. Your father insists the fish was bigger than it looks.\n\nLove,\nMum",
+            "text": "Here are a couple from Sunday. Your father insists the fish was bigger than it looks. Ring us on +44 20 7946 0958 this weekend?\n\nLove,\nMum",
             "attachments": [
               {
                 "filename": "lake-morning.svg",
@@ -198,7 +215,7 @@
         ]
       },
       {
-        "subject": "Re: Otter Mail feedback — keyboard shortcuts",
+        "subject": "Re: Otter feedback — keyboard shortcuts",
         "labels": ["INBOX", "Projects/Otter"],
         "messages": [
           {
@@ -207,7 +224,7 @@
               "email": "jose@alvarez.example"
             },
             "hoursAgo": 96,
-            "text": "Hi Robin,\n\nI've been using Otter Mail for a week. Love it. Two things:\n\n1. Could `e` archive and move to the next message rather than back to the list?\n2. Is there a shortcut for \"mark as unread\"?\n\nJosé",
+            "text": "Hi Robin,\n\nI've been using Otter for a week. Love it. Two things:\n\n1. Could `e` archive and move to the next message rather than back to the list?\n2. Is there a shortcut for \"mark as unread\"?\n\nJosé",
             "attachments": []
           },
           {
@@ -733,7 +750,7 @@
         ]
       },
       {
-        "subject": "Invitation: Design review @ Fri, Oct 2, 2:00 PM UTC (sam@acme.example)",
+        "subject": "Invitation: Design review @ Thu, Nov 12, 2:00 PM UTC (sam@acme.example)",
         "labels": ["INBOX", "IMPORTANT"],
         "messages": [
           {
@@ -743,7 +760,7 @@
             },
             "hoursAgo": 9,
             "unread": true,
-            "text": "Priya Natarajan has invited you to an event.\n\nDesign review: new reader layout\nWhen: Fri, Oct 2, 2:00 PM UTC\nWhere: Room Rhine / video call",
+            "text": "Priya Natarajan has invited you to an event.\n\nDesign review: new reader layout\nWhen: Thu, Nov 12, 2:00 PM UTC\nWhere: Room Rhine / video call",
             "attachments": [
               {
                 "filename": "invite.ics",
@@ -787,6 +804,97 @@
             "starred": true,
             "text": "Tuesday at 15:00 works. Talk then!",
             "attachments": []
+          }
+        ]
+      },
+      {
+        "subject": "Northwind renewal: order form",
+        "labels": ["INBOX", "Clients/Northwind"],
+        "messages": [
+          {
+            "from": {
+              "name": "Karim Haddad",
+              "email": "karim@acme.example"
+            },
+            "hoursAgo": 77,
+            "text": "Sam,\n\nFirst draft of Northwind's renewal order form attached: 160 seats, SSO add-on, 12 months from 1 November. Can you check the SSO wording before I send it?\n\nKarim",
+            "attachments": [
+              {
+                "filename": "Northwind_Order_Form_v1.pdf",
+                "mimeType": "application/pdf",
+                "size": 764
+              }
+            ]
+          },
+          {
+            "to": [
+              {
+                "name": "Karim Haddad",
+                "email": "karim@acme.example"
+              }
+            ],
+            "hoursAgo": 73,
+            "text": "Looks good. SSO should say 'SAML 2.0 and OIDC'. Send it over.",
+            "attachments": []
+          },
+          {
+            "from": {
+              "name": "Oluwaseun Adeyemi",
+              "email": "olu@northwind.example"
+            },
+            "to": [
+              {
+                "name": "Karim Haddad",
+                "email": "karim@acme.example"
+              },
+              {
+                "name": "Sam Park",
+                "email": "sam@acme.example"
+              }
+            ],
+            "hoursAgo": 51,
+            "text": "Thanks both. Our legal team's redlines are in the attached v2: mostly the liability cap and a 30-day notice period.\n\nOluwaseun",
+            "attachments": [
+              {
+                "filename": "Northwind Order Form v2 (redlines).pdf",
+                "mimeType": "application/pdf",
+                "size": 787
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "subject": "Northwind order form — final for signature",
+        "labels": ["INBOX", "Clients/Northwind"],
+        "messages": [
+          {
+            "from": {
+              "name": "Karim Haddad",
+              "email": "karim@acme.example"
+            },
+            "to": [
+              {
+                "name": "Oluwaseun Adeyemi",
+                "email": "olu@northwind.example"
+              }
+            ],
+            "cc": [
+              {
+                "name": "Sam Park",
+                "email": "sam@acme.example"
+              }
+            ],
+            "hoursAgo": 20,
+            "unread": true,
+            "text": "Hi Oluwaseun,\n\nWe accept the liability cap; the notice period stays at 60 days. Final version attached, ready for signature on your side.\n\nKarim",
+            "attachments": [
+              {
+                "filename": "Northwind_Order_Form_FINAL.pdf",
+                "mimeType": "application/pdf",
+                "size": 767
+              }
+            ]
           }
         ]
       },
@@ -1061,7 +1169,7 @@
             },
             "hoursAgo": 240,
             "text": "Top requests this month: offline search (41), keyboard shortcuts (27), Outlook import (12).",
-            "html": "<h2>September feedback</h2><table border='1' cellpadding='6' style='border-collapse:collapse'><tr><th>Request</th><th>Votes</th></tr><tr><td>Offline search</td><td>41</td></tr><tr><td>Keyboard shortcuts</td><td>27</td></tr><tr><td>Outlook import</td><td>12</td></tr></table><p>NPS: <b>54</b> (+3)</p>",
+            "html": "<h2>September feedback</h2><table border='1' cellpadding='6' style='border-collapse:collapse'><tr><th>Request</th><th>Votes</th></tr><tr><td>Offline search</td><td>41</td></tr><tr><td>Keyboard shortcuts</td><td>27</td></tr><tr><td>Outlook import</td><td>12</td></tr></table><p>NPS: <b>54</b> (+3)</p><p>Questions? Call me on +1 415 555 0132.</p>",
             "attachments": []
           }
         ]

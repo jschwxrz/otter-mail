@@ -11,6 +11,7 @@ struct ThreadRow: View {
     let thread: MailThread
     var mark = "star"
     var mine: Set<String> = []
+    var preview = true
 
     var body: some View {
         let unread = thread.unread
@@ -78,10 +79,12 @@ struct ThreadRow: View {
                 .foregroundStyle(unread ? palette.text : palette.text.opacity(0.6))
                 .lineLimit(1)
 
-            Text(thread.isDraft ? "Draft · \(latest.snippet)" : latest.snippet)
-                .font(.inter(.subheadline))
-                .foregroundStyle(palette.muted.opacity(0.8))
-                .lineLimit(1)
+            if preview {
+                Text(thread.isDraft ? "Draft · \(latest.snippet)" : latest.snippet)
+                    .font(.inter(.subheadline))
+                    .foregroundStyle(palette.muted.opacity(0.8))
+                    .lineLimit(1)
+            }
         }
     }
 

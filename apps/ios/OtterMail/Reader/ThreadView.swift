@@ -39,7 +39,14 @@ struct ThreadView: View {
                     .padding(.horizontal, MessageView.inset)
 
                 let messages = thread.distinctMessages(preferring: store.alias(place.scope)?.email)
+                let code = thread.verificationCode
                 ForEach(messages) { message in
+                    // Above the message it came from, where the Mac and web put it.
+                    if let code, message.id == thread.sent.last?.id {
+                        CodeCard(code: code)
+                            .padding(.bottom, 16)
+                            .padding(.horizontal, MessageView.inset)
+                    }
                     let open = message.id == messages.last?.id || message.unread || expanded.contains(message.id)
                     MessageView(message: message, mailbox: mailbox, open: open) {
                         if message.draft {
