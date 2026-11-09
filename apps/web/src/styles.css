@@ -601,7 +601,7 @@ html[data-window-controls="none"] {
   }
 
   [data-mail-layout="full"] .message-list-preview .message-list-snippet::before {
-    content: "— ";
+    content: "· ";
   }
 
   /* Chips on the row's line, before the date (Linear's), not under it. */
