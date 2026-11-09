@@ -108,10 +108,11 @@ background refresh with notifications (Settings › Notifications) and the unrea
 attachments in Quick Look, one-click unsubscribe, and signatures edited as Gmail keeps them.
 
 Sign-in codes (`Mail/VerificationCode.swift`, `Reader/CodeCard.swift`): the Sign-in codes plugin's
-card, with Copy. `VerificationCode` is `packages/shared/src/verification-code.ts` ported, its
-cases in `OtterMailTests/VerificationCodeTests.swift`; change both together. The reader shows the
-card above the message that carries the code, as the Mac and web do. A list row shows it in place
-of the preview line, only for half an hour after the mail arrived, since codes expire.
+code with Copy & trash, which copies it and trashes the conversation (with Undo).
+`VerificationCode` is `packages/shared/src/verification-code.ts` ported, its cases in
+`OtterMailTests/VerificationCodeTests.swift`; change both together. The reader shows a one-line
+card above the message that carries the code, as the Mac and web do. A list row shows the code as
+its preview line, only for half an hour after the mail arrived, since codes expire.
 
 ## Running
 

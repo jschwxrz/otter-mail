@@ -43,7 +43,10 @@ struct ThreadView: View {
                 ForEach(messages) { message in
                     // Above the message it came from, where the Mac and web put it.
                     if let code, message.id == thread.sent.last?.id {
-                        CodeCard(code: code)
+                        CodeCard(code: code, onTrash: thread.labels.contains("TRASH") ? nil : {
+                            store.trash(thread.id)
+                            leave(thread)
+                        })
                             .padding(.bottom, 16)
                             .padding(.horizontal, MessageView.inset)
                     }

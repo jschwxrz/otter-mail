@@ -1,9 +1,9 @@
 import XCTest
 
 /**
- * The demo's "Your Linden sign-in code" (482913) carries its code card in
- * the inbox and in the reader. Copy says "Copied" without opening the
- * conversation, the row still opens it and still swipes.
+ * The demo's "Your Linden sign-in code" (482913) shows its code on the row's
+ * preview line, an ordinary row's height, with Copy & trash; the reader's card
+ * has it too. Each copies the code and trashes the conversation, with Undo.
  */
 final class SignInCodeUITests: XCTestCase {
     private let subject = "Your Linden sign-in code"
@@ -12,49 +12,63 @@ final class SignInCodeUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchEnvironment["OTTER_COPIED_SECONDS"] = "0"
         app.launch()
         let demo = app.buttons["Try the demo mailbox"]
         if demo.waitForExistence(timeout: 3) { demo.tap() }
         XCTAssertTrue(app.buttons["All places"].waitForExistence(timeout: 8), "the inbox didn't open")
     }
 
-    func testCodeCardInInboxAndReader() {
+    func testCopyAndTrashFromTheInboxAndTheReader() {
         let app = XCUIApplication()
+        let row = rowButton(app, subject)
+        XCTAssertTrue(row.waitForExistence(timeout: 8), "code mail missing from the inbox")
+        XCTAssertTrue(row.label.contains(code), "the row doesn't show the code")
+        XCTAssertEqual(cell(app, subject).frame.height, cell(app, "Dinner Saturday?").frame.height, accuracy: 0.5, "the code row isn't an ordinary row's height")
 
-        XCTAssertTrue(app.buttons["otp-copy"].firstMatch.waitForExistence(timeout: 8), "no code card in the inbox")
-        XCTAssertTrue(app.staticTexts[code].exists, "the card shows the wrong code")
-        let copyButton = app.buttons["otp-copy"].firstMatch
-        XCTAssertGreaterThanOrEqual(copyButton.frame.height, 44, "Copy is smaller than a 44pt target")
-        copy(app, "in the inbox")
-        XCTAssertTrue(app.buttons["All places"].exists, "Copy opened the conversation")
+        let button = app.buttons["otp-copy"].firstMatch
+        XCTAssertEqual(button.label, "Copy code and trash")
+        XCTAssertGreaterThanOrEqual(button.frame.height, 44, "Copy & trash is smaller than a 44pt target")
 
-        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", subject)).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 5), "code mail missing from the inbox")
         row.tap()
         XCTAssertTrue(app.staticTexts[subject].waitForExistence(timeout: 5), "tapping the row didn't open the conversation")
-        XCTAssertTrue(app.staticTexts[code].waitForExistence(timeout: 5), "no code card in the reader")
         XCTAssertEqual(app.otherElements.matching(identifier: "otp-card").count, 1, "the reader repeats the card")
-        copy(app, "in the reader")
-
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        UIPasteboard.general.string = ""
+        app.otherElements["otp-card"].buttons["otp-copy"].tap()
+        XCTAssertTrue(gone(app.staticTexts[subject]), "Copy & trash didn't leave the reader")
+        if !app.buttons["All places"].exists { app.navigationBars.buttons.element(boundBy: 0).tap() }
         XCTAssertTrue(app.buttons["All places"].waitForExistence(timeout: 5), "didn't come back to the inbox")
-        let card = app.otherElements.matching(identifier: "otp-card").allElementsBoundByIndex.first(where: { $0.isHittable })
-        XCTAssertNotNil(card, "the read row lost its code card")
-        card?.swipeRight()
-        XCTAssertTrue(gone(row), "swiping the row on its card didn't archive it")
+        XCTAssertTrue(gone(row), "the reader's Copy & trash didn't trash the conversation")
+        app.buttons["Undo"].tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "Undo didn't bring the conversation back")
+        XCTAssertEqual(pasted(), code, "the reader's Copy & trash didn't copy the code")
+        UIPasteboard.general.string = ""
+        app.buttons["otp-copy"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["All places"].exists, "Copy & trash opened the conversation")
+        XCTAssertTrue(gone(row), "Copy & trash didn't trash the conversation")
+        XCTAssertTrue(app.staticTexts["Conversation trashed"].exists, "no Undo after Copy & trash")
+        XCTAssertEqual(pasted(), code, "Copy & trash didn't copy the code")
     }
 
-    private func copy(_ app: XCUIApplication, _ place: String) {
-        let buttons = app.buttons.matching(identifier: "otp-copy")
-        guard let button = buttons.allElementsBoundByIndex.first(where: { $0.isHittable && $0.label == "Copy code" }) else {
-            return XCTFail("no Copy \(place)")
+    private func rowButton(_ app: XCUIApplication, _ subject: String) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "label CONTAINS %@", subject)).firstMatch
+    }
+
+    /** The runner reading the app's copy asks "Allow Paste", which blocks the read until it's answered. */
+    private func pasted() -> String? {
+        var string: String?
+        let read = expectation(description: "read the pasteboard")
+        DispatchQueue.global().async {
+            string = UIPasteboard.general.string
+            read.fulfill()
         }
-        let copied = buttons.matching(NSPredicate(format: "label == %@", "Copied"))
-        let before = copied.count
-        button.tap()
-        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count > %d", before), object: copied)
-        XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 5), .completed, "Copy didn't say Copied \(place)")
+        let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Allow Paste"]
+        if allow.waitForExistence(timeout: 5) { allow.tap() }
+        wait(for: [read], timeout: 5)
+        return string
+    }
+
+    private func cell(_ app: XCUIApplication, _ subject: String) -> XCUIElement {
+        app.cells.containing(NSPredicate(format: "label CONTAINS %@", subject)).firstMatch
     }
 
     private func gone(_ element: XCUIElement) -> Bool {

@@ -1,72 +1,65 @@
 import SwiftUI
 import UIKit
 
-/**
- * The sign-in code a mail carries, with Copy (extensions/sign-in-codes'
- * CodeCard). Copying says so on the button for a moment. The button is
- * borderless so, in a list row, it takes its own tap and not the row's.
- */
+/** The sign-in code a mail carries, on one line with Copy & trash (extensions/sign-in-codes' CodeCard). */
 struct CodeCard: View {
     @Environment(\.palette) private var palette
     let code: String
-
-    @State private var copied = false
-
-    static let confirmation: Duration? = {
-        #if DEBUG
-        // XCUITest's wait for the app to idle after a tap outlasts 1.5s, so UI tests set
-        // OTTER_COPIED_SECONDS=0 to keep "Copied" up (another number is that many seconds).
-        if let seconds = ProcessInfo.processInfo.environment["OTTER_COPIED_SECONDS"].flatMap(Double.init) {
-            return seconds > 0 ? .seconds(seconds) : nil
-        }
-        #endif
-        return .seconds(1.5)
-    }()
+    var onTrash: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "key.horizontal")
-                .font(.system(size: 15))
-                .foregroundStyle(palette.muted)
-                .frame(width: 40, height: 40)
-                .background(palette.text.opacity(0.06), in: .rect(cornerRadius: 12))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Verification code")
-                    .font(.inter(.footnote))
-                    .foregroundStyle(palette.muted)
-                Text(code)
-                    .font(.system(.title3, design: .monospaced).weight(.semibold))
-                    .tracking(1.5)
-                    .foregroundStyle(palette.text)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
+            Text(code)
+                .font(.system(.title3, design: .monospaced).weight(.semibold))
+                .tracking(1.5)
+                .foregroundStyle(palette.text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Spacer(minLength: 8)
-            Button(action: copy) {
-                Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
-                    .font(.inter(.subheadline).weight(.medium))
-                    .foregroundStyle(palette.text)
-                    .labelStyle(.titleAndIcon)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 44)
-                    .background(palette.text.opacity(0.08), in: .capsule)
-                    .contentShape(.capsule)
-            }
-            .buttonStyle(.borderless)
-            .accessibilityLabel(copied ? "Copied" : "Copy code")
-            .accessibilityIdentifier("otp-copy")
+            CodeButton(code: code, onTrash: onTrash)
         }
-        .padding(12)
+        .padding(.leading, 16)
+        .padding(.trailing, 6)
+        .padding(.vertical, 2)
         .background(palette.card, in: .rect(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(palette.border))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("otp-card")
+    }
+}
+
+/**
+ * Copies the code, then trashes its conversation, as the Mac and web do.
+ * Small to see, with a 44pt target; borderless, so in a list row it takes its
+ * own tap and not the row's.
+ */
+struct CodeButton: View {
+    @Environment(\.palette) private var palette
+    let code: String
+    var onTrash: (() -> Void)?
+
+    @State private var copied = false
+
+    var body: some View {
+        Button(action: copy) {
+            Label(copied ? "Copied" : onTrash == nil ? "Copy" : "Copy & trash", systemImage: copied ? "checkmark" : "doc.on.doc")
+                .font(.inter(.footnote).weight(.medium))
+                .foregroundStyle(palette.text)
+                .labelStyle(.titleAndIcon)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(palette.text.opacity(0.08), in: .capsule)
+                .frame(minHeight: 44)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel(copied ? "Copied" : onTrash == nil ? "Copy code" : "Copy code and trash")
+        .accessibilityIdentifier("otp-copy")
         .task(id: copied) {
-            guard copied, let confirmation = Self.confirmation else { return }
-            try? await Task.sleep(for: confirmation)
+            guard copied else { return }
+            try? await Task.sleep(for: .seconds(1.5))
             if !Task.isCancelled { copied = false }
         }
     }
@@ -75,6 +68,7 @@ struct CodeCard: View {
         Self.copy(code, to: .general)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         copied = true
+        onTrash?()
     }
 
     static func copy(_ code: String, to pasteboard: UIPasteboard) {
