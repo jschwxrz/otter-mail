@@ -605,6 +605,9 @@ export async function taskRuns(g: CronGateway, id: string, limit: number): Promi
   }));
 }
 
+const transcriptGone = (error: unknown) =>
+  error instanceof Error && error.message.startsWith("The recorded cron transcript is unavailable");
+
 /**
  * The rows of one run (`cron.history`). The scheduler writes the job's message, with its own
  * preamble for unattended runs, as the run's first row: that's shown as what was asked.
@@ -618,16 +621,21 @@ export async function runRows(
   const messages: Record<string, unknown>[] = [];
   let cursor: string | undefined;
   for (let page = 0; page < HISTORY_PAGES; page++) {
-    const result = await call<{ messages: Record<string, unknown>[]; nextCursor?: string }>(
-      g,
-      "cron.history",
-      {
-        id,
-        ...(at ? { runAtMs: Number(at) } : { runId }),
-        limit: 200,
-        ...(cursor ? { cursor } : {}),
-      },
-    );
+    const params = {
+      id,
+      ...(at ? { runAtMs: Number(at) } : { runId }),
+      limit: 200,
+      ...(cursor ? { cursor } : {}),
+    };
+    let result: { messages: Record<string, unknown>[]; nextCursor?: string };
+    try {
+      result = await g.request("cron.history", params);
+    } catch (error) {
+      // A run the gateway kept no transcript for (a heartbeat, a pruned session): its summary
+      // stands in for it.
+      if (page === 0 && transcriptGone(error)) return [];
+      throw cronError(error);
+    }
     messages.push(...result.messages);
     cursor = result.nextCursor;
     if (!cursor) break;
