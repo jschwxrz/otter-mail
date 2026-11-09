@@ -107,6 +107,13 @@ Also: Apple's on-device Translation (on request, or automatically for languages 
 background refresh with notifications (Settings › Notifications) and the unread badge,
 attachments in Quick Look, one-click unsubscribe, and signatures edited as Gmail keeps them.
 
+Sign-in codes (`Mail/VerificationCode.swift`, `Reader/CodeCard.swift`): the Sign-in codes plugin's
+code with Copy & trash, which copies it and trashes the conversation (with Undo).
+`VerificationCode` is `packages/shared/src/verification-code.ts` ported, its cases in
+`OtterMailTests/VerificationCodeTests.swift`; change both together. The reader shows a one-line
+card above the message that carries the code, as the Mac and web do. A list row shows the code as
+its preview line, only for half an hour after the mail arrived, since codes expire.
+
 ## Running
 
 ```sh
@@ -136,6 +143,13 @@ Unit tests (`OtterMailTests`, Swift Testing) run in the simulator:
 
 ```sh
 xcodebuild -project apps/ios/OtterMail.xcodeproj -scheme OtterMail -destination 'platform=iOS Simulator,name=iPhone 17' test
+```
+
+UI tests (`OtterMailUITests`, XCTest, against the demo mailbox) have their own scheme, so the unit
+test run stays quick:
+
+```sh
+xcodebuild -project apps/ios/OtterMail.xcodeproj -scheme OtterMailUITests -destination 'platform=iOS Simulator,name=iPhone 17' test
 ```
 
 Shipping: the Release iPhone workflow builds and uploads to TestFlight (`pnpm release:ios` does
