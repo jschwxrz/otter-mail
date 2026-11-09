@@ -572,4 +572,68 @@ describe("What Hermes sends to Otter", () => {
       messages: [{ role: "assistant", text: "The build passed." }],
     });
   });
+
+  it("tells a delivery right after your turn from the turn itself", async () => {
+    let rows = [
+      { id: 10, role: "user", content: "Check" },
+      { id: 11, role: "assistant", content: "Done." },
+    ];
+    let active = now;
+    serve({
+      ...started,
+      "GET /v1/runs/run-1/events": () => sse([{ event: "run.completed", output: "Done." }]),
+      "GET /api/sessions": (url) =>
+        Response.json({
+          data: url.searchParams.get("source") ? [] : [{ id: "session-1", last_active: active }],
+        }),
+      "GET /api/jobs": () => Response.json({ jobs: [] }),
+      "GET /api/sessions/session-1/messages": (url) =>
+        Response.json({ data: url.searchParams.get("limit") === "1" ? rows.slice(-1) : rows }),
+    });
+    current.settings = settings;
+    const runs: AgentRun[] = [];
+    const reads: string[] = [];
+    hermesProvider.watch!(
+      settings,
+      [{ id: "session-1", since: Number.MAX_SAFE_INTEGER }],
+      (r) => runs.push(r),
+      (_id, at) => reads.push(at),
+    );
+    await send();
+    rows = [...rows, { id: 12, role: "assistant", content: "Also: the deploy finished." }];
+    active += 60;
+    hermesProvider.watch!(
+      settings,
+      [{ id: "session-1", since: Date.now(), cursor: "9" }],
+      (r) => runs.push(r),
+      (_id, at) => reads.push(at),
+    );
+    hermesProvider.delivered!(settings);
+    await vi.waitFor(() => expect(runs).toHaveLength(1));
+    expect(runs[0].requestId).toBe("delivered:session-1@11");
+  });
+
+  it("catches a chat it hasn't read yet up on what came after its last turn", async () => {
+    const since = Date.now() - 60_000;
+    serve({
+      "GET /api/sessions": (url) =>
+        Response.json({
+          data: url.searchParams.get("source") ? [] : [{ id: "chat-2", last_active: now }],
+        }),
+      "GET /api/jobs": () => Response.json({ jobs: [] }),
+      "GET /api/sessions/chat-2/messages": () =>
+        Response.json({
+          data: [
+            { id: 3, role: "user", content: "Hi", timestamp: since / 1000 - 30 },
+            { id: 4, role: "assistant", content: "Hello.", timestamp: since / 1000 - 20 },
+            { id: 5, role: "assistant", content: "Your report is ready.", timestamp: now },
+          ],
+        }),
+    });
+    current.settings = settings;
+    const runs: AgentRun[] = [];
+    hermesProvider.watch!(settings, [{ id: "chat-2", since }], (r) => runs.push(r));
+    await vi.waitFor(() => expect(runs).toHaveLength(1));
+    expect(runs[0].requestId).toBe("delivered:chat-2@4");
+  });
 });

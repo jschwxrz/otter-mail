@@ -27,6 +27,7 @@ import {
   PROBE_TIMEOUT_MS,
   apiRoot,
   connectedPlatforms,
+  rawMessages,
   authHeaders,
   contentText,
   parseJson,
@@ -49,11 +50,13 @@ import {
   pendingApprovals,
   replyOf,
   startRun,
+  type Run,
 } from "./runs.js";
 import {
   DELIVERED,
   deliveredNow,
   deliveredReply,
+  ranTo,
   stopWatching,
   watchDeliveries,
 } from "./deliveries.js";
@@ -364,6 +367,25 @@ async function patchSession(ready: Ready, sessionId: string, patch: Record<strin
   if (!response.ok) throw new Error(await readError(response));
 }
 
+/**
+ * Before a run of yours says it's done: where it ended in the session, so what Hermes writes after
+ * it is told apart, and, after a new chat's first turn, the name Hermes gave the session.
+ */
+function ownRun(run: Run, first: boolean): Run {
+  const { ready, sessionId, requestId, emit } = run;
+  run.finishing = async () => {
+    const [rows, session] = await Promise.all([
+      rawMessages(ready, sessionId, 1).catch(() => []),
+      first ? sessionOf(ready, sessionId).catch(() => null) : null,
+    ]);
+    const last = rows.at(-1)?.id;
+    if (last !== undefined) ranTo(sessionId, last);
+    const title = session?.title?.trim();
+    if (title) emit({ requestId, type: "title", title });
+  };
+  return run;
+}
+
 export const hermesProvider: ChatProvider<HermesSettings> = {
   kind: "hermes",
   displayName: "Hermes",
@@ -496,15 +518,7 @@ export const hermesProvider: ChatProvider<HermesSettings> = {
       }
       if ("error" in started) return emit({ requestId, type: "error", message: started.error });
       await keepRun(requestId, { runId: started.runId, sessionId, at: Date.now() });
-      const run = newRun(requestId, started.runId, sessionId, ready, emit);
-      const session = sessionId;
-      // Hermes names a new session while its first turn runs.
-      if (first)
-        run.finishing = async () => {
-          const title = (await sessionOf(ready, session))?.title?.trim();
-          if (title) emit({ requestId, type: "title", title });
-        };
-      return follow(run);
+      return follow(ownRun(newRun(requestId, started.runId, sessionId, ready, emit), first));
     }
 
     const controller = new AbortController();
@@ -569,7 +583,7 @@ export const hermesProvider: ChatProvider<HermesSettings> = {
       if (kept) {
         logger.info("agent", "hermes resume", { requestId, runId: kept.runId });
         emit({ requestId, type: "transcript", messages: [] });
-        return await follow(newRun(requestId, kept.runId, sessionId, ready, emit));
+        return await follow(ownRun(newRun(requestId, kept.runId, sessionId, ready, emit), false));
       }
       const reply = await replyOf(ready, sessionId);
       if (!reply.some((m) => m.role === "assistant" && m.text.trim()))

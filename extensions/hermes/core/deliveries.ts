@@ -118,6 +118,18 @@ async function newChats(
   }
 }
 
+/** Where each chat's own turns ended in its session (the last message id), as this device saw them end. */
+const ownTo = new Map<string, number>();
+
+/** A turn of yours ended at message `last`: what follows it is Hermes's own. */
+export function ranTo(sessionId: string, last: number): void {
+  ownTo.set(sessionId, Math.max(last, ownTo.get(sessionId) ?? -1));
+  const chat = watching?.sessions.get(sessionId);
+  if (!chat || Number(chat.cursor ?? -1) >= last) return;
+  chat.cursor = String(last);
+  watching?.read?.(sessionId, chat.cursor);
+}
+
 /** What Hermes wrote into a chat since it was last read, when no message of yours led to it. */
 async function inChats(w: Watching, ready: Ready, recent: RawSession[]): Promise<void> {
   const active = new Map(recent.map((s) => [String(s.id), toMillis(s.last_active)]));
@@ -126,23 +138,29 @@ async function inChats(w: Watching, ready: Ready, recent: RawSession[]): Promise
     // A turn going in the chat follows all it leads to.
     if (lastActive === undefined || chat.since === Number.MAX_SAFE_INTEGER) continue;
     if ([...following.values()].some((run) => run.sessionId === id)) continue;
-    if (chat.cursor !== undefined && readAt.get(id) === lastActive) continue;
+    if (readAt.get(id) === lastActive) continue;
     const rows = await rawMessages(ready, id, 50);
     readAt.set(id, lastActive);
     const last = rows.at(-1)?.id;
     if (last === undefined) continue;
-    const cursor = chat.cursor === undefined ? undefined : Number(chat.cursor);
-    if (cursor === last) continue;
+    const from = Math.max(Number(chat.cursor ?? -1) || -1, ownTo.get(id) ?? -1);
+    if (from >= last) continue;
+    // A chat not read yet: what followed your last message, after the chat last ended.
+    const added =
+      from >= 0
+        ? rows.filter((m) => (m.id ?? 0) > from)
+        : rows
+            .slice(rows.findLastIndex((m) => m.role === "user") + 1)
+            .filter((m) => toMillis(m.timestamp) > chat.since);
     w.read?.(id, String(last));
     chat.cursor = String(last);
-    if (cursor === undefined || Number.isNaN(cursor)) continue;
-    const added = rows.filter((m) => (m.id ?? 0) > cursor);
-    // A message of yours (or from another of Hermes's apps) is a turn, not a delivery.
-    if (added.some((m) => m.role === "user") || !said(added.map(toMessage))) continue;
+    // A message from another of Hermes's apps is a turn, not a delivery.
+    if (!added.length || added.some((m) => m.role === "user") || !said(added.map(toMessage)))
+      continue;
     logger.info("agent", "hermes wrote in a chat", { session: id });
     w.started({
       sessionId: id,
-      requestId: `${DELIVERED}${id}@${cursor}`,
+      requestId: `${DELIVERED}${id}@${(added[0].id ?? 1) - 1}`,
       deliveredAt: toMillis(added.at(-1)?.timestamp) || Date.now(),
       delivery: { kind: "message", from: "Hermes" },
     });
