@@ -172,7 +172,7 @@ nonisolated final class NWTransport: MailTransport, @unchecked Sendable {
                 // Unreachable, refused or a bad certificate: fail now rather than wait for the network.
                 case .waiting(let error), .failed(let error):
                     self?.failure.withLock { $0 = error }
-                    finish(error)
+                    finish(Self.lost(error))
                     connection.cancel()
                 case .cancelled: finish(ImapError.closed)
                 default: break
@@ -210,9 +210,9 @@ nonisolated final class NWTransport: MailTransport, @unchecked Sendable {
 
     /**
      * The network going away under a connection, as URLSession (the STARTTLS
-     * transport) reports it. iOS aborts a suspended app's sockets
-     * (ECONNABORTED), and Wi-Fi handing over to cellular resets them. Any
-     * other error stays as it is. A connection the network failed is
+     * transport) reports it, connecting or connected. iOS aborts a suspended
+     * app's sockets (ECONNABORTED), and Wi-Fi handing over to cellular resets
+     * them. Any other error stays as it is. A connection the network failed is
      * cancelled (by the state handler), which ends what was waiting on it,
      * and anything sent on it after, as ECANCELED: that is the `failure`.
      */
