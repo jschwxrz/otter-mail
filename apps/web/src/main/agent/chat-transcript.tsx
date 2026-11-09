@@ -11,17 +11,18 @@ import {
   GitForkIcon,
   LayersIcon,
   MailIcon,
+  Minimize2Icon,
   RotateCcwIcon,
   SendIcon,
   TextQuoteIcon,
   XIcon,
 } from "lucide-react";
 import { IconBtn, HintTooltip } from "../mail/ui";
-import { WorkLog } from "./work-log";
+import { CompactionRow, WorkLog, isCompaction, type TurnItem } from "./work-log";
 import type { ChatChange } from "../mail/api";
 import type { ContextKind, ContextMeta } from "./chat-context";
 import { findTokenRanges, messageTokens } from "@otter/shared/chat-search";
-import { retryTurn, useChats, type ChatTurn } from "./chat-store";
+import { retryTurn, runReplyIds, useChats, type ChatTurn } from "./chat-store";
 import { Button } from "~/components/ui/button";
 import { ChatMarkdown } from "./chat-markdown";
 import { messageTime } from "./chat-time";
@@ -183,17 +184,20 @@ function WorkingTimer({ startedAt }: { startedAt: number }) {
   return <>{formatDuration(now - startedAt)}</>;
 }
 
-function WorkingRow({ startedAt }: { startedAt?: number }) {
+/** `compacting`: the agent compacts its context before it starts on your message. */
+function WorkingRow({ startedAt, compacting }: { startedAt?: number; compacting: boolean }) {
+  const verb = compacting ? "Compacting" : "Working";
   return (
     <div className="border-b border-border/40 pb-2 pt-1">
       <div className="flex h-6 min-w-0 items-baseline gap-2 px-1 text-sm leading-relaxed text-muted-foreground tabular-nums">
-        <span className="relative shrink-0 whitespace-nowrap text-shimmer">
+        <span className="relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-shimmer">
+          {compacting ? <Minimize2Icon aria-hidden className="size-3 shrink-0" /> : null}
           {startedAt ? (
-            <>
-              Working for <WorkingTimer startedAt={startedAt} />
-            </>
+            <span>
+              {verb} for <WorkingTimer startedAt={startedAt} />
+            </span>
           ) : (
-            "Working…"
+            `${verb}…`
           )}
         </span>
       </div>
@@ -326,6 +330,18 @@ function highlightFound(turnId: string, query: string): (() => void) | undefined
   };
 }
 
+const shownItems = (turn: ChatTurn | undefined): TurnItem[] =>
+  (turn?.items ?? []).filter((item) => item.kind === "step" || item.text.trim());
+
+const isSteer = (turn: ChatTurn | undefined) =>
+  turn?.role === "user" && (turn.intent === "steer" || turn.intent === "promoted");
+
+/** How many compactions a reply opens with: those ran before the agent read your message. */
+function openingCompactions(items: TurnItem[]): number {
+  const at = items.findIndex((item) => !isCompaction(item));
+  return at < 0 ? items.length : at;
+}
+
 export function ChatTranscript({
   turns,
   streaming,
@@ -377,12 +393,26 @@ export function ChatTranscript({
       else next.add(id);
       return next;
     });
-  return turns.map((turn) => {
+  const runReplies = streaming ? runReplyIds(turns) : new Set<string>();
+  const isLive = (turn: ChatTurn) => runReplies.has(turn.id) && !turn.finishedAt && !turn.error;
+  const runStartedAt = turns.find((turn) => runReplies.has(turn.id))?.startedAt;
+  return turns.map((turn, index) => {
     if (turn.role === "user") {
+      // A compaction before the run is drawn above the message, once it's done.
+      const reply = turns[index + 1];
+      const replyItems = reply?.role === "assistant" ? shownItems(reply) : [];
+      const opening = replyItems[openingCompactions(replyItems) - 1];
+      const compaction =
+        opening?.kind === "step" && !(isLive(reply) && opening.output === undefined)
+          ? opening
+          : null;
       return (
         <MessageScroller.Item key={turn.id} messageId={turn.id}>
+          {compaction ? <CompactionRow output={compaction.output} live={false} /> : null}
           <div className="group flex flex-col items-end gap-1 py-3">
-            {turn.intent ? <IntentMarker intent={turn.intent} /> : null}
+            {turn.intent === "steer" || turn.intent === "promoted" ? (
+              <IntentMarker intent={turn.intent} />
+            ) : null}
             {turn.context ? <ContextRecap context={turn.context} onOpen={onOpenContext} /> : null}
             <div className="relative max-w-[80%] select-text whitespace-pre-wrap rounded-2xl bg-message px-4 py-2.5 text-sm leading-relaxed text-message-foreground wrap-anywhere">
               {turn.skill ? (
@@ -411,8 +441,17 @@ export function ChatTranscript({
       );
     }
     const isLast = turn.id === turns[turns.length - 1]?.id;
-    const live = streaming && isLast && !turn.finishedAt && !turn.error;
-    const items = (turn.items ?? []).filter((item) => item.kind === "step" || item.text.trim());
+    const live = isLive(turn);
+    const all = shownItems(turn);
+    const opening = turns[index - 1]?.role === "user" ? openingCompactions(all) : 0;
+    const items = all.slice(opening);
+    const compactingFirst =
+      live &&
+      all.slice(0, opening).some((item) => item.kind === "step" && item.output === undefined);
+    // A compaction mid-turn shows as its own live divider, in place of the working row.
+    const compactingMidway =
+      live &&
+      items.some((item) => isCompaction(item) && item.kind === "step" && item.output === undefined);
     const lastStep = items.findLastIndex((item) => item.kind === "step");
     const work = items.slice(0, lastStep + 1);
     const answer = items
@@ -420,24 +459,37 @@ export function ChatTranscript({
       .map((item) => (item.kind === "text" ? item.text.trim() : ""))
       .join("\n\n");
     const steps = work.filter((item) => item.kind === "step").length;
-    const folded = steps > 0 && !live;
-    const showWork = steps > 0 && (live || expandedFolds.has(turn.id));
+    // A compaction never folds away: it stays between the fold and the answer.
+    const foldable = work.some((item) => !isCompaction(item));
+    const expanded = expandedFolds.has(turn.id);
+    const folded = foldable && !live;
+    const showWork = work.length > 0 && (live || !foldable || expanded);
+    const keptCompactions =
+      folded && !expanded
+        ? work.filter((item, i) => isCompaction(item) && !isCompaction(work[i + 1]))
+        : [];
+    const continued = isSteer(turns[index - 1]);
     const foldLabel =
       turn.startedAt && turn.finishedAt
-        ? `Worked for ${formatDuration(turn.finishedAt - turn.startedAt)}`
-        : `Took ${steps} step${steps === 1 ? "" : "s"}`;
+        ? `${continued ? "Continued" : "Worked"} for ${formatDuration(turn.finishedAt - turn.startedAt)}`
+        : continued
+          ? "Continued"
+          : `Took ${steps} step${steps === 1 ? "" : "s"}`;
     return (
       <MessageScroller.Item key={turn.id} messageId={turn.id}>
         <div className="flex flex-col">
           <DeliveryRow turn={turn} />
-          {live ? <WorkingRow startedAt={turn.startedAt} /> : null}
+          {live && isLast && !compactingMidway ? (
+            <WorkingRow startedAt={runStartedAt} compacting={compactingFirst} />
+          ) : null}
           {folded ? (
             <WorkFoldRow
               label={foldLabel}
-              expanded={expandedFolds.has(turn.id)}
+              expanded={expanded}
               onToggle={() => toggleFold(turn.id)}
             />
           ) : null}
+          {keptCompactions.length > 0 ? <WorkLog items={keptCompactions} /> : null}
           {showWork ? (
             <WorkLog items={work} live={live} onOpenFile={onOpenFile} loadImage={loadImage} />
           ) : null}

@@ -1,16 +1,9 @@
 import { setSyncedPreference } from "../synced-preferences";
 import { useId, useState, useSyncExternalStore } from "react";
-import {
-  ChevronDownIcon,
-  CornerUpRightIcon,
-  GripVerticalIcon,
-  ListOrderedIcon,
-  PencilIcon,
-  Redo2Icon,
-  XIcon,
-} from "lucide-react";
+import { ArrowUpIcon, ChevronDownIcon, PencilIcon, Redo2Icon, XIcon } from "lucide-react";
 import { Btn, HintTooltip, IconBtn, cn } from "../mail/ui";
 import { useShortcutLabel } from "../keybindings/store";
+import type { QueuedMessage } from "./chat-store";
 
 export type FollowUpBehavior = "queue" | "steer";
 
@@ -37,213 +30,174 @@ export function useFollowUpBehavior(): FollowUpBehavior {
   }, getFollowUpBehavior);
 }
 
-type QueueItem = { id: string; question: string; skill?: { name: string } };
+const QUEUE_VISIBLE_ROWS = 3;
 
-export function QueuedRunsControl({
+/**
+ * The chat's queued messages at the end of its transcript, as Otter Code shows them: each in
+ * full, dashed and unfilled until it's sent, with Send now, Edit and Remove under it.
+ */
+export function QueuedMessages({
   items,
   editingId,
-  canSteer,
+  canSend,
+  onSend,
   onEdit,
   onCancelEdit,
-  onSteer,
   onRemove,
-  onMove,
 }: {
-  items: QueueItem[];
+  items: QueuedMessage[];
   editingId: string | null;
-  canSteer: boolean;
+  /** A run is going that a message can join. */
+  canSend: boolean;
+  onSend: (id: string) => void;
   onEdit: (id: string) => void;
   onCancelEdit: () => void;
-  onSteer: (id: string) => void;
   onRemove: (id: string) => void;
-  /** Move `id` before `beforeId` (null = to the end). */
-  onMove: (id: string, beforeId: string | null) => void;
 }) {
-  const [expanded, setExpanded] = useState(true);
-  const [drag, setDrag] = useState<{ id: string; insertIndex: number } | null>(null);
-  const [armed, setArmed] = useState<string | null>(null);
-  const steerShortcut = useShortcutLabel("agent.sendQueuedNow");
+  const [showAll, setShowAll] = useState(false);
+  const sendShortcut = useShortcutLabel("agent.sendQueuedNow");
   const editShortcut = useShortcutLabel("agent.editQueued");
   const listId = useId();
   if (items.length === 0) return null;
-
-  const drop = () => {
-    if (!drag) return;
-    const { id, insertIndex } = drag;
-    const from = items.findIndex((i) => i.id === id);
-    setDrag(null);
-    if (insertIndex === from || insertIndex === from + 1) return;
-    onMove(id, items[insertIndex]?.id ?? null);
-  };
+  const collapsible = items.length > QUEUE_VISIBLE_ROWS;
+  const visible = collapsible && !showAll ? items.slice(0, QUEUE_VISIBLE_ROWS - 1) : items;
 
   return (
-    <div
-      role="region"
+    <section
       aria-label={`${items.length} queued message${items.length === 1 ? "" : "s"}`}
-      aria-live="polite"
-      className="relative z-0 mb-2 rounded-2xl border border-(--chat-composer-outline) bg-(--chat-composer-surface) px-1.5 py-1 text-sm shadow-xs/5 dark:border-transparent"
+      className="relative flex w-full flex-col gap-2 pb-4 pt-1"
     >
-      <button
-        type="button"
-        aria-label={expanded ? "Collapse queued messages" : "Expand queued messages"}
-        aria-expanded={expanded}
-        aria-controls={listId}
-        onPointerDown={(event) => event.preventDefault()}
-        onClick={() => setExpanded((value) => !value)}
-        className="flex h-7 w-full cursor-pointer items-center gap-2 rounded-lg px-1.5 text-left hover:bg-accent-surface/50"
-      >
-        <ListOrderedIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-        <span className="min-w-0 flex-1 text-muted-foreground">Queued</span>
-        <span className="min-w-4 text-center font-medium tabular-nums text-muted-foreground">
-          {items.length}
-        </span>
-        <ChevronDownIcon
-          className={cn(
-            "size-3.5 shrink-0 text-muted-foreground transition-transform",
-            !expanded && "rotate-180",
-          )}
-          aria-hidden
-        />
-      </button>
-      <ol id={listId} className={cn("max-h-32 overflow-y-auto", !expanded && "hidden")}>
-        {items.map((item, index) => {
-          const isEditing = editingId === item.id;
-          const preview = `${item.skill ? `/${item.skill.name} ` : ""}${item.question}`;
+      <span className="sr-only" aria-live="polite">
+        {items.length} queued
+      </span>
+      <ol id={listId} className="flex flex-col items-end gap-3">
+        {visible.map((item, index) => {
+          const isEditing = item.id === editingId;
+          const text = `${item.skill ? `/${item.skill.name} ` : ""}${item.question}`.trim();
           return (
             <li
               key={item.id}
+              aria-label={`Queued message ${index + 1} of ${items.length}, not sent`}
               aria-current={isEditing ? "true" : undefined}
-              draggable={drag?.id === item.id || armed === item.id}
-              onDragStart={(event) => {
-                if (armed !== item.id) return event.preventDefault();
-                event.dataTransfer.effectAllowed = "move";
-                setDrag({ id: item.id, insertIndex: index });
-              }}
-              onDragOver={(event) => {
-                if (!drag) return;
-                event.preventDefault();
-                const rect = event.currentTarget.getBoundingClientRect();
-                const insertIndex = event.clientY < rect.top + rect.height / 2 ? index : index + 1;
-                if (insertIndex !== drag.insertIndex) setDrag({ ...drag, insertIndex });
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                drop();
-              }}
-              onDragEnd={() => {
-                setArmed(null);
-                setDrag(null);
-              }}
-              className={cn(
-                "relative flex h-7 items-center gap-1.5 rounded-sm px-0.5",
-                isEditing && "bg-accent-surface text-foreground",
-                drag?.id === item.id && "opacity-50",
-              )}
+              className="flex w-full flex-col items-end gap-1"
             >
-              {drag && drag.insertIndex === index ? (
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute inset-x-0 top-0 h-0.5 rounded bg-primary/70"
-                />
-              ) : null}
-              {drag && drag.insertIndex === items.length && index === items.length - 1 ? (
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 rounded bg-primary/70"
-                />
-              ) : null}
-              <IconBtn
-                label="Reorder queued message (drag, or press the arrow keys)"
-                className="size-6 cursor-grab active:cursor-grabbing"
-                onPointerDown={() => {
-                  setArmed(item.id);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "ArrowUp" && index > 0) {
-                    event.preventDefault();
-                    onMove(item.id, items[index - 1].id);
-                  } else if (event.key === "ArrowDown" && index < items.length - 1) {
-                    event.preventDefault();
-                    onMove(item.id, items[index + 2]?.id ?? null);
-                  }
-                }}
+              <div
+                className={cn(
+                  "flex min-w-0 max-w-[80%] flex-col gap-2 rounded-2xl border border-dashed px-3 py-2 text-sm leading-relaxed",
+                  isEditing
+                    ? "border-primary/60 text-foreground"
+                    : "border-muted-foreground/40 text-muted-foreground",
+                )}
               >
-                <GripVerticalIcon className="size-3.5" />
-              </IconBtn>
-              <span className="min-w-0 flex-1 truncate text-foreground/80" title={preview}>
-                {isEditing ? <span className="sr-only">Editing queued message: </span> : null}
-                {preview}
-              </span>
-              {isEditing ? (
-                <Btn
-                  size="xs"
-                  variant="ghost"
-                  aria-label="Cancel editing queued message"
-                  onClick={onCancelEdit}
-                >
-                  Cancel
-                </Btn>
-              ) : (
-                <>
-                  <HintTooltip
-                    label="Edit in the composer"
-                    hint={index === items.length - 1 ? editShortcut : undefined}
-                  >
-                    <IconBtn
-                      label="Edit queued message"
-                      className="size-6"
-                      onClick={() => onEdit(item.id)}
+                {item.sent?.length ? (
+                  <span className="flex flex-wrap items-center gap-1">
+                    {item.sent.map((file) =>
+                      file.thumb ? (
+                        <img
+                          key={file.name}
+                          src={file.thumb}
+                          alt={file.name}
+                          className="size-8 rounded-md border border-border/70 object-cover"
+                        />
+                      ) : (
+                        <span
+                          key={file.name}
+                          className="max-w-40 truncate rounded-md border border-border/70 px-1.5 py-0.5 text-xs"
+                        >
+                          {file.name}
+                        </span>
+                      ),
+                    )}
+                  </span>
+                ) : null}
+                {text ? <p className="whitespace-pre-wrap wrap-anywhere">{text}</p> : null}
+              </div>
+              <div className="flex items-center gap-0.5 pe-1 text-xs text-muted-foreground">
+                {isEditing ? (
+                  <>
+                    <span className="px-1 text-foreground">Editing in the composer</span>
+                    <Btn
+                      size="xs"
+                      variant="ghost"
+                      aria-label="Cancel editing queued message"
+                      onClick={onCancelEdit}
                     >
-                      <PencilIcon className="size-3.5" />
-                    </IconBtn>
-                  </HintTooltip>
-                  <HintTooltip
-                    label={canSteer ? "Send as a steer instead" : "There is no active run to steer"}
-                    hint={canSteer && index === 0 ? steerShortcut : undefined}
-                  >
-                    <span className="flex shrink-0">
-                      <Btn
-                        size="xs"
-                        variant="ghost-muted"
-                        disabled={!canSteer}
-                        onClick={() => onSteer(item.id)}
+                      Cancel
+                    </Btn>
+                  </>
+                ) : (
+                  <>
+                    {canSend ? (
+                      <HintTooltip
+                        label="Send into the current turn"
+                        hint={index === 0 ? sendShortcut : undefined}
                       >
-                        <CornerUpRightIcon className="size-3.5" />
-                        Steer
-                      </Btn>
-                    </span>
-                  </HintTooltip>
-                  <HintTooltip label="Remove from queue">
-                    <IconBtn
-                      label="Remove queued message"
-                      className="size-6"
-                      onClick={() => onRemove(item.id)}
+                        <Btn size="xs" variant="ghost-muted" onClick={() => onSend(item.id)}>
+                          <ArrowUpIcon />
+                          Send now
+                        </Btn>
+                      </HintTooltip>
+                    ) : null}
+                    <HintTooltip
+                      label="Edit in the composer"
+                      hint={index === items.length - 1 ? editShortcut : undefined}
                     >
-                      <XIcon className="size-3.5" />
-                    </IconBtn>
-                  </HintTooltip>
-                </>
-              )}
+                      <IconBtn
+                        label="Edit queued message"
+                        className="size-6"
+                        onClick={() => onEdit(item.id)}
+                      >
+                        <PencilIcon className="size-3.5" />
+                      </IconBtn>
+                    </HintTooltip>
+                    <HintTooltip label="Remove from queue">
+                      <IconBtn
+                        label="Remove queued message"
+                        className="size-6"
+                        onClick={() => onRemove(item.id)}
+                      >
+                        <XIcon className="size-3.5" />
+                      </IconBtn>
+                    </HintTooltip>
+                  </>
+                )}
+              </div>
             </li>
           );
         })}
       </ol>
-    </div>
+      {collapsible ? (
+        <button
+          type="button"
+          aria-expanded={showAll}
+          aria-controls={listId}
+          onPointerDown={(event) => event.preventDefault()}
+          onClick={() => setShowAll((value) => !value)}
+          className="flex cursor-pointer items-center gap-1 self-end pe-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          {showAll ? "Show fewer" : `Show all ${items.length} queued`}
+          <ChevronDownIcon
+            aria-hidden
+            className={cn("size-3.5 transition-transform", showAll && "rotate-180")}
+          />
+        </button>
+      ) : null}
+    </section>
   );
 }
 
-export function IntentMarker({ intent }: { intent: "queued" | "steer" | "promoted" }) {
-  const tooltip =
-    intent === "queued"
-      ? "Queued behind the active turn"
-      : intent === "promoted"
-        ? "Originally queued, then promoted to steer the active turn"
-        : "Steered the active turn";
+export function IntentMarker({ intent }: { intent: "steer" | "promoted" }) {
   return (
-    <HintTooltip label={tooltip}>
+    <HintTooltip
+      label={
+        intent === "promoted"
+          ? "Originally queued, then promoted to steer the active turn"
+          : "Steered the active turn"
+      }
+    >
       <div className="me-1 flex items-center justify-end gap-1 text-xs leading-none text-muted-foreground">
-        {intent === "queued" ? null : <Redo2Icon aria-hidden className="size-3" />}
-        {intent === "queued" ? "Queued" : "Steer"}
+        <Redo2Icon aria-hidden className="size-3" />
+        Steer
       </div>
     </HintTooltip>
   );
