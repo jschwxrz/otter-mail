@@ -7,6 +7,8 @@ export type HermesSettings = AgentSettings & {
   reasoningEffort: string;
   serviceTier: string;
   sessions?: boolean;
+  /** Jobs whose results stay on Hermes rather than coming to Otter (comma-separated ids). */
+  mutedJobs?: string;
 };
 
 export const HERMES_DEFAULTS: HermesSettings = {

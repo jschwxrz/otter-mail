@@ -4,6 +4,10 @@ import type { HermesSettings } from "./settings.js";
 vi.mock("../../../packages/core/src/services/agent/settings.js", () => ({
   getHermesKey: async () => "test-key",
 }));
+const saved = vi.hoisted(() => [] as unknown[]);
+vi.mock("../../../packages/core/src/services/agent/service.js", () => ({
+  saveAgentSettings: async (_kind: string, change: unknown) => void saved.push(change),
+}));
 const { hermesProvider, hermesSchedule, hermesTask } = await import("./hermes.js");
 const settings = { baseUrl: "https://hermes.test/v1", enabled: true } as HermesSettings;
 const schedules = hermesProvider.schedules!;
@@ -55,8 +59,9 @@ describe("hermesTask", () => {
         status: "error",
         error: "Model unavailable",
       },
-      delivery: { kind: "none" },
+      delivery: { kind: "otter", chat: "new" },
     });
+    expect(hermesTask(job, { mutedJobs: "x,a1b2c3" }).delivery).toEqual({ kind: "none" });
   });
 
   it("reads intervals, one-offs, pauses and deliveries", () => {
@@ -96,7 +101,7 @@ describe("Hermes's jobs API", () => {
     expect(calls[0].url.href).toBe("https://hermes.test/api/jobs?include_disabled=true");
     expect((calls[0].init.headers as Record<string, string>).Authorization).toBe("Bearer test-key");
     expect(listed?.tasks).toHaveLength(1);
-    expect(listed?.can).toMatchObject({ create: true, deliverToOtter: false, history: false });
+    expect(listed?.can).toMatchObject({ create: true, deliverToOtter: true, history: true });
   });
 
   it("isn't listed until Hermes is set up", async () => {
@@ -177,5 +182,74 @@ describe("Hermes's jobs API", () => {
         schedule: { kind: "cron", expr: "x x x x x" },
       }),
     ).rejects.toThrow("Invalid schedule 'x'");
+  });
+
+  it("sends results to Otter, or leaves them on Hermes", async () => {
+    const calls = serve(() => Response.json({ job }));
+    saved.length = 0;
+    const mine = { ...settings, mutedJobs: "" };
+    await schedules.save(mine, "a1b2c3", {
+      name: "Morning brief",
+      schedule: { kind: "cron", expr: "0 9 * * 1-5" },
+      resultsTo: { kind: "off" },
+    });
+    expect(JSON.parse(String(calls[1].init.body))).toMatchObject({ deliver: "local" });
+    expect(saved).toEqual([{ mutedJobs: "a1b2c3" }]);
+    await schedules.save(mine, "a1b2c3", {
+      name: "Morning brief",
+      schedule: { kind: "cron", expr: "0 9 * * 1-5" },
+      resultsTo: { kind: "new-chat" },
+    });
+    expect(saved).toEqual([{ mutedJobs: "a1b2c3" }, { mutedJobs: "" }]);
+  });
+
+  it("lists past runs, each with its transcript", async () => {
+    const at = Date.parse("2026-11-08T09:00:00Z") / 1000;
+    const calls = serve((url) => {
+      if (url.pathname === "/api/jobs/a1b2c3") return Response.json({ job });
+      if (url.pathname === "/api/sessions")
+        return Response.json({
+          data: [
+            {
+              id: "local-1",
+              title: "Morning brief · Nov 08 09:00",
+              started_at: at,
+              ended_at: at + 42,
+              end_reason: "cron_complete",
+              model: "gpt-5",
+            },
+            {
+              id: "cron_a1b2c3_20261107_090000",
+              started_at: at - 86_400,
+              ended_at: at - 86_380,
+              end_reason: "cron_incomplete_no_output",
+            },
+            { id: "local-2", title: "Other job · Nov 08 09:00", started_at: at, ended_at: at + 1 },
+            { id: "local-3", title: "Morning brief · Nov 09 09:00", started_at: at + 86_400 },
+          ],
+        });
+      return Response.json({
+        data: [
+          { role: "user", content: "[IMPORTANT: scheduled] Summarise my inbox" },
+          { role: "assistant", content: "Three new threads." },
+        ],
+      });
+    });
+    expect(await schedules.runs!(settings, "a1b2c3", 10)).toEqual([
+      { id: "local-1", at: at * 1000, status: "ok", durationMs: 42_000, model: "gpt-5" },
+      {
+        id: "cron_a1b2c3_20261107_090000",
+        at: (at - 86_400) * 1000,
+        status: "error",
+        durationMs: 20_000,
+        error: "It finished without a result.",
+      },
+    ]);
+    expect(calls.find((c) => c.url.pathname === "/api/sessions")?.url.search).toBe(
+      "?source=cron&limit=200",
+    );
+    expect(await schedules.runTranscript!(settings, "a1b2c3", "local-1")).toEqual([
+      { role: "assistant", text: "Three new threads." },
+    ]);
   });
 });
