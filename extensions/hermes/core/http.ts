@@ -126,7 +126,9 @@ export function toSession(raw: RawSession): ChatSession {
   };
 }
 
-type RawMessage = {
+export type RawMessage = {
+  id?: number;
+  timestamp?: number;
   role?: string;
   content?: unknown;
   tool_name?: string | null;
@@ -135,7 +137,7 @@ type RawMessage = {
     | null;
 };
 
-function toMessage(m: RawMessage): ChatSessionMessage {
+export function toMessage(m: RawMessage): ChatSessionMessage {
   const role = m.role === "user" || m.role === "assistant" || m.role === "tool" ? m.role : "system";
   const toolCalls = (m.tool_calls ?? [])
     .filter((call) => call.function?.name ?? call.name)
@@ -153,17 +155,53 @@ function toMessage(m: RawMessage): ChatSessionMessage {
   };
 }
 
+/** Oldest first: the whole session, or (`latest`) its last messages. */
+export async function rawMessages(
+  ready: Ready,
+  sessionId: string,
+  latest?: number,
+): Promise<RawMessage[]> {
+  const page = latest ? `order=latest&limit=${latest}` : "order=oldest&limit=500";
+  const response = await fetch(
+    `${ready.root}/api/sessions/${encodeURIComponent(sessionId)}/messages?${page}`,
+    { headers: authHeaders(ready.key), signal: AbortSignal.timeout(10_000) },
+  );
+  if (!response.ok) throw new Error(await readError(response));
+  return ((await response.json()) as { data?: RawMessage[] }).data ?? [];
+}
+
 export async function sessionMessages(
   ready: Ready,
   sessionId: string,
 ): Promise<ChatSessionMessage[]> {
+  return (await rawMessages(ready, sessionId)).map(toMessage);
+}
+
+/** GET /api/sessions, most recently active first; of one source (`cron`, `otter`) or all. */
+export async function listSessions(
+  ready: Ready,
+  limit: number,
+  source?: string,
+): Promise<RawSession[]> {
   const response = await fetch(
-    `${ready.root}/api/sessions/${encodeURIComponent(sessionId)}/messages?order=oldest&limit=500`,
+    `${ready.root}/api/sessions?${source ? `source=${source}&` : ""}limit=${limit}`,
     { headers: authHeaders(ready.key), signal: AbortSignal.timeout(10_000) },
   );
   if (!response.ok) throw new Error(await readError(response));
-  const body = (await response.json()) as { data?: RawMessage[] };
-  return (body.data ?? []).map(toMessage);
+  return ((await response.json()) as { data?: RawSession[] }).data ?? [];
+}
+
+/** The gateway's platforms (GET /health/detailed): Otter's plugin, Telegram…, by name. */
+export async function connectedPlatforms(ready: Ready): Promise<string[]> {
+  const response = await fetch(`${ready.root}/health/detailed`, {
+    headers: authHeaders(ready.key),
+    signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+  });
+  if (!response.ok) return [];
+  const body = (await response.json()) as { platforms?: Record<string, { state?: string }> };
+  return Object.entries(body.platforms ?? {})
+    .filter(([, p]) => p.state === "connected")
+    .map(([name]) => name);
 }
 
 export async function sessionOf(ready: Ready, sessionId: string): Promise<RawSession | null> {

@@ -1,3 +1,4 @@
+import type { ScheduledTaskInput } from "@otter/contracts/scheduled";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { HermesSettings } from "./settings.js";
 
@@ -100,11 +101,24 @@ describe("hermesSchedule", () => {
 
 describe("Hermes's jobs API", () => {
   it("lists paused jobs too", async () => {
-    const calls = serve(() => Response.json({ jobs: [job] }));
+    const calls = serve((url) =>
+      url.pathname === "/health/detailed"
+        ? Response.json({
+            platforms: {
+              api_server: { state: "connected" },
+              otter: { state: "connected" },
+              telegram: { state: "connected" },
+              discord: { state: "fatal" },
+            },
+          })
+        : Response.json({ jobs: [job] }),
+    );
     const listed = await schedules.list(settings);
-    expect(calls[0].url.href).toBe("https://hermes.test/api/jobs?include_disabled=true");
-    expect((calls[0].init.headers as Record<string, string>).Authorization).toBe("Bearer test-key");
+    const jobs = calls.find((c) => c.url.pathname === "/api/jobs")!;
+    expect(jobs.url.href).toBe("https://hermes.test/api/jobs?include_disabled=true");
+    expect((jobs.init.headers as Record<string, string>).Authorization).toBe("Bearer test-key");
     expect(listed?.tasks).toHaveLength(1);
+    expect(listed?.channels).toEqual([{ id: "telegram", label: "Telegram", accounts: [] }]);
     expect(listed?.can).toMatchObject({ create: true, deliverToOtter: true, history: true });
   });
 
@@ -206,6 +220,36 @@ describe("Hermes's jobs API", () => {
       resultsTo: { kind: "new-chat" },
     });
     expect(saved).toEqual([{ mutedJobs: "a1b2c3" }, { mutedJobs: "" }]);
+  });
+
+  it("sends results straight to Otter through its plugin, or to another channel", async () => {
+    const calls = serve((url) =>
+      url.pathname === "/health/detailed"
+        ? Response.json({ platforms: { otter: { state: "connected" } } })
+        : Response.json({ job }),
+    );
+    const edit = (resultsTo: ScheduledTaskInput["resultsTo"]) =>
+      schedules.save({ ...settings }, "a1b2c3", {
+        name: "Morning brief",
+        schedule: { kind: "cron", expr: "0 9 * * 1-5" },
+        resultsTo,
+      });
+    const sent = () =>
+      JSON.parse(String(calls.findLast((c) => c.init.method === "PATCH")!.init.body));
+    await edit({ kind: "new-chat" });
+    expect(sent()).toMatchObject({ deliver: "otter" });
+    await edit({ kind: "channel", channel: "telegram", to: "-100123" });
+    expect(sent()).toMatchObject({ deliver: "telegram:-100123" });
+    expect(hermesTask({ ...job, deliver: "otter" }).delivery).toEqual({
+      kind: "otter",
+      chat: "new",
+    });
+    expect(hermesTask({ ...job, deliver: "telegram:-100123" }).delivery).toEqual({
+      kind: "channel",
+      channel: "telegram",
+      label: "Telegram",
+      to: "-100123",
+    });
   });
 
   it("lists past runs, each with its transcript", async () => {

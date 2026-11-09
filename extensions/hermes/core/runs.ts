@@ -334,6 +334,7 @@ export async function startRun(
   sessionId: string,
   input: string | unknown[],
   modelFields: Record<string, unknown>,
+  instructions?: string,
 ): Promise<{ runId: string } | { error: string }> {
   const response = await fetch(`${ready.root}/v1/runs`, {
     method: "POST",
@@ -342,6 +343,7 @@ export async function startRun(
       input: typeof input === "string" ? input : [{ role: "user", content: input }],
       session_id: sessionId,
       ...modelFields,
+      ...(instructions ? { instructions } : {}),
     }),
   });
   if (response.status === 401) return { error: "unauthorized" };

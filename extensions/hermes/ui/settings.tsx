@@ -15,6 +15,7 @@ import {
 import { useState } from "react";
 
 import { hermesApi } from "./api";
+import { HermesDeliveries } from "./deliveries";
 
 /** Hermes' settings as core shows them (its key never leaves the backend: only whether there is one). */
 export function hermesSettings(provider: ProviderSnapshot) {
@@ -140,6 +141,7 @@ export function HermesSettings({ provider, update }: AgentSettingsProps) {
           }
         />
       </SettingsSection>
+      {connected && provider.status === "ready" ? <HermesDeliveries /> : null}
       <ModelsSection
         provider={provider}
         selectedModel={settings.model}

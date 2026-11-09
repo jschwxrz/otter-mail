@@ -106,6 +106,21 @@ describe("Hermes replies", () => {
     expect(events.at(-1)).toEqual({ requestId: "req-1", type: "done", responseId: null });
   });
 
+  it("tells the agent about Otter's chats when Hermes has Otter's plugin", async () => {
+    serve({
+      "GET /v1/models": () => Response.json({ data: [{ id: "hermes-agent" }] }),
+      "GET /api/sessions": () => Response.json({ data: [] }),
+      "GET /health/detailed": () => Response.json({ platforms: { otter: { state: "connected" } } }),
+      ...started,
+      "GET /v1/runs/run-1/events": () => sse([{ event: "run.completed", output: "Done." }]),
+    });
+    expect((await hermesProvider.checkStatus(settings)).status).toBe("ready");
+    await send();
+    const body = JSON.parse(String(calls.find((c) => c.url.pathname === "/v1/runs")!.init.body));
+    expect(body.instructions).toContain('"otter:session-1": this chat.');
+    expect(body.instructions).toContain('"otter:new"');
+  });
+
   it("keeps commentary when the final reply has no deltas", async () => {
     serve({
       ...started,
@@ -367,7 +382,8 @@ describe("Scheduled runs that come to Otter", () => {
     options: Partial<HermesSettings> = {},
   ) {
     serve({
-      "GET /api/sessions": () => Response.json({ data: sessions }),
+      "GET /api/sessions": (url) =>
+        Response.json({ data: url.searchParams.get("source") === "cron" ? sessions : [] }),
       "GET /api/jobs": () => Response.json({ jobs }),
       ...Object.fromEntries(
         sessions.map((s) => [
@@ -409,7 +425,7 @@ describe("Scheduled runs that come to Otter", () => {
     await vi.waitFor(() => expect(runs).toHaveLength(2));
     expect(runs.map((r) => r.sessionId)).toEqual(["cron_a1b2c3_20261109_090000", "local-abc"]);
     expect(runs[0]).toMatchObject({
-      requestId: "cron:cron_a1b2c3_20261109_090000",
+      requestId: "delivered:cron_a1b2c3_20261109_090000",
       chat: { title: expect.stringMatching(/^Morning brief · /) },
       delivery: {
         kind: "automation",
@@ -441,17 +457,119 @@ describe("Scheduled runs that come to Otter", () => {
     });
     const events: ChatEvent[] = [];
     await hermesProvider.resume!(
-      { requestId: "cron:local-abc", sessionId: "local-abc" },
+      { requestId: "delivered:local-abc", sessionId: "local-abc" },
       settings,
       (e) => events.push(e),
     );
     expect(events).toEqual([
       {
-        requestId: "cron:local-abc",
+        requestId: "delivered:local-abc",
         type: "transcript",
         messages: [{ role: "assistant", text: "Good morning." }],
       },
-      { requestId: "cron:local-abc", type: "done", responseId: null },
+      { requestId: "delivered:local-abc", type: "done", responseId: null },
     ]);
+  });
+});
+
+describe("What Hermes sends to Otter", () => {
+  const now = Date.now() / 1000;
+  const jobs = [
+    { id: "a1b2c3", name: "Morning brief", deliver: "otter", schedule_display: "0 9 * * *" },
+  ];
+
+  it("starts a chat for what its plugin delivered", async () => {
+    serve({
+      "GET /api/sessions": (url) =>
+        Response.json({
+          data:
+            url.searchParams.get("source") === "otter"
+              ? [
+                  { id: "otter-1", source: "otter", title: "Morning brief #3", last_active: now },
+                  { id: "otter-2", source: "otter", title: "Hermes #2", last_active: now },
+                ]
+              : [],
+        }),
+      "GET /api/jobs": () => Response.json({ jobs }),
+      "GET /api/sessions/otter-1/messages": () =>
+        Response.json({ data: [{ id: 1, role: "assistant", content: "Three new threads." }] }),
+      "GET /api/sessions/otter-2/messages": () =>
+        Response.json({ data: [{ id: 1, role: "assistant", content: "The build finished." }] }),
+    });
+    current.settings = settings;
+    const runs: AgentRun[] = [];
+    hermesProvider.watch!(settings, [], (r) => runs.push(r));
+    await vi.waitFor(() => expect(runs).toHaveLength(2));
+    expect(runs[0]).toMatchObject({
+      sessionId: "otter-1",
+      requestId: "delivered:otter-1",
+      chat: { title: expect.stringMatching(/^Morning brief · /) },
+      delivery: { kind: "automation", jobId: "a1b2c3", name: "Morning brief" },
+    });
+    expect(runs[1]).toMatchObject({
+      chat: { title: expect.stringMatching(/^Hermes · /) },
+      delivery: { kind: "message", from: "Hermes" },
+    });
+  });
+
+  it("shows what it wrote into a chat on its own, not the replies to your messages", async () => {
+    let rows = [
+      { id: 7, role: "user", content: "Watch the build" },
+      { id: 8, role: "assistant", content: "Watching." },
+    ];
+    let active = now;
+    serve({
+      "GET /api/sessions": (url) =>
+        Response.json({
+          data: url.searchParams.get("source") ? [] : [{ id: "chat-1", last_active: active }],
+        }),
+      "GET /api/jobs": () => Response.json({ jobs: [] }),
+      "GET /api/sessions/chat-1/messages": () => Response.json({ data: rows }),
+    });
+    current.settings = settings;
+    const runs: AgentRun[] = [];
+    const reads: string[] = [];
+    const watch = (cursor?: string) =>
+      hermesProvider.watch!(
+        settings,
+        [{ id: "chat-1", since: 0, ...(cursor && { cursor }) }],
+        (r) => runs.push(r),
+        (_id, at) => reads.push(at),
+      );
+    watch();
+    await vi.waitFor(() => expect(reads).toEqual(["8"]));
+    expect(runs).toEqual([]);
+
+    rows = [...rows, { id: 9, role: "assistant", content: "The build passed." }];
+    active += 60;
+    hermesProvider.delivered!(settings);
+    await vi.waitFor(() => expect(runs).toHaveLength(1));
+    expect(runs[0]).toMatchObject({
+      sessionId: "chat-1",
+      requestId: "delivered:chat-1@8",
+      delivery: { kind: "message", from: "Hermes" },
+    });
+    expect(reads).toEqual(["8", "9"]);
+
+    rows = [
+      ...rows,
+      { id: 10, role: "user", content: "Thanks" },
+      { id: 11, role: "assistant", content: "Any time." },
+    ];
+    active += 60;
+    hermesProvider.delivered!(settings);
+    await vi.waitFor(() => expect(reads).toEqual(["8", "9", "11"]));
+    expect(runs).toHaveLength(1);
+
+    const events: ChatEvent[] = [];
+    await hermesProvider.resume!(
+      { requestId: "delivered:chat-1@8", sessionId: "chat-1" },
+      settings,
+      (e) => events.push(e),
+    );
+    expect(events[0]).toMatchObject({
+      type: "transcript",
+      messages: [{ role: "assistant", text: "The build passed." }],
+    });
   });
 });

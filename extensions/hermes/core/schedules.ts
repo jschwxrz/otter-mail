@@ -1,32 +1,28 @@
 /**
  * Hermes's cron jobs (/api/jobs) as scheduled tasks. Each run is a session of its own (source
- * "cron"), so its past runs and their transcripts are its cron sessions. A job that keeps its
- * results on Hermes (deliver "local") has them come to Otter: each run a new chat, unless Otter
- * was told to leave them there (`mutedJobs`, Otter's own setting: Hermes has no "nowhere").
+ * "cron"), so its past runs and their transcripts are its cron sessions. Results come to Otter
+ * through its plugin when Hermes has it (deliver "otter"); without it, a job that keeps its results
+ * on Hermes (deliver "local") has Otter read them (deliveries.ts), unless Otter was told to leave
+ * them there (`mutedJobs`, Otter's own setting: Hermes has no "nowhere").
  */
 
-import {
-  agentSettings,
-  logger,
-  preferenceChanged,
-  saveAgentSettings,
-} from "@otter/core/extension-kit";
+import { preferenceChanged, saveAgentSettings } from "@otter/core/extension-kit";
+import type { ChatSessionMessage, ScheduleSupport } from "@otter/core/extension-kit";
 import type {
-  AgentRun,
-  ChatSessionMessage,
-  ScheduleSupport,
-  WatchedSession,
-} from "@otter/core/extension-kit";
-import type { ScheduledTask, ScheduledTaskInput, TaskRun } from "@otter/contracts/scheduled";
+  DeliveryChannel,
+  ScheduledTask,
+  ScheduledTaskInput,
+  TaskRun,
+} from "@otter/contracts/scheduled";
 
 import {
   authHeaders,
-  readError,
+  connectedPlatforms,
+  listSessions,
   requireReady,
   sessionMessages,
   toMillis,
   type RawSession,
-  type Ready,
 } from "./http.js";
 import type { HermesSettings } from "./settings.js";
 
@@ -60,7 +56,7 @@ const muted = (settings: Pick<HermesSettings, "mutedJobs">) =>
 /** Its results stay on Hermes, where Otter reads them. */
 const keepsResults = (job: HermesJob) => (job.deliver ?? "local") === "local";
 
-const toOtter = (job: HermesJob, settings: Pick<HermesSettings, "mutedJobs">) =>
+export const toOtter = (job: HermesJob, settings: Pick<HermesSettings, "mutedJobs">) =>
   keepsResults(job) && !muted(settings).has(job.id);
 
 /** A Hermes cron job (GET /api/jobs) as a scheduled task. */
@@ -81,7 +77,6 @@ export function hermesTask(
   const nextRunAt = enabled ? time(job.next_run_at) : undefined;
   const lastAt = time(job.last_run_at);
   const failed = job.last_status === "error" || job.last_status === "failed";
-  const deliver = job.deliver ?? "local";
   return {
     provider: "hermes",
     id: job.id,
@@ -100,19 +95,39 @@ export function hermesTask(
           },
         }
       : {}),
-    delivery:
-      deliver === "local"
-        ? toOtter(job, settings)
-          ? { kind: "otter", chat: "new" }
-          : { kind: "none" }
-        : {
-            kind: "elsewhere",
-            label:
-              deliver === "origin"
-                ? "where it was set up"
-                : deliver.charAt(0).toUpperCase() + deliver.slice(1),
-          },
+    delivery: deliveryOf(job, settings),
   };
+}
+
+const label = (platform: string) =>
+  platform
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+
+function deliveryOf(
+  job: HermesJob,
+  settings: Pick<HermesSettings, "mutedJobs">,
+): ScheduledTask["delivery"] {
+  const deliver = job.deliver ?? "local";
+  if (deliver === "local")
+    return toOtter(job, settings) ? { kind: "otter", chat: "new" } : { kind: "none" };
+  if (deliver === "otter") return { kind: "otter", chat: "new" };
+  if (deliver.startsWith("otter:")) return { kind: "otter", chat: "one" };
+  const [platform, to] = deliver.split(/:(.*)/s);
+  if (to && !deliver.includes(","))
+    return { kind: "channel", channel: platform, label: label(platform), to };
+  return {
+    kind: "elsewhere",
+    label: deliver === "origin" ? "where it was set up" : deliver.split(",").map(label).join(", "),
+  };
+}
+
+/** Its own API server and Otter aside, the platforms results can go to. */
+function channelsOf(platforms: string[]): DeliveryChannel[] {
+  return platforms
+    .filter((p) => p !== "api_server" && p !== "otter")
+    .map((id) => ({ id, label: label(id), accounts: [] }));
 }
 
 /** A schedule in words Hermes parses (`hermes cron`'s): a cron expression, `every 90m`, an ISO time. */
@@ -125,7 +140,7 @@ export function hermesSchedule(schedule: ScheduledTaskInput["schedule"]): string
 
 const JOBS_TIMEOUT_MS = 10_000;
 
-async function jobsRequest<T>(
+export async function jobsRequest<T>(
   settings: HermesSettings,
   path: string,
   init: { method?: string; body?: unknown } = {},
@@ -165,21 +180,14 @@ async function setMuted(settings: HermesSettings, id: string, on: boolean): Prom
   preferenceChanged("assistant");
 }
 
-/** Where results go, as Hermes takes it; undefined leaves it. */
-function deliverFor(input: ScheduledTaskInput): string | undefined {
+/** Where results go, as Hermes takes it (straight to Otter when it has Otter's plugin); undefined leaves it. */
+function deliverFor(input: ScheduledTaskInput, platforms: string[]): string | undefined {
   const to = input.resultsTo;
   if (!to) return undefined;
-  if (to.kind === "new-chat" || to.kind === "off") return "local";
-  throw new Error("Hermes sends results to Otter, or keeps them.");
-}
-
-async function cronSessions(ready: Ready, limit = 100): Promise<RawSession[]> {
-  const response = await fetch(`${ready.root}/api/sessions?source=cron&limit=${limit}`, {
-    headers: authHeaders(ready.key),
-    signal: AbortSignal.timeout(JOBS_TIMEOUT_MS),
-  });
-  if (!response.ok) throw new Error(await readError(response));
-  return ((await response.json()) as { data?: RawSession[] }).data ?? [];
+  if (to.kind === "new-chat") return platforms.includes("otter") ? "otter" : "local";
+  if (to.kind === "off") return "local";
+  if (to.kind === "channel") return `${to.channel}:${to.to}`;
+  throw new Error("Hermes can't post results to a webhook.");
 }
 
 /** The job a cron session is a run of: by its id (`cron_<job>_<time>`), else its title (`<name> · <time>`). */
@@ -194,7 +202,7 @@ export function jobOf(session: RawSession, jobs: HermesJob[]): HermesJob | undef
   });
 }
 
-const SILENT = "[SILENT]";
+export const SILENT = "[SILENT]";
 
 /** What the run wrote you: its replies, without the prompt Hermes sent it. */
 export function runReply(messages: ChatSessionMessage[]): ChatSessionMessage[] {
@@ -202,7 +210,7 @@ export function runReply(messages: ChatSessionMessage[]): ChatSessionMessage[] {
 }
 
 /** Its final reply, which is what Hermes delivers. */
-const finalReply = (reply: ChatSessionMessage[]) =>
+export const finalReply = (reply: ChatSessionMessage[]) =>
   reply.findLast((m) => m.role === "assistant" && m.text.trim())?.text.trim() ?? "";
 
 function taskRun(session: RawSession): TaskRun {
@@ -219,113 +227,17 @@ function taskRun(session: RawSession): TaskRun {
   };
 }
 
-export const CRON_RUN = "cron:";
-
-const shortDate = (at: number) =>
-  new Date(at).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
-
-/** How long a run counts as new to a device that hasn't seen it: the day's deliveries. */
-const BACKLOG_MS = 24 * 60 * 60 * 1000;
-const POLL_MS = 60_000;
-
-type Watching = {
-  sessions: Set<string>;
-  started: (run: AgentRun) => void;
-};
-let watching: Watching | null = null;
-let poll: ReturnType<typeof setInterval> | undefined;
-let checking: Promise<void> | null = null;
-let checkedAt = 0;
-/** A chat list that changes often (each message) needn't ask Hermes each time. */
-const RECHECK_MS = 15_000;
-/** Runs already shown, or with nothing to show. */
-const seen = new Set<string>();
-
-/** Runs that finished since: each starts a chat of its own (`AgentRun.chat`), like OpenClaw's `chat:new`. */
-async function checkDeliveries(): Promise<void> {
-  if (!watching) return;
-  // As they are now: a task turned off, here or on another device, stays off.
-  const settings = (await agentSettings("hermes")) as HermesSettings;
-  const ready = await requireReady(settings).catch(() => null);
-  if (!ready) return;
-  const [sessions, { jobs }] = await Promise.all([
-    cronSessions(ready),
-    jobsRequest<{ jobs: HermesJob[] }>(settings, "?include_disabled=true"),
-  ]);
-  const since = Date.now() - BACKLOG_MS;
-  for (const session of sessions) {
-    const id = String(session.id ?? "");
-    const ended = toMillis(session.ended_at);
-    if (!id || seen.has(id) || watching?.sessions.has(id) || !ended) continue;
-    if (ended < since) {
-      seen.add(id);
-      continue;
-    }
-    const job = jobOf(session, jobs);
-    if (!job || !toOtter(job, settings)) continue;
-    const reply = finalReply(runReply(await sessionMessages(ready, id)));
-    // The chats watched change as they're made: the run is shown if none has it yet.
-    const w = watching;
-    if (!w) return;
-    seen.add(id);
-    if (!reply || reply.startsWith(SILENT) || w.sessions.has(id)) continue;
-    logger.info("agent", "hermes scheduled run", { job: job.id, session: id });
-    w.started({
-      sessionId: id,
-      requestId: `${CRON_RUN}${id}`,
-      chat: { title: `${job.name || "Hermes"} · ${shortDate(ended)}` },
-      deliveredAt: ended,
-      delivery: {
-        kind: "automation",
-        jobId: job.id,
-        ...(job.name ? { name: job.name } : {}),
-        ...((job.schedule_display ?? job.schedule?.display)
-          ? { schedule: job.schedule_display ?? job.schedule?.display }
-          : {}),
-      },
-    });
-  }
-}
-
-function checkSoon(): void {
-  checkedAt = Date.now();
-  checking ??= checkDeliveries()
-    .catch((error: unknown) =>
-      logger.info("agent", "hermes deliveries unavailable", { error: String(error) }),
-    )
-    .finally(() => {
-      checking = null;
-    });
-}
-
-export function watchDeliveries(
-  sessions: WatchedSession[],
-  started: (run: AgentRun) => void,
-): void {
-  watching = { sessions: new Set(sessions.map((s) => s.id)), started };
-  poll ??= setInterval(checkSoon, POLL_MS);
-  if (Date.now() - checkedAt > RECHECK_MS) checkSoon();
-}
-
-export function stopWatching(): void {
-  watching = null;
-  checkedAt = 0;
-  clearInterval(poll);
-  poll = undefined;
-}
-
-/** A run that came to Otter, as its chat's turn. */
-export async function deliveredReply(ready: Ready, sessionId: string) {
-  return runReply(await sessionMessages(ready, sessionId));
-}
-
 export const hermesSchedules: ScheduleSupport<HermesSettings> = {
   async list(settings) {
-    if (!(await requireReady(settings).catch(() => null))) return null;
-    const { jobs } = await jobsRequest<{ jobs: HermesJob[] }>(settings, "?include_disabled=true");
+    const ready = await requireReady(settings).catch(() => null);
+    if (!ready) return null;
+    const [{ jobs }, platforms] = await Promise.all([
+      jobsRequest<{ jobs: HermesJob[] }>(settings, "?include_disabled=true"),
+      connectedPlatforms(ready),
+    ]);
     return {
       tasks: jobs.map((job) => hermesTask(job, settings)),
-      channels: [],
+      channels: channelsOf(platforms),
       can: {
         create: true,
         deliverToOtter: true,
@@ -336,7 +248,11 @@ export const hermesSchedules: ScheduleSupport<HermesSettings> = {
     };
   },
   async save(settings, id, input) {
-    const deliver = deliverFor(input);
+    const platforms =
+      input.resultsTo?.kind === "new-chat"
+        ? await connectedPlatforms(await requireReady(settings))
+        : [];
+    const deliver = deliverFor(input, platforms);
     const body = {
       name: input.name,
       schedule: hermesSchedule(input.schedule),
@@ -376,7 +292,7 @@ export const hermesSchedules: ScheduleSupport<HermesSettings> = {
   async runs(settings, id, limit) {
     const ready = await requireReady(settings);
     const [sessions, { job }] = await Promise.all([
-      cronSessions(ready, 200),
+      listSessions(ready, 200, "cron"),
       jobsRequest<{ job: HermesJob }>(settings, jobPath(id)),
     ]);
     return sessions

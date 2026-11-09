@@ -26,6 +26,7 @@ import type {
 import {
   PROBE_TIMEOUT_MS,
   apiRoot,
+  connectedPlatforms,
   authHeaders,
   contentText,
   parseJson,
@@ -50,12 +51,13 @@ import {
   startRun,
 } from "./runs.js";
 import {
-  CRON_RUN,
+  DELIVERED,
+  deliveredNow,
   deliveredReply,
-  hermesSchedules,
   stopWatching,
   watchDeliveries,
-} from "./schedules.js";
+} from "./deliveries.js";
+import { hermesSchedules } from "./schedules.js";
 import { HERMES_DEFAULTS, type HermesSettings } from "./settings.js";
 
 export { normalizeHermesBaseUrl } from "./http.js";
@@ -339,6 +341,16 @@ async function streamResponsesTurn(ctx: ResponsesTurn): Promise<void> {
 }
 
 let skillsCache: { at: number; baseUrl: string; data: Skill[] } | null = null;
+/** Hermes has Otter's plugin: its agent can send to Otter's chats. */
+let otterPlatform = false;
+
+/** What an agent in an Otter chat is told about sending to Otter (send_message, a scheduled task's deliver). */
+export const otterTargetsNote = (sessionId: string) =>
+  [
+    "You are in a chat in Otter, the user's app for mail, calendar and agents. Otter is one of your platforms (`otter`):",
+    `- "otter:${sessionId}": this chat.`,
+    '- "otter:new" (or "otter"): a new Otter chat for each delivery, for a scheduled task that should post a fresh chat every run (a morning brief, an alert).',
+  ].join("\n");
 /** Turns over the Responses API, which end when the app lets go of them. */
 const responding = new Map<string, AbortController>();
 
@@ -382,11 +394,19 @@ export const hermesProvider: ChatProvider<HermesSettings> = {
       };
     }
     try {
-      const [agentModels, sessions, catalog] = await Promise.all([
+      const ready = {
+        baseUrl: settings.baseUrl,
+        root: apiRoot(settings.baseUrl),
+        key,
+        agentModel: "",
+      };
+      const [agentModels, sessions, catalog, platforms] = await Promise.all([
         fetchHermesModels(settings.baseUrl, key),
         probeHermesSessions(settings.baseUrl, key),
         fetchHermesCatalog(settings.baseUrl, key),
+        connectedPlatforms(ready).catch((): string[] => []),
       ]);
+      otterPlatform = platforms.includes("otter");
       const models: ProviderModel[] =
         catalog.length > 0
           ? catalog
@@ -462,7 +482,14 @@ export const hermesProvider: ChatProvider<HermesSettings> = {
     if (sessionId) {
       let started: Awaited<ReturnType<typeof startRun>>;
       try {
-        started = await startRun(ready, requestId, sessionId, message, modelFields);
+        started = await startRun(
+          ready,
+          requestId,
+          sessionId,
+          message,
+          modelFields,
+          otterPlatform ? otterTargetsNote(sessionId) : undefined,
+        );
       } catch (error) {
         logger.info("agent", "hermes run not started", { requestId, error: String(error) });
         return emit({ requestId, type: "error", message: "unreachable" });
@@ -534,8 +561,8 @@ export const hermesProvider: ChatProvider<HermesSettings> = {
     const ready = await requireReady(settings).catch(() => null);
     if (!ready) return emit({ requestId, type: "error", message: "detached" });
     try {
-      if (requestId.startsWith(CRON_RUN)) {
-        emit({ requestId, type: "transcript", messages: await deliveredReply(ready, sessionId) });
+      if (requestId.startsWith(DELIVERED)) {
+        emit({ requestId, type: "transcript", messages: await deliveredReply(ready, requestId) });
         return emit({ requestId, type: "done", responseId: null });
       }
       const kept = await keptRun(requestId);
@@ -555,8 +582,12 @@ export const hermesProvider: ChatProvider<HermesSettings> = {
     }
   },
 
-  watch(settings, sessions, started) {
-    if (settings.sessions) watchDeliveries(sessions, started);
+  watch(settings, sessions, started, read) {
+    if (settings.sessions) watchDeliveries(sessions, started, read);
+  },
+
+  delivered() {
+    deliveredNow();
   },
 
   async respondApproval(requestId, approvalId, decision) {
