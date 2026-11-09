@@ -78,12 +78,46 @@ export type CalEvent = CalendarEvent & {
   teammate?: string;
 };
 
+const SAVED_LISTS = "calendar:lists";
+const SAVED_EVENTS = "calendar:events";
+
+function readSaved<T>(key: string): T | null {
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? "null") as T | null;
+  } catch {
+    return null;
+  }
+}
+
+function save(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Full or blocked: the next open loads from the network, as before.
+  }
+}
+
+function savedLists(accountIds: string[]): AccountCalendars[] | undefined {
+  const found = (readSaved<AccountCalendars[]>(SAVED_LISTS) ?? []).filter((l) =>
+    accountIds.includes(l.accountId),
+  );
+  return found.length ? found : undefined;
+}
+
+/** The calendars, drawn from the last time's list while the network answers. */
 export function useCalendarLists(accountIds: string[]) {
   return useQuery({
     queryKey: ["calendar", "lists", accountIds],
-    queryFn: () => ipc<AccountCalendars[]>("calendar:listCalendars", { accountIds }),
+    queryFn: async () => {
+      const lists = await ipc<AccountCalendars[]>("calendar:listCalendars", { accountIds });
+      save(
+        SAVED_LISTS,
+        lists.filter((l) => !l.error),
+      );
+      return lists;
+    },
     enabled: accountIds.length > 0,
-    placeholderData: keepPreviousData,
+    placeholderData: (previous) => previous ?? savedLists(accountIds),
     staleTime: 5 * 60_000,
   });
 }
@@ -196,14 +230,33 @@ const rangeKey = (refs: CalendarRef[], from: number, to: number) => [
   refs.map(calendarKey),
 ];
 
+type SavedRange = { from: number; to: number; events: CalEvent[] };
+
+/** Last time's events in the range, from the calendars shown: what to draw while the network answers. */
+function savedEvents(refs: CalendarRef[], from: number, to: number): Cached | undefined {
+  const saved = readSaved<SavedRange>(SAVED_EVENTS);
+  if (!saved || saved.to <= from || saved.from >= to) return undefined;
+  const keys = new Set(refs.map(calendarKey));
+  return {
+    events: saved.events.filter(
+      (e) => keys.has(calendarKey(e)) && e.endMs > from && e.startMs < to,
+    ),
+    failed: [],
+  };
+}
+
 /** The calendars' events in [from, to); the neighbouring ranges load too, so stepping is instant. */
 export function useCalendarEvents(refs: CalendarRef[], from: number, to: number) {
   const qc = useQueryClient();
   const query = useQuery({
     queryKey: rangeKey(refs, from, to),
-    queryFn: () => fetchRange(refs, from, to),
+    queryFn: async () => {
+      const found = await fetchRange(refs, from, to);
+      save(SAVED_EVENTS, { from, to, events: found.events } satisfies SavedRange);
+      return found;
+    },
     enabled: refs.length > 0,
-    placeholderData: keepPreviousData,
+    placeholderData: (previous) => previous ?? savedEvents(refs, from, to),
     staleTime: 30_000,
     refetchInterval: 120_000,
   });
