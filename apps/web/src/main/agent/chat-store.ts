@@ -10,6 +10,7 @@ import {
   type ChatDelivery,
   type ChatMessageMatch,
   type ChatTurn,
+  type ChatTurnItem,
 } from "@otter/contracts/chats";
 
 import { ipc } from "~/lib/ipc";
@@ -1402,24 +1403,27 @@ function onChatEvent(raw: unknown): void {
                 !t.step.compaction &&
                 (event.id === undefined || t.id === undefined || t.id === event.id),
             );
-      // A step from before a steer finishes in the reply it started in.
+      // A step from before a steer finishes in the reply it started in: by its id, or, for an
+      // agent without ids (Hermes takes a steer only after its running tools), the step still
+      // running there when none runs here.
+      const belongs = (item: ChatTurnItem) =>
+        item.kind === "step" &&
+        (event.id ? item.id === event.id : item.output === undefined && !item.step.compaction);
       const earlier =
-        byId < 0 && event.id
+        byId < 0 && (event.id || index < 0)
           ? nextTurns.findLastIndex(
               (t) =>
-                t !== turn &&
-                t.role === "assistant" &&
-                !t.finishedAt &&
-                t.items?.some((item) => item.kind === "step" && item.id === event.id),
+                t !== turn && t.role === "assistant" && !t.finishedAt && t.items?.some(belongs),
             )
           : -1;
       const step = items[index];
       if (earlier >= 0) {
         const before = nextTurns[earlier];
+        const at = before.items!.findIndex(belongs);
         nextTurns[earlier] = {
           ...before,
-          items: before.items?.map((item) =>
-            item.kind === "step" && item.id === event.id ? { ...item, output: event.output } : item,
+          items: before.items!.map((item, i) =>
+            i === at ? { ...item, output: event.output } : item,
           ),
         };
       } else if (step?.kind === "step") items[index] = { ...step, output: event.output };
