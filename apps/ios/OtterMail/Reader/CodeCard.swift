@@ -1,11 +1,17 @@
 import SwiftUI
 import UIKit
 
-/** The sign-in code a mail carries, on one line with Copy & trash (extensions/sign-in-codes' CodeCard). */
+/**
+ * The sign-in code a mail carries, with Copy & trash (extensions/sign-in-codes'
+ * CodeCard), which copies it and trashes its conversation, as the Mac and web
+ * do. The button is borderless so, in a list row, it takes its own tap and not the row's.
+ */
 struct CodeCard: View {
     @Environment(\.palette) private var palette
     let code: String
     var onTrash: (() -> Void)?
+
+    @State private var copied = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -16,47 +22,28 @@ struct CodeCard: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Spacer(minLength: 8)
-            CodeButton(code: code, onTrash: onTrash)
+            Button(action: copy) {
+                Label(copied ? "Copied" : onTrash == nil ? "Copy" : "Copy & trash", systemImage: copied ? "checkmark" : "doc.on.doc")
+                    .font(.inter(.subheadline).weight(.medium))
+                    .foregroundStyle(palette.text)
+                    .labelStyle(.titleAndIcon)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 44)
+                    .background(palette.text.opacity(0.08), in: .capsule)
+                    .contentShape(.capsule)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel(copied ? "Copied" : onTrash == nil ? "Copy code" : "Copy code and trash")
+            .accessibilityIdentifier("otp-copy")
         }
         .padding(.leading, 16)
-        .padding(.trailing, 6)
-        .padding(.vertical, 2)
+        .padding([.vertical, .trailing], 8)
         .background(palette.card, in: .rect(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(palette.border))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("otp-card")
-    }
-}
-
-/**
- * Copies the code, then trashes its conversation, as the Mac and web do.
- * Small to see, with a 44pt target; borderless, so in a list row it takes its
- * own tap and not the row's.
- */
-struct CodeButton: View {
-    @Environment(\.palette) private var palette
-    let code: String
-    var onTrash: (() -> Void)?
-
-    @State private var copied = false
-
-    var body: some View {
-        Button(action: copy) {
-            Label(copied ? "Copied" : onTrash == nil ? "Copy" : "Copy & trash", systemImage: copied ? "checkmark" : "doc.on.doc")
-                .font(.inter(.footnote).weight(.medium))
-                .foregroundStyle(palette.text)
-                .labelStyle(.titleAndIcon)
-                .lineLimit(1)
-                .fixedSize()
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(palette.text.opacity(0.08), in: .capsule)
-                .frame(minHeight: 44)
-                .contentShape(.rect)
-        }
-        .buttonStyle(.borderless)
-        .accessibilityLabel(copied ? "Copied" : onTrash == nil ? "Copy code" : "Copy code and trash")
-        .accessibilityIdentifier("otp-copy")
         .task(id: copied) {
             guard copied else { return }
             try? await Task.sleep(for: .seconds(1.5))
