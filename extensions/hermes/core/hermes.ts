@@ -368,18 +368,23 @@ async function patchSession(ready: Ready, sessionId: string, patch: Record<strin
 }
 
 /**
- * Before a run of yours says it's done: where it ended in the session, so what Hermes writes after
- * it is told apart, and, after a new chat's first turn, the name Hermes gave the session.
+ * Before a run of yours says it's done: where it ended in the session (its reply after the last
+ * message of yours), so what Hermes writes after it is told apart, and, after a new chat's first
+ * turn, the name Hermes gave the session.
  */
 function ownRun(run: Run, first: boolean): Run {
   const { ready, sessionId, requestId, emit } = run;
   run.finishing = async () => {
     const [rows, session] = await Promise.all([
-      rawMessages(ready, sessionId, 1).catch(() => []),
+      rawMessages(ready, sessionId, 50).catch(() => []),
       first ? sessionOf(ready, sessionId).catch(() => null) : null,
     ]);
-    const last = rows.at(-1)?.id;
-    if (last !== undefined) ranTo(sessionId, last);
+    const reply = run.text.text.trim();
+    const after = rows.slice(rows.findLastIndex((m) => m.role === "user") + 1);
+    const end = after.find(
+      (m) => m.role === "assistant" && contentText(m.content).trim() === reply,
+    );
+    if (reply && end?.id !== undefined) ranTo(sessionId, end.id);
     const title = session?.title?.trim();
     if (title) emit({ requestId, type: "title", title });
   };

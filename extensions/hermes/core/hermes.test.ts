@@ -574,9 +574,11 @@ describe("What Hermes sends to Otter", () => {
   });
 
   it("tells a delivery right after your turn from the turn itself", async () => {
-    let rows = [
+    // The delivery is in before the turn has said it's done.
+    const rows = [
       { id: 10, role: "user", content: "Check" },
       { id: 11, role: "assistant", content: "Done." },
+      { id: 12, role: "assistant", content: "Also: the deploy finished." },
     ];
     let active = now;
     serve({
@@ -600,7 +602,6 @@ describe("What Hermes sends to Otter", () => {
       (_id, at) => reads.push(at),
     );
     await send();
-    rows = [...rows, { id: 12, role: "assistant", content: "Also: the deploy finished." }];
     active += 60;
     hermesProvider.watch!(
       settings,
@@ -635,5 +636,34 @@ describe("What Hermes sends to Otter", () => {
     hermesProvider.watch!(settings, [{ id: "chat-2", since }], (r) => runs.push(r));
     await vi.waitFor(() => expect(runs).toHaveLength(1));
     expect(runs[0].requestId).toBe("delivered:chat-2@4");
+  });
+
+  it("takes a newer message of yours from another of Hermes's apps for a turn", async () => {
+    const since = Date.now() - 60_000;
+    serve({
+      "GET /api/sessions": (url) =>
+        Response.json({
+          data: url.searchParams.get("source") ? [] : [{ id: "chat-3", last_active: now }],
+        }),
+      "GET /api/jobs": () => Response.json({ jobs: [] }),
+      "GET /api/sessions/chat-3/messages": () =>
+        Response.json({
+          data: [
+            { id: 3, role: "user", content: "From the CLI", timestamp: now - 5 },
+            { id: 4, role: "assistant", content: "Answered there.", timestamp: now },
+          ],
+        }),
+    });
+    current.settings = settings;
+    const runs: AgentRun[] = [];
+    const reads: string[] = [];
+    hermesProvider.watch!(
+      settings,
+      [{ id: "chat-3", since }],
+      (r) => runs.push(r),
+      (_id, at) => reads.push(at),
+    );
+    await vi.waitFor(() => expect(reads).toEqual(["4"]));
+    expect(runs).toEqual([]);
   });
 });

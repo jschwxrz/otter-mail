@@ -145,13 +145,15 @@ async function inChats(w: Watching, ready: Ready, recent: RawSession[]): Promise
     if (last === undefined) continue;
     const from = Math.max(Number(chat.cursor ?? -1) || -1, ownTo.get(id) ?? -1);
     if (from >= last) continue;
-    // A chat not read yet: what followed your last message, after the chat last ended.
+    // A chat not read yet: what followed your last message (unless that came since, from
+    // another of Hermes's apps), after the chat last ended.
+    const yours = rows.findLastIndex((m) => m.role === "user");
     const added =
       from >= 0
         ? rows.filter((m) => (m.id ?? 0) > from)
-        : rows
-            .slice(rows.findLastIndex((m) => m.role === "user") + 1)
-            .filter((m) => toMillis(m.timestamp) > chat.since);
+        : rows.slice(yours + 1).filter((m) => toMillis(m.timestamp) > chat.since);
+    if (from < 0 && yours >= 0 && toMillis(rows[yours].timestamp) > chat.since)
+      added.unshift(rows[yours]);
     w.read?.(id, String(last));
     chat.cursor = String(last);
     // A message from another of Hermes's apps is a turn, not a delivery.
