@@ -21,10 +21,13 @@ struct ThreadListView: View {
     @State private var unreadOnly = false
     @State private var selected: Set<String> = []
     @State private var found: (query: String, ids: [String]) = ("", [])
+    /** Redraws the rows when a shown code goes stale. */
+    @State private var codesChecked = Date.now
 
     var body: some View {
         let searching = !query.trimmingCharacters(in: .whitespaces).isEmpty
         let threads = searching ? results : searchTab ? [] : unreadOnly ? listed.filter(\.unread) : listed
+        let codesExpire = threads.compactMap { $0.freshVerificationCode() == nil ? nil : $0.sent.last?.date.addingTimeInterval(MailThread.freshCodeAge) }.min()
 
         List {
             if !searchTab {
@@ -127,6 +130,11 @@ struct ThreadListView: View {
             guard !Task.isCancelled else { return }
             let ids = await sync.search(query, scope: place.scope)
             found = (query, ids)
+        }
+        .task(id: [codesExpire, codesChecked]) {
+            guard let codesExpire else { return }
+            try? await Task.sleep(for: .seconds(max(0, codesExpire.timeIntervalSinceNow) + 1))
+            if !Task.isCancelled { codesChecked = .now }
         }
         .refreshable {
             await store.sync?.syncAll()
