@@ -1346,14 +1346,12 @@ function MailHome() {
   };
 
   const openMessage = (owner: string, messageId: string, alias?: string) => {
-    // A workspace's item isn't a message: mail opens in its own mailbox. An alias mailbox lists
-    // only its own mail, so other mail leaves it.
+    // Agents', Calendar's and a workspace's items aren't messages: mail opens in its own mailbox.
+    // An alias mailbox lists only its own mail, so other mail leaves it.
     const mailbox = alias && aliases.some((a) => a.id === alias) ? alias : owner;
     const switching = alias
       ? mailbox !== space?.id
-      : (!spansMailboxes && owner !== effectiveAccountId) ||
-        workspace !== undefined ||
-        aliasSpace !== null;
+      : (!spansMailboxes && owner !== effectiveAccountId) || ownsMain || aliasSpace !== null;
     setAutoFocusDraft(true);
     go({
       ...(switching ? { mailbox, label: "INBOX" } : {}),
