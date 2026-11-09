@@ -5,7 +5,12 @@
  * was told to leave them there (`mutedJobs`, Otter's own setting: Hermes has no "nowhere").
  */
 
-import { logger, saveAgentSettings } from "@otter/core/extension-kit";
+import {
+  agentSettings,
+  logger,
+  preferenceChanged,
+  saveAgentSettings,
+} from "@otter/core/extension-kit";
 import type {
   AgentRun,
   ChatSessionMessage,
@@ -157,6 +162,7 @@ async function setMuted(settings: HermesSettings, id: string, on: boolean): Prom
   else ids.delete(id);
   settings.mutedJobs = [...ids].join(",");
   await saveAgentSettings("hermes", { mutedJobs: settings.mutedJobs });
+  preferenceChanged("assistant");
 }
 
 /** Where results go, as Hermes takes it; undefined leaves it. */
@@ -195,15 +201,9 @@ export function runReply(messages: ChatSessionMessage[]): ChatSessionMessage[] {
   return messages.filter((m) => m.role !== "user" && m.role !== "system");
 }
 
-const said = (reply: ChatSessionMessage[]) =>
-  reply
-    .filter((m) => m.role === "assistant")
-    .map((m) => m.text)
-    .join("\n")
-    .trim();
-
-/** A run that answered [SILENT] had nothing worth telling you. */
-const isSilent = (reply: ChatSessionMessage[]) => said(reply).startsWith(SILENT);
+/** Its final reply, which is what Hermes delivers. */
+const finalReply = (reply: ChatSessionMessage[]) =>
+  reply.findLast((m) => m.role === "assistant" && m.text.trim())?.text.trim() ?? "";
 
 function taskRun(session: RawSession): TaskRun {
   const at = toMillis(session.started_at);
@@ -229,7 +229,6 @@ const BACKLOG_MS = 24 * 60 * 60 * 1000;
 const POLL_MS = 60_000;
 
 type Watching = {
-  settings: HermesSettings;
   sessions: Set<string>;
   started: (run: AgentRun) => void;
 };
@@ -244,29 +243,32 @@ const seen = new Set<string>();
 
 /** Runs that finished since: each starts a chat of its own (`AgentRun.chat`), like OpenClaw's `chat:new`. */
 async function checkDeliveries(): Promise<void> {
-  const w = watching;
-  if (!w) return;
-  const ready = await requireReady(w.settings).catch(() => null);
+  if (!watching) return;
+  // As they are now: a task turned off, here or on another device, stays off.
+  const settings = (await agentSettings("hermes")) as HermesSettings;
+  const ready = await requireReady(settings).catch(() => null);
   if (!ready) return;
   const [sessions, { jobs }] = await Promise.all([
     cronSessions(ready),
-    jobsRequest<{ jobs: HermesJob[] }>(w.settings, "?include_disabled=true"),
+    jobsRequest<{ jobs: HermesJob[] }>(settings, "?include_disabled=true"),
   ]);
   const since = Date.now() - BACKLOG_MS;
   for (const session of sessions) {
     const id = String(session.id ?? "");
     const ended = toMillis(session.ended_at);
-    if (!id || seen.has(id) || w.sessions.has(id) || !ended) continue;
+    if (!id || seen.has(id) || watching?.sessions.has(id) || !ended) continue;
     if (ended < since) {
       seen.add(id);
       continue;
     }
     const job = jobOf(session, jobs);
-    if (!job || !toOtter(job, w.settings)) continue;
-    const reply = runReply(await sessionMessages(ready, id));
+    if (!job || !toOtter(job, settings)) continue;
+    const reply = finalReply(runReply(await sessionMessages(ready, id)));
+    // The chats watched change as they're made: the run is shown if none has it yet.
+    const w = watching;
+    if (!w) return;
     seen.add(id);
-    if (!said(reply) || isSilent(reply)) continue;
-    if (watching !== w) return;
+    if (!reply || reply.startsWith(SILENT) || w.sessions.has(id)) continue;
     logger.info("agent", "hermes scheduled run", { job: job.id, session: id });
     w.started({
       sessionId: id,
@@ -297,11 +299,10 @@ function checkSoon(): void {
 }
 
 export function watchDeliveries(
-  settings: HermesSettings,
   sessions: WatchedSession[],
   started: (run: AgentRun) => void,
 ): void {
-  watching = { settings, sessions: new Set(sessions.map((s) => s.id)), started };
+  watching = { sessions: new Set(sessions.map((s) => s.id)), started };
   poll ??= setInterval(checkSoon, POLL_MS);
   if (Date.now() - checkedAt > RECHECK_MS) checkSoon();
 }

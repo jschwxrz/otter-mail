@@ -556,7 +556,7 @@ export const hermesProvider: ChatProvider<HermesSettings> = {
   },
 
   watch(settings, sessions, started) {
-    if (settings.sessions) watchDeliveries(settings, sessions, started);
+    if (settings.sessions) watchDeliveries(sessions, started);
   },
 
   async respondApproval(requestId, approvalId, decision) {

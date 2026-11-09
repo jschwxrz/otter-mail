@@ -18,8 +18,10 @@ vi.mock("../../../packages/core/src/platform.js", () => ({
 vi.mock("../../../packages/core/src/services/agent/settings.js", () => ({
   getHermesKey: async () => "test-key",
 }));
+const current = vi.hoisted(() => ({ settings: {} as Record<string, unknown> }));
 vi.mock("../../../packages/core/src/services/agent/service.js", () => ({
   saveAgentSettings: vi.fn(async () => {}),
+  agentSettings: async () => current.settings,
 }));
 const { hermesProvider } = await import("./hermes.js");
 const settings = {
@@ -356,6 +358,8 @@ describe("Scheduled runs that come to Otter", () => {
     end_reason: ended ? "cron_complete" : null,
   });
   const replyTo = (id: string) => (id === "local-quiet" ? "[SILENT]" : `Report ${id}`);
+  const commentary = (id: string) =>
+    id === "local-quiet" ? [{ role: "assistant", content: "Checking your inbox." }] : [];
 
   function watch(
     sessions: ReturnType<typeof run>[],
@@ -372,6 +376,7 @@ describe("Scheduled runs that come to Otter", () => {
             Response.json({
               data: [
                 { role: "user", content: "[IMPORTANT: You are running as a scheduled cron job.]" },
+                ...commentary(s.id),
                 { role: "assistant", content: replyTo(s.id) },
               ],
             }),
@@ -379,6 +384,7 @@ describe("Scheduled runs that come to Otter", () => {
       ),
     });
     const runs: AgentRun[] = [];
+    current.settings = { ...settings, ...options };
     hermesProvider.watch!(
       { ...settings, ...options },
       watched.map((id) => ({ id, since: 0 })),

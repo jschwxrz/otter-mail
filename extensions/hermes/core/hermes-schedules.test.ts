@@ -5,6 +5,10 @@ vi.mock("../../../packages/core/src/services/agent/settings.js", () => ({
   getHermesKey: async () => "test-key",
 }));
 const saved = vi.hoisted(() => [] as unknown[]);
+const synced = vi.hoisted(() => [] as string[]);
+vi.mock("../../../packages/core/src/services/preferences.js", () => ({
+  preferenceChanged: (key: string) => void synced.push(key),
+}));
 vi.mock("../../../packages/core/src/services/agent/service.js", () => ({
   saveAgentSettings: async (_kind: string, change: unknown) => void saved.push(change),
 }));
@@ -195,6 +199,7 @@ describe("Hermes's jobs API", () => {
     });
     expect(JSON.parse(String(calls[1].init.body))).toMatchObject({ deliver: "local" });
     expect(saved).toEqual([{ mutedJobs: "a1b2c3" }]);
+    expect(synced).toEqual(["assistant"]);
     await schedules.save(mine, "a1b2c3", {
       name: "Morning brief",
       schedule: { kind: "cron", expr: "0 9 * * 1-5" },
