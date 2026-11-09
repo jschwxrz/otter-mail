@@ -144,6 +144,13 @@ Unit tests (`OtterMailTests`, Swift Testing) run in the simulator:
 xcodebuild -project apps/ios/OtterMail.xcodeproj -scheme OtterMail -destination 'platform=iOS Simulator,name=iPhone 17' test
 ```
 
+UI tests (`OtterMailUITests`, XCTest, against the demo mailbox) have their own scheme, so the unit
+test run stays quick:
+
+```sh
+xcodebuild -project apps/ios/OtterMail.xcodeproj -scheme OtterMailUITests -destination 'platform=iOS Simulator,name=iPhone 17' test
+```
+
 Shipping: the Release iPhone workflow builds and uploads to TestFlight (`pnpm release:ios` does
 the same from a Mac); see `docs/release.md`. The app has its own version, `MARKETING_VERSION` in
 the Xcode project, apart from the Mac app's.
