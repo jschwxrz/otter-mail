@@ -92,7 +92,10 @@ export function WorkLog({
 }
 /* oxlint-enable react/no-array-index-key */
 
-function CompactionRow({ output, live }: { output?: string; live: boolean }) {
+export const isCompaction = (item: TurnItem | undefined) =>
+  item?.kind === "step" && Boolean(item.step.compaction);
+
+export function CompactionRow({ output, live }: { output?: string; live: boolean }) {
   const running = live && output === undefined;
   const label = running
     ? "Compacting context"

@@ -10,6 +10,7 @@ import {
   type ChatDelivery,
   type ChatMessageMatch,
   type ChatTurn,
+  type ChatTurnItem,
 } from "@otter/contracts/chats";
 
 import { ipc } from "~/lib/ipc";
@@ -82,7 +83,8 @@ type ChatsState = {
   approvals: { requestId: string; approval: ApprovalRequest }[];
   questions: { requestId: string; question: ChatQuestion }[];
   queue: QueuedMessage[];
-  editingQueued: string | null;
+  /** The queued message being edited in its chat's composer, and the draft it took the place of. */
+  editingQueued: { id: string; convoId: string; savedDraft: string } | null;
   hydrating: string | null;
   drafts: Record<string, string>;
   citations: Record<string, Citation[]>;
@@ -133,6 +135,19 @@ function newConversation(provider: ProviderKind = "openrouter"): Conversation {
     turns: [],
     loaded: true,
   };
+}
+
+const isSteer = (t: ChatTurn) =>
+  t.role === "user" && (t.intent === "steer" || t.intent === "promoted");
+
+/** The replies of the latest run: the last one, and those before it that a steer continued. */
+export function runReplyIds(turns: ChatTurn[]): Set<string> {
+  const ids = new Set<string>();
+  for (let i = turns.length - 1; i >= 0; i -= 1) {
+    if (turns[i].role === "assistant") ids.add(turns[i].id);
+    else if (!isSteer(turns[i])) break;
+  }
+  return ids;
 }
 
 export const isBlank = (c: Conversation) => c.loaded && c.turns.length === 0;
@@ -470,10 +485,10 @@ function endRun(requestId: string): void {
 function startQueued(): void {
   for (;;) {
     const { queue, runs, editingQueued } = get();
-    const next = queue.find((m) => !runs[m.convoId] && m.id !== editingQueued);
+    const next = queue.find((m) => !runs[m.convoId] && m.id !== editingQueued?.id);
     if (!next) return;
     set({ queue: queue.filter((m) => m.id !== next.id) });
-    startTurn(next, "queued");
+    startTurn(next);
   }
 }
 
@@ -483,6 +498,7 @@ function appendExchange(
   requestKey: string,
   intent?: ChatTurn["intent"],
 ): void {
+  const steered = intent === "steer" || intent === "promoted";
   patchConversation(convoId, (c) => ({
     ...c,
     updatedAt: Date.now(),
@@ -490,8 +506,9 @@ function appendExchange(
     snoozedUntil: null,
     settledAt: null,
     turns: [
+      // A steer joins the run in flight: the reply before it goes on until the run ends.
       ...c.turns.map((t, i) =>
-        i === c.turns.length - 1 && t.role === "assistant" && !t.finishedAt
+        !steered && i === c.turns.length - 1 && t.role === "assistant" && !t.finishedAt
           ? { ...t, finishedAt: Date.now() }
           : t,
       ),
@@ -619,21 +636,13 @@ export function retryTurn(turnId: string): void {
 export function steerQueued(id: string): void {
   const msg = get().queue.find((m) => m.id === id);
   if (!msg || !get().runs[msg.convoId]) return;
+  if (get().editingQueued?.id === id) cancelQueuedEdit();
   set((s) => ({ queue: s.queue.filter((m) => m.id !== id) }));
   steer(msg, "promoted");
 }
 
-export function moveQueued(id: string, beforeId: string | null): void {
-  set((s) => {
-    const moving = s.queue.find((m) => m.id === id);
-    if (!moving || id === beforeId) return s;
-    const rest = s.queue.filter((m) => m.id !== id);
-    const at = beforeId === null ? rest.length : rest.findIndex((m) => m.id === beforeId);
-    return at < 0 ? s : { queue: [...rest.slice(0, at), moving, ...rest.slice(at)] };
-  });
-}
-
 export function removeQueued(id: string): void {
+  if (get().editingQueued?.id === id) cancelQueuedEdit();
   set((s) => ({ queue: s.queue.filter((m) => m.id !== id) }));
 }
 
@@ -657,9 +666,23 @@ export function updateQueued(id: string, text: string): void {
   }));
 }
 
-export function setEditingQueued(id: string | null): void {
-  if (get().editingQueued === id) return;
-  set({ editingQueued: id });
+/** Moves a queued message into its chat's composer; it stays queued, held, until saved or cancelled. */
+export function editQueued(id: string): void {
+  const msg = get().queue.find((m) => m.id === id);
+  if (!msg) return;
+  const { editingQueued, drafts } = get();
+  const savedDraft =
+    editingQueued?.convoId === msg.convoId ? editingQueued.savedDraft : (drafts[msg.convoId] ?? "");
+  set({ editingQueued: { id, convoId: msg.convoId, savedDraft } });
+  setDraft(msg.convoId, msg.question);
+}
+
+/** Gives the composer its draft back; `convoId` limits it to that chat's edit. */
+export function cancelQueuedEdit(convoId?: string): void {
+  const editing = get().editingQueued;
+  if (!editing || (convoId && editing.convoId !== convoId)) return;
+  set({ editingQueued: null });
+  setDraft(editing.convoId, editing.savedDraft);
   startQueued();
 }
 
@@ -1380,8 +1403,30 @@ function onChatEvent(raw: unknown): void {
                 !t.step.compaction &&
                 (event.id === undefined || t.id === undefined || t.id === event.id),
             );
+      // A step from before a steer finishes in the reply it started in: by its id, or, for an
+      // agent without ids (Hermes takes a steer only after its running tools), the step still
+      // running there when none runs here.
+      const belongs = (item: ChatTurnItem) =>
+        item.kind === "step" &&
+        (event.id ? item.id === event.id : item.output === undefined && !item.step.compaction);
+      const earlier =
+        byId < 0 && (event.id || index < 0)
+          ? nextTurns.findLastIndex(
+              (t) =>
+                t !== turn && t.role === "assistant" && !t.finishedAt && t.items?.some(belongs),
+            )
+          : -1;
       const step = items[index];
-      if (step?.kind === "step") items[index] = { ...step, output: event.output };
+      if (earlier >= 0) {
+        const before = nextTurns[earlier];
+        const at = before.items!.findIndex(belongs);
+        nextTurns[earlier] = {
+          ...before,
+          items: before.items!.map((item, i) =>
+            i === at ? { ...item, output: event.output } : item,
+          ),
+        };
+      } else if (step?.kind === "step") items[index] = { ...step, output: event.output };
     } else if (event.type === "error") {
       updated.error = friendlyError(event.message, s.provider);
       const msg = sent.get(event.requestId);
@@ -1393,6 +1438,17 @@ function onChatEvent(raw: unknown): void {
       // A step whose result never came isn't running any more.
       items.forEach((item, i) => {
         if (item.kind === "step" && item.output === undefined) items[i] = { ...item, output: "" };
+      });
+      const run = runReplyIds(nextTurns);
+      nextTurns.forEach((t, i) => {
+        if (t === turn || !run.has(t.id) || t.finishedAt) return;
+        nextTurns[i] = {
+          ...t,
+          finishedAt: updated.finishedAt,
+          items: t.items?.map((item) =>
+            item.kind === "step" && item.output === undefined ? { ...item, output: "" } : item,
+          ),
+        };
       });
       for (const item of items) {
         if (item.kind === "text") opens.files.push(...linkedFiles(item.text));

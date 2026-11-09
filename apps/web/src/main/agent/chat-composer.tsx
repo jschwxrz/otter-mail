@@ -23,17 +23,16 @@ import {
   filesFromPaste,
   type useChatAttachments,
 } from "./chat-attachments";
-import { QueuedRunsControl, useFollowUpBehavior } from "./chat-queue";
+import { useFollowUpBehavior } from "./chat-queue";
 import {
   answerQuestion,
+  cancelQueuedEdit,
   clampTitle,
-  moveQueued,
-  removeQueued,
+  editQueued as editQueuedMessage,
   respondApproval,
   sendMessage,
   setCitations,
   setDraft,
-  setEditingQueued,
   steerQueued,
   stopRun,
   updateQueued,
@@ -45,7 +44,6 @@ import { ContextKindIcon, SkillBadge } from "./chat-transcript";
 import { toast } from "../mail/toast";
 import { useCommandHandlers } from "../keybindings/dispatch";
 import { modKeyName, shortcutText } from "../keybindings/keys";
-import { useLatest } from "../use-latest";
 
 const NO_CITATIONS: Citation[] = [];
 
@@ -155,19 +153,14 @@ export function ChatComposer({
     if (context.quote) setAttach(true);
   }
 
-  const [editing, setEditing] = useState<{
-    id: string;
-    savedDraft: string;
-  } | null>(null);
-  const editingId = editing?.id ?? null;
-  useEffect(() => setEditingQueued(editingId), [editingId]);
-  useEffect(() => () => setEditingQueued(null), []);
+  const editing = useChats((s) => (s.editingQueued?.convoId === chatId ? s.editingQueued : null));
+  // A queued message left in the composer would stay held: give it back on leaving the chat.
+  useEffect(() => () => cancelQueuedEdit(chatId), [chatId]);
 
   const [shownChat, setShownChat] = useState(chatId);
   if (shownChat !== chatId) {
     setShownChat(chatId);
     setActiveSkill(null);
-    setEditing(null);
   }
 
   const compose = (): Outgoing | null => {
@@ -224,16 +217,8 @@ export function ChatComposer({
   };
 
   const editQueued = (id: string) => {
-    const msg = queue.find((m) => m.id === id);
-    if (!msg) return;
-    setEditing({ id, savedDraft: editing ? editing.savedDraft : draft });
-    setDraft(chatId, msg.question);
+    editQueuedMessage(id);
     inputRef.current?.focus();
-  };
-  const cancelQueuedEdit = () => {
-    if (!editing) return;
-    setDraft(chatId, editing.savedDraft);
-    setEditing(null);
   };
   const saveQueuedEdit = () => {
     if (!editing) return;
@@ -242,26 +227,6 @@ export function ChatComposer({
     updateQueued(editing.id, text);
     cancelQueuedEdit();
   };
-  const removeQueuedMessage = (id: string) => {
-    if (editing?.id === id) cancelQueuedEdit();
-    removeQueued(id);
-  };
-  // The edited message left the queue (it started, or was removed): keep a
-  // dirty edit in the composer, otherwise restore the user's draft.
-  const cancelQueuedEditForEffect = useLatest(cancelQueuedEdit);
-  useEffect(() => {
-    if (!editing || queue.some((m) => m.id === editing.id)) return;
-    const original = draft.trim();
-    if (original && !editing.savedDraft.trim()) {
-      // oxlint-disable-next-line react/set-state-in-effect -- Coordinate queue consumption and editing with the external agent turn lifecycle.
-      setEditing(null);
-      toast.info("Queued message is no longer queued", {
-        description: "Your unsaved edit was kept in the composer.",
-      });
-    } else {
-      cancelQueuedEditForEffect.current();
-    }
-  }, [queue, cancelQueuedEditForEffect, draft, editing]);
 
   const respond = (approvalId: string, decision: ApprovalDecision) => {
     setRespondingApproval(approvalId);
@@ -360,16 +325,6 @@ export function ChatComposer({
             ))}
           </div>
         ) : null}
-        <QueuedRunsControl
-          items={activeQueue}
-          editingId={editing?.id ?? null}
-          canSteer={canSteer}
-          onEdit={editQueued}
-          onCancelEdit={cancelQueuedEdit}
-          onSteer={steerQueued}
-          onRemove={removeQueuedMessage}
-          onMove={moveQueued}
-        />
         {pendingApproval && busy ? (
           <ApprovalCard
             key={pendingApproval.approval.id}

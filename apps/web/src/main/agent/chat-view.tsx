@@ -19,13 +19,26 @@ import {
 } from "./chat-cite";
 import { AttachmentPreview, attachmentPreview, type PreviewFile } from "../mail/attachment-preview";
 import { DropOverlay, useChatAttachments, useFileDrop } from "./chat-attachments";
-import { forkChat, isElsewhere, loadChat, setCitations, useChats } from "./chat-store";
+import {
+  cancelQueuedEdit,
+  editQueued,
+  forkChat,
+  isElsewhere,
+  loadChat,
+  removeQueued,
+  setCitations,
+  steerQueued,
+  useChats,
+  type QueuedMessage,
+} from "./chat-store";
+import { QueuedMessages } from "./chat-queue";
 import { ChatTranscript } from "./chat-transcript";
 import { ChatComposer } from "./chat-composer";
 import { isProviderUsable } from "./agent-providers";
 import { toast } from "../mail/toast";
 
 const NO_CITATIONS: Citation[] = [];
+const NO_QUEUE: QueuedMessage[] = [];
 
 function useChatImageLoader(provider?: ProviderKind, sessionId?: string | null) {
   return useCallback(
@@ -70,6 +83,17 @@ export function ChatView({
     if (unloaded) void loadChat(chatId);
   }, [unloaded, chatId]);
   const streaming = useChats((s) => Boolean(s.runs[chatId]));
+  const queue = useChats((s) =>
+    s.queue.some((m) => m.convoId === chatId) ? s.queue : NO_QUEUE,
+  ).filter((m) => m.convoId === chatId);
+  const editingQueued = useChats((s) =>
+    s.editingQueued?.convoId === chatId ? s.editingQueued.id : null,
+  );
+  // A message joins the run unless the run waits on an approval.
+  const canSendQueued = useChats((s) => {
+    const run = s.runs[chatId];
+    return Boolean(run) && !s.approvals.some((a) => a.requestId === run.requestId);
+  });
   const hydrating = useChats((s) => s.hydrating === chatId);
   const citations = useChats((s) => s.citations[chatId]) ?? NO_CITATIONS;
   const turns = convo?.turns ?? [];
@@ -233,6 +257,18 @@ export function ChatView({
                           )
                       : undefined
                   }
+                />
+                <QueuedMessages
+                  items={queue}
+                  editingId={editingQueued}
+                  canSend={canSendQueued}
+                  onSend={steerQueued}
+                  onEdit={(id) => {
+                    editQueued(id);
+                    inputRef.current?.focus();
+                  }}
+                  onCancelEdit={() => cancelQueuedEdit(chatId)}
+                  onRemove={removeQueued}
                 />
               </MessageScroller.Content>
             </ScrollArea>
