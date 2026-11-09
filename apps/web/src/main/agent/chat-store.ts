@@ -170,11 +170,11 @@ function turnsFromMessages(messages: ChatSessionMessage[]): ChatTurn[] {
         turns.push(open);
       }
       if (m.text) open.items!.push({ kind: "text", text: m.text });
-      for (const step of m.toolCalls ?? []) open.items!.push({ kind: "step", step });
+      // A compaction is in the session once it's done.
+      for (const step of m.toolCalls ?? [])
+        open.items!.push({ kind: "step", step, ...(step.compaction ? { output: "" } : {}) });
     } else if (m.role === "tool" && open) {
-      const pending = open.items!.find(
-        (t) => t.kind === "step" && t.output === undefined && !t.step.compaction,
-      );
+      const pending = open.items!.find((t) => t.kind === "step" && t.output === undefined);
       if (pending?.kind === "step") pending.output = m.text || "(done)";
     }
   }
