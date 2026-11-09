@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type MutableRefObject,
@@ -7,7 +8,7 @@ import {
   type KeyboardEvent,
   type RefObject,
 } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useShallow } from "zustand/react/shallow";
 import { PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { chatTabId, type ChatTabRef } from "@otter/contracts/chats";
@@ -46,7 +47,8 @@ import {
   readDetailsDocked,
   saveDetailsDocked,
 } from "./chat-context-panel";
-import { ChatFind } from "./chat-find";
+import { CiteSelectionButton, useCitations } from "./chat-cite";
+import { DomFind } from "./chat-find";
 import { ChatTitle } from "./chat-title";
 import { ChatView } from "./chat-view";
 import { DitherBackdrop } from "../mail/dither-backdrop";
@@ -212,6 +214,14 @@ export function ChatWorkspace({
   }, [missing, chatId, selectedKind, onSelectChatRef]);
 
   const open = (ref: ChatTabRef, title: string) => openChatTab(chatId, ref, title);
+  const queryClient = useQueryClient();
+  // The agent may have rewritten the file since its tab first loaded it.
+  const openFile = (href: string) => {
+    open({ kind: "file", href }, href.split(/[\\/]/).pop() || href);
+    void queryClient.invalidateQueries({
+      queryKey: ["chat-file", convo?.provider, convo?.sessionId, href],
+    });
+  };
   const openChange = async (change: ChatChange) => {
     const { target } = change;
     if (target.kind === "thread" || target.kind === "draft")
@@ -364,7 +374,7 @@ export function ChatWorkspace({
       centered={blank}
       inputRef={inputRef}
       onOpenChange={openChange}
-      onOpenFile={(href) => open({ kind: "file", href }, href.split(/[\\/]/).pop() || href)}
+      onOpenFile={openFile}
       onShowChat={onSelectChat}
     />
   );
@@ -437,8 +447,9 @@ export function ChatWorkspace({
         {find !== null || (docked && detailsShown && convo) ? (
           <div className="pointer-events-none absolute top-[calc(var(--workspace-topbar-height)+0.75rem)] right-3 bottom-4 z-20 flex w-80 flex-col gap-2 *:pointer-events-auto">
             {find !== null ? (
-              <ChatFind
-                transcript={transcriptRef}
+              <DomFind
+                root={transcriptRef}
+                label="Find in chat"
                 focusKey={find}
                 onClose={() => {
                   setFind(null);
@@ -496,7 +507,12 @@ export function ChatWorkspace({
                   />
                 ) : null
               ) : shown?.ref.kind === "file" ? (
-                <FileTab key={shown.id} chatId={chatId} href={shown.ref.href} />
+                <FileTab
+                  key={shown.id}
+                  chatId={chatId}
+                  href={shown.ref.href}
+                  onCited={() => inputRef.current?.focus()}
+                />
               ) : null}
               {features.browser && shown?.ref.kind === "page" ? (
                 <PageSlot key={shown.id} tabId={chatPageId(chatId, shown.id)} />
@@ -575,7 +591,9 @@ function TabProblem({ message }: { message: string }) {
   );
 }
 
-function FileTab({ chatId, href }: { chatId: string; href: string }) {
+function FileTab({ chatId, href, onCited }: { chatId: string; href: string; onCited: () => void }) {
+  const [root, setRoot] = useState<HTMLDivElement | null>(null);
+  const citing = useCitations(chatId, onCited);
   const convo = useChats((s) => s.conversations.find((c) => c.id === chatId));
   const file = useQuery({
     queryKey: ["chat-file", convo?.provider, convo?.sessionId, href],
@@ -583,6 +601,9 @@ function FileTab({ chatId, href }: { chatId: string; href: string }) {
     retry: false,
     queryFn: () => mailApi.agentReadFile(convo!.provider, convo!.sessionId ?? "", href),
   });
+  const data = file.data;
+  // Stable while the bytes are, so the preview reloads only when they change.
+  const preview = useMemo(() => data && { ...data, load: async () => data.data }, [data]);
   if (file.error)
     return (
       <TabProblem
@@ -593,7 +614,15 @@ function FileTab({ chatId, href }: { chatId: string; href: string }) {
         }
       />
     );
-  if (!file.data) return null;
-  const data = file.data;
-  return <FilePreview file={{ ...data, load: async () => data.data }} />;
+  if (!preview) return null;
+  return (
+    <div ref={setRoot} data-cite-source className="flex min-h-0 flex-1 flex-col">
+      <FilePreview file={preview} />
+      <CiteSelectionButton
+        root={root}
+        onCite={(text, range) => citing.cite(text, range, preview.name)}
+      />
+      {citing.editor}
+    </div>
+  );
 }

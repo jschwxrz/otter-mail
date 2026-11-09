@@ -1,5 +1,5 @@
 /* oxlint-disable react/no-array-index-key -- Table rows and columns have stable positions and may contain identical values. */
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppWindowIcon,
   Code2Icon,
@@ -13,7 +13,10 @@ import { Dialog, DialogClose, DialogContent, DialogTitle } from "~/components/ui
 import { features } from "../features";
 import { ChatMarkdown } from "../agent/chat-markdown";
 import { formatAttachmentSize } from "../agent/chat-attachments";
+import { DomFind, isFindKey } from "../agent/chat-find";
 import { HintTooltip, IconBtn } from "./ui";
+
+const PdfViewer = lazy(() => import("./pdf-viewer"));
 
 type PreviewKind = "pdf" | "html" | "markdown" | "table" | "text" | "image" | "video" | "audio";
 
@@ -196,7 +199,11 @@ export function AttachmentPreview({
   );
 }
 
-type Loaded = { url: string; text: { text: string; truncated: boolean } | null };
+type Loaded = {
+  url: string;
+  text: { text: string; truncated: boolean } | null;
+  bytes: Uint8Array;
+};
 
 export function FilePreview({ file }: { file: PreviewFile }) {
   const preview = attachmentPreview(file.name, file.mimeType);
@@ -225,6 +232,11 @@ function PreviewSurface({
   const [rendered, setRendered] = useState(true);
   const [attempt, setAttempt] = useState(0);
   const toggles = kind === "markdown" || kind === "html" || kind === "table";
+  const [find, setFind] = useState<number | null>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  // A page rendered in its sandboxed frame keeps its text to itself.
+  const findable = !MEDIA_KINDS.has(kind) && !(kind === "html" && rendered);
 
   useEffect(() => {
     let cancelled = false;
@@ -243,7 +255,7 @@ function PreviewSurface({
         if (kind === "html") text = decodeHtmlSource(bytes);
         else if (kind !== "pdf" && !MEDIA_KINDS.has(kind)) text = decodeText(bytes);
         url = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
-        setLoaded({ url, text });
+        setLoaded({ url, text, bytes });
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Could not load this file.");
       }
@@ -279,14 +291,9 @@ function PreviewSurface({
       <LoaderCircleIcon className="size-5 animate-spin text-muted-foreground" />
     </div>
   ) : kind === "pdf" ? (
-    // Chromium's viewer, with the header above as its only chrome: the page
-    // alone, fitted to the width. Zoom, scrolling and find still work.
-    // oxlint-disable-next-line react/iframe-missing-sandbox -- the PDF viewer needs an unsandboxed frame; a PDF runs no scripts
-    <iframe
-      src={`${loaded.url}#toolbar=0&view=FitH`}
-      title={file.name}
-      className="min-h-0 flex-1 border-0 bg-white"
-    />
+    <Suspense fallback={<div className="flex-1" />}>
+      <PdfViewer data={loaded.bytes} name={file.name} />
+    </Suspense>
   ) : kind === "html" && rendered ? (
     // Mail's HTML is untrusted: no scripts, forms or popups, and an opaque origin.
     <iframe
@@ -350,7 +357,17 @@ function PreviewSurface({
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div
+      ref={surfaceRef}
+      tabIndex={-1}
+      className="flex min-h-0 flex-1 flex-col outline-none"
+      onKeyDown={(e) => {
+        if (!findable || !isFindKey(e.nativeEvent)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setFind((key) => (key ?? 0) + 1);
+      }}
+    >
       <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border/60 ps-4 pe-2">
         {inline ? (
           <span className="min-w-0 truncate text-sm font-medium">{file.name}</span>
@@ -411,7 +428,24 @@ function PreviewSurface({
           Showing the first 1 MB. Save the file to read all of it.
         </div>
       ) : null}
-      {body}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col">
+          {body}
+        </div>
+        {find !== null && findable && loaded ? (
+          <div className="absolute top-3 right-3 z-10 w-72 max-w-[calc(100%-1.5rem)]">
+            <DomFind
+              root={bodyRef}
+              label={`Find in ${file.name}`}
+              focusKey={find}
+              onClose={() => {
+                setFind(null);
+                surfaceRef.current?.focus();
+              }}
+            />
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

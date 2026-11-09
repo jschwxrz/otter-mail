@@ -305,6 +305,12 @@ function DialogContent({
           className,
         )}
         {...props}
+        onEscapeKeyDown={(event) => {
+          // Radix hears Escape first: what closes on its own Escape (a find bar) goes first.
+          if ((event.target as Element | null)?.closest?.("[data-own-escape]"))
+            event.preventDefault();
+          props.onEscapeKeyDown?.(event);
+        }}
       >
         {children}
         {showCloseButton ? (
