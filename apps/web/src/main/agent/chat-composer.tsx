@@ -36,6 +36,7 @@ import {
   steerQueued,
   stopRun,
   updateQueued,
+  isCompacting,
   useChats,
   type Conversation,
   type Outgoing,
@@ -241,7 +242,12 @@ export function ChatComposer({
   const activeQueue = queue.filter((m) => m.convoId === chatId);
   const activeApprovals = run ? approvals.filter((a) => a.requestId === run.requestId) : [];
   const activeQuestions = run ? questions.filter((q) => q.requestId === run.requestId) : [];
-  const canSteer = run != null && activeApprovals.length === 0;
+  const compacting = useChats((s) =>
+    s.runs[chatId]
+      ? isCompacting(s.conversations.find((c) => c.id === chatId)?.turns ?? [])
+      : false,
+  );
+  const canSteer = run != null && activeApprovals.length === 0 && !compacting;
   useCommandHandlers({
     "agent.sendQueuedNow": () => {
       const next = activeQueue[0];
@@ -277,9 +283,11 @@ export function ChatComposer({
 
   const hasDraft = Boolean(draft.trim() || activeSkill || files.count > 0 || citations.length > 0);
   const submitMode: "send" | "queue" | "steer" = run
-    ? modHeld
-      ? alternateAction
-      : followUp
+    ? compacting
+      ? "queue"
+      : modHeld
+        ? alternateAction
+        : followUp
     : "send";
   const submitLabel = editing
     ? "Update queued message"
@@ -291,7 +299,9 @@ export function ChatComposer({
   const submitTooltip =
     submitMode === "send" || editing
       ? submitLabel
-      : `Click to ${followUp}, ${modKeyName}-click or ${shortcutText("mod+enter")} to ${alternateAction}`;
+      : compacting
+        ? "Queue message. The agent can't take a steer while it compacts its context"
+        : `Click to ${followUp}, ${modKeyName}-click or ${shortcutText("mod+enter")} to ${alternateAction}`;
 
   const busy = run != null;
   const attached = context.attached;

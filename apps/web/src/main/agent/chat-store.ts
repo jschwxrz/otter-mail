@@ -150,6 +150,20 @@ export function runReplyIds(turns: ChatTurn[]): Set<string> {
   return ids;
 }
 
+/** The run in flight is compacting its context: it can't take a steer until that's done. */
+export function isCompacting(turns: ChatTurn[]): boolean {
+  const run = runReplyIds(turns);
+  return turns.some(
+    (t) =>
+      run.has(t.id) &&
+      !t.finishedAt &&
+      t.items?.some((i) => i.kind === "step" && i.step.compaction && i.output === undefined),
+  );
+}
+
+const compactingIn = (convoId: string) =>
+  isCompacting(get().conversations.find((c) => c.id === convoId)?.turns ?? []);
+
 export const isBlank = (c: Conversation) => c.loaded && c.turns.length === 0;
 
 export const hasDraft = (drafts: Record<string, string>, id: string) => Boolean(drafts[id]?.trim());
@@ -641,7 +655,9 @@ function steer(msg: Outgoing, intent: "steer" | "promoted" = "steer"): void {
 
 export function sendMessage(msg: Outgoing, followUp: FollowUpBehavior): void {
   if (!get().runs[msg.convoId]) return startTurn(msg);
-  if (followUp === "queue" || msg.attachments) set((s) => ({ queue: [...s.queue, msg] }));
+  // As in Otter Code, a message waits in the queue while the run compacts.
+  if (followUp === "queue" || msg.attachments || compactingIn(msg.convoId))
+    set((s) => ({ queue: [...s.queue, msg] }));
   else steer(msg);
 }
 
@@ -659,7 +675,7 @@ export function retryTurn(turnId: string): void {
 
 export function steerQueued(id: string): void {
   const msg = get().queue.find((m) => m.id === id);
-  if (!msg || !get().runs[msg.convoId]) return;
+  if (!msg || !get().runs[msg.convoId] || compactingIn(msg.convoId)) return;
   if (get().editingQueued?.id === id) cancelQueuedEdit();
   set((s) => ({ queue: s.queue.filter((m) => m.id !== id) }));
   steer(msg, "promoted");
