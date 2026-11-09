@@ -737,6 +737,20 @@ describe("runs", () => {
     expect(rows.map((r) => r.content)).toEqual(["one", "two"]);
     expect(calls[1].params).toMatchObject({ runId: "cron-request.1", cursor: "c2" });
   });
+
+  // OTTER-MAIL-DESKTOP-N: what a 2026.11 gateway answers for a heartbeat's run.
+  it("has no rows for a run without a recorded transcript", async () => {
+    const { g } = fakeGateway(
+      () =>
+        new Error("The recorded cron transcript is unavailable. Refresh the run and try again."),
+    );
+    await expect(runRows(g, "brief", "at:5")).resolves.toEqual([]);
+  });
+
+  it("still fails when the gateway can't answer", async () => {
+    const { g } = fakeGateway(() => new Error("cron.history unavailable during gateway restart"));
+    await expect(runRows(g, "brief", "at:5")).rejects.toThrow("during gateway restart");
+  });
 });
 
 describe("channels", () => {
