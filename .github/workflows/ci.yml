@@ -30,6 +30,7 @@ jobs:
     outputs:
       iphone: ${{ steps.filter.outputs.iphone }}
       translator: ${{ steps.filter.outputs.translator }}
+      hermes: ${{ steps.filter.outputs.hermes }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -57,6 +58,7 @@ jobs:
           {
             echo "iphone=$(changed '^(apps/ios/|packages/shared/|package\.json$|scripts/export-ios-resources\.ts$|\.github/workflows/ci\.yml$)')"
             echo "translator=$(changed '^(native/translator/|\.github/actions/select-xcode/|\.github/workflows/ci\.yml$)')"
+            echo "hermes=$(changed '^(extensions/hermes/gateway/|\.github/workflows/ci\.yml$)')"
           } | tee -a "$GITHUB_OUTPUT"
 
   # A runner each: on one they slowed each other down, enough to time out tests.
@@ -97,6 +99,27 @@ jobs:
 
       - name: ${{ matrix.name }}
         run: ${{ matrix.run }}
+
+  # Otter's Hermes plugin (extensions/hermes/gateway), against the Hermes release on PyPI.
+  hermes:
+    name: Hermes plugin
+    needs: changes
+    if: needs.changes.outputs.hermes == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v10.3.3
+
+      # importlib: the plugin's folder is called gateway, like the Hermes package it imports.
+      - name: Test
+        run: >
+          uv run --no-project --python 3.12
+          --with hermes-agent==0.19.0 --with aiohttp --with pytest
+          pytest -q -p no:cacheprovider --import-mode=importlib extensions/hermes/gateway/tests
 
   # Apple Translation's TranslationSession(installedSource:target:) is macOS 26
   # API, so the translator needs Xcode 26+ (Swift 6, macOS 26 SDK). No Node

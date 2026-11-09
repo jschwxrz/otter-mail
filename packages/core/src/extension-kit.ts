@@ -29,6 +29,7 @@ export { onOtterAccountChange } from "./services/otter-account.js";
 export { preferenceChanged } from "./services/preferences.js";
 
 export { fromBase64, sha256Hex, toBase64, utf8Decode, utf8Encode } from "./bytes.js";
+export { readJson, writeJson } from "./json-file.js";
 export { runAsTask } from "./handlers/ipc-budget.js";
 export { broadcast, handle, registeredHandlers } from "./ipc.js";
 export { logger } from "./logger.js";

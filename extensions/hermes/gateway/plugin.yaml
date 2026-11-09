@@ -1,0 +1,24 @@
+name: otter
+label: Otter
+kind: platform
+version: 1.0.0
+description: >
+  Otter as a delivery channel: scheduled results and messages become chats in Otter.
+  Each delivery is kept on Hermes as a session; the relay only tells Otter's apps which one to read.
+author: Otterware
+python_dependencies:
+  - "aiohttp>=3.10,<4"
+requires_env:
+  - name: OTTER_RELAY_URL
+    description: "Otter's relay (https://relay.otterware.app)"
+    prompt: "Relay URL"
+    password: false
+  - name: OTTER_CHANNEL_TOKEN
+    description: "The channel token from Otter's Hermes settings (otter_ch_…)"
+    prompt: "Channel token"
+    password: true
+optional_env:
+  - name: OTTER_HOME_CHANNEL
+    description: "Where deliver: otter goes: new (a new chat each time, the default) or a Hermes session id"
+    prompt: "Home chat (or empty)"
+    password: false

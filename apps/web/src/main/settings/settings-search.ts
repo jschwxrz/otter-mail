@@ -403,6 +403,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["hermes base url api key server connect"],
   },
   {
+    id: "hermes-deliveries",
+    title: "Messages from Hermes",
+    pane: "agents",
+    item: "hermes",
+    searchTerms: ["hermes plugin platform channel cron scheduled deliver send_message notify"],
+  },
+  {
     id: "openclaw-connection",
     title: "Connection",
     pane: "agents",

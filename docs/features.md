@@ -437,7 +437,7 @@ optional fix PRs. See [support.md](support.md); error reports, [error-reports.md
 | Queued follow-ups                                                                                                                                                                                                                                              | ✓                                                                       | ✓                                             | —                                                   |
 | Fork a chat from a reply (OpenClaw)                                                                                                                                                                                                                            | ✓                                                                       | ✓                                             | —                                                   |
 | Watch the agent's browser live (OpenClaw)                                                                                                                                                                                                                      | ✓                                                                       | ✓                                             | —                                                   |
-| Scheduled tasks of every agent (a page under New chat in the Agents sidebar): list, filter by agent and status, create, edit, pause, run now, delete, past runs; results to Otter, any channel the agent has, or a webhook (OpenClaw; Hermes without delivery) | ✓                                                                       | ✓                                             | —                                                   |
+| Scheduled tasks of every agent (a page under New chat in the Agents sidebar): list, filter by agent and status, create, edit, pause, run now, delete, past runs; results to Otter, any channel the agent has, or a webhook (OpenClaw; Hermes: to Otter or not) | ✓                                                                       | ✓                                             | —                                                   |
 | Take control of the agent's browser (OpenClaw)                                                                                                                                                                                                                 | ✓                                                                       | ✓                                             | —                                                   |
 | See the agent's pointer in its browser (OpenClaw)                                                                                                                                                                                                              | ✓                                                                       | ✓                                             | —                                                   |
 | Mail tools (OpenRouter; Claude, Codex on Mac)                                                                                                                                                                                                                  | ✓ (every mailbox)                                                       | ✓ (OpenRouter)                                | ✓ (OpenRouter; read, search, draft, send, organize) |
@@ -526,6 +526,31 @@ plugin can tell the agent, in an Otter chat, about these targets). OpenClaw lets
 from any chat, as from its Control UI; a `chat.send` turn sees only the scheduled tasks its own chat
 made. Scheduled tasks made from a chat then deliver back to it over the channel. Without the
 plugin, or before that, sends stay `chat.send`.
+
+Hermes connects to its API server (port 8642, usually served on the tailnet), with its
+`API_SERVER_KEY`, and the connection follows the Otter account. Each chat is a Hermes session,
+which Hermes names itself from the first message (renaming a chat in Otter renames the session),
+and each message is a run in it (`/v1/runs`), which belongs to Hermes, not the app: the reply is
+followed over the run's event stream, picked up again from where it was when the connection
+drops, and from its start on the next launch when the app quit during it (this device keeps the
+run's id for a day; another device shows what the session holds). Replies, tool steps, steering,
+stopping and command approvals (also answered elsewhere) come through.
+
+Otter is also a Hermes platform, `otter` (the plugin in `extensions/hermes/gateway`, set up from
+Settings › Agents › Hermes on Mac and web). What Hermes sends to it (a scheduled task's
+`deliver: otter`, its send_message tool) is kept on Hermes as a session of its own (`otter:new`, a
+new chat each time) or in the chat it names (`otter:<session id>`), and the plugin tells the
+relay only a pointer, as OpenClaw's does, so the account's devices read it at once. What Hermes
+writes into one of your chats on its own (a delivery to it, a background task finishing) shows up
+there as a turn of its own, also when no device was looking (each chat remembers how far it read
+its session). Without the plugin, a scheduled task whose results stay on Hermes
+(`deliver: local`) brings each run that said something (not `[SILENT]`) to Otter as a new chat,
+read once a minute. Either way the chat is "Morning brief · Sat, Nov 8", with the
+"Scheduled · Morning brief" header and a notification. The Scheduled page sends a task's results
+to Otter (through the plugin when Hermes has it), to another of Hermes's connected platforms
+(Telegram, Slack…, to a chat you name), or leaves them on Hermes (Otter's own setting, synced
+with the account: Hermes has no "nowhere"). Its past runs are its cron sessions, each with its
+transcript.
 
 Other agents on the Mac (Claude Code or Codex in a terminal, Cursor, …) get the same tools from
 that server while the app is open, with a token made in Settings › Agents (its address stays the

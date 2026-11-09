@@ -22,7 +22,7 @@ export function OpenClawDeliveries() {
   const load = useCallback(
     () =>
       channelApi.list().then(
-        ({ channels }) => setChannels(channels),
+        ({ channels }) => setChannels(channels.filter((c) => c.label !== "Hermes")),
         () => setSignedOut(true),
       ),
     [],
