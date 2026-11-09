@@ -23,6 +23,7 @@ import {
   cancelQueuedEdit,
   editQueued,
   forkChat,
+  isCompacting,
   isElsewhere,
   loadChat,
   removeQueued,
@@ -92,7 +93,11 @@ export function ChatView({
   // A message joins the run unless the run waits on an approval.
   const canSendQueued = useChats((s) => {
     const run = s.runs[chatId];
-    return Boolean(run) && !s.approvals.some((a) => a.requestId === run.requestId);
+    return (
+      Boolean(run) &&
+      !s.approvals.some((a) => a.requestId === run.requestId) &&
+      !isCompacting(s.conversations.find((c) => c.id === chatId)?.turns ?? [])
+    );
   });
   const hydrating = useChats((s) => s.hydrating === chatId);
   const citations = useChats((s) => s.citations[chatId]) ?? NO_CITATIONS;
