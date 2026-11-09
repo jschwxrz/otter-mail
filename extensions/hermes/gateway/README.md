@@ -51,9 +51,14 @@ hermes send -t otter "Your build finished."
 `hermes config set OTTER_HOME_CHANNEL <session id>` sends `otter` deliveries to one chat
 instead of a new one each time.
 
+Hermes 0.19 (the release on PyPI) takes only `otter`: the `otter:…` targets need a newer Hermes.
+
 ## Develop
 
 ```sh
-cd /path/to/hermes-agent
-.venv/bin/python -m pytest /path/to/otter/extensions/hermes/gateway/tests
+uv run --no-project --with hermes-agent==0.19.0 --with aiohttp --with pytest \
+  pytest --import-mode=importlib extensions/hermes/gateway/tests
 ```
+
+CI runs this when the plugin changes. Against a newer Hermes, use its checkout's
+`.venv/bin/python -m pytest --import-mode=importlib …` instead.

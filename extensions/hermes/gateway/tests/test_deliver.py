@@ -28,9 +28,10 @@ def plugin(tmp_path, monkeypatch):
 
 
 def _db():
+    from hermes_constants import get_hermes_home
     from hermes_state import SessionDB
 
-    return SessionDB()
+    return SessionDB(get_hermes_home() / "state.db")
 
 
 def test_new_chat_kept_when_the_relay_is_down(plugin, caplog):
@@ -68,3 +69,19 @@ def test_existing_chat_and_missing_one(plugin):
 def test_plain_send_is_titled_hermes(plugin):
     result = asyncio.run(plugin.deliver({"relay_url": "http://127.0.0.1:1", "token": "t"}, "new", "Hi"))
     assert _db().get_session_title(result["message_id"]) == "Hermes"
+
+
+def test_registers_with_this_hermes(plugin):
+    from gateway.platform_registry import PlatformEntry
+
+    entries = []
+
+    class Ctx:
+        def register_platform(self, **fields):
+            entries.append(PlatformEntry(source="plugin", **fields))
+
+    package = sys.modules["otter_plugin"]
+    package.register(Ctx())
+    (entry,) = entries
+    assert entry.name == "otter" and entry.cron_deliver_env_var == "OTTER_HOME_CHANNEL"
+    assert entry.standalone_sender_fn is not None and entry.platform_hint

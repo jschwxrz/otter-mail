@@ -7,18 +7,31 @@ Hermes's API server, which is also how they talk to Hermes, so nothing here list
 
 import asyncio
 import logging
+import uuid
+from datetime import datetime
 from typing import Any, Optional
 
 from gateway.config import Platform
-from gateway.platforms._shared import (
-    env_is_connected,
-    extra_or_secret,
-    get_scoped_secret,
-    seed_extra_from_env,
-    send_error,
-)
+
+try:
+    from gateway.platforms._shared import (
+        env_is_connected,
+        extra_or_secret,
+        get_scoped_secret,
+        seed_extra_from_env,
+        send_error,
+    )
+except ImportError:
+    from ._compat import (
+        env_is_connected,
+        extra_or_secret,
+        get_scoped_secret,
+        seed_extra_from_env,
+        send_error,
+    )
 from gateway.platforms.base import BasePlatformAdapter, SendResult
 
+from ._compat import register_platform
 from .otter_channel import (
     DEFAULT_TITLE,
     NEW_CHAT,
@@ -57,11 +70,25 @@ def _job_name(job_id: Any) -> Optional[str]:
     return (job or {}).get("name") or None
 
 
-def _keep(chat_id: str, text: str, title: str) -> str:
-    from hermes_state_ids import new_session_id
-    from hermes_state_registry import acquire, release_or_close
+def _open_db():
+    try:
+        from hermes_state_ids import new_session_id
+        from hermes_state_registry import acquire, release_or_close
 
-    db = acquire()
+        return acquire(), new_session_id, release_or_close
+    except ImportError:
+        # Released Hermes (0.19) has neither: its own database, ids as its gateway makes them.
+        from hermes_constants import get_hermes_home
+        from hermes_state import SessionDB
+
+        def new_id() -> str:
+            return f"{datetime.now():%Y%m%d_%H%M%S}_{uuid.uuid4().hex[:8]}"
+
+        return SessionDB(get_hermes_home() / "state.db"), new_id, lambda db: db.close()
+
+
+def _keep(chat_id: str, text: str, title: str) -> str:
+    db, new_session_id, release_or_close = _open_db()
     try:
         if chat_id == NEW_CHAT:
             session_id = db.create_session(new_session_id(), SOURCE)
@@ -161,7 +188,8 @@ PLATFORM_HINT = (
 
 
 def register(ctx):
-    ctx.register_platform(
+    register_platform(
+        ctx,
         name=SOURCE,
         label="Otter",
         dashboard_description="Deliver scheduled results and messages to Otter, as chats.",
