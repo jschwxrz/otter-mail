@@ -1085,3 +1085,133 @@ describe("what an agent delivers to Otter", () => {
     expect(events[0]).toMatchObject({ messages: [{ role: "assistant", text: "Hi Chris." }] });
   });
 });
+
+describe("compaction in an OpenClaw turn", () => {
+  const step = { kind: "tool", title: "Compacting context", compaction: true };
+  const compaction = (payload: object) =>
+    fixture.onEvent({ event: "agent", payload: { stream: "compaction", ...payload } });
+  const codexRow = (itemId: string) => ({
+    role: "custom",
+    customType: "openclaw.context-compaction",
+    content: "Context compacted",
+    __openclaw: { itemId, id: `codex-context-compaction:${itemId}` },
+  });
+
+  async function sending() {
+    history = () => ({ messages: [sent], sessionInfo: { activeRunIds: [] } });
+    gateway();
+    const turn = send();
+    await vi.waitFor(() =>
+      expect(fixture.request).toHaveBeenCalledWith(
+        "chat.send",
+        expect.anything(),
+        expect.anything(),
+      ),
+    );
+    return turn;
+  }
+  const steps = (events: ChatEvent[]) =>
+    events.filter((e) => e.type === "tool" || e.type === "toolResult");
+
+  it("shows the session's compactions, its own run's included, and no other session's", async () => {
+    const { events, ended } = await sending();
+    compaction({ runId: "req-1", sessionKey: "s", data: { phase: "start", itemId: "c-1" } });
+    compaction({
+      runId: "req-1",
+      sessionKey: "s",
+      data: { phase: "end", itemId: "c-1", completed: false, willRetry: true },
+    });
+    compaction({
+      runId: "req-1",
+      sessionKey: "s",
+      data: { phase: "end", itemId: "c-1", completed: true },
+    });
+    compaction({ runId: "other", sessionKey: "t", data: { phase: "start" } });
+    event("sessions.changed", { sessionId: "uuid-1" });
+    compaction({ runId: "uuid-1:native-compact", data: { phase: "start" } });
+    compaction({ runId: "uuid-1:native-compact", data: { phase: "end", completed: false } });
+    compaction({ runId: "uuid-2:native-compact", data: { phase: "start" } });
+    event("chat", { runId: "req-1", state: "final" });
+    await ended;
+    expect(steps(events)).toEqual([
+      { requestId: "req-1", type: "tool", id: "compaction:c-1", step },
+      { requestId: "req-1", type: "toolResult", id: "compaction:c-1", output: "" },
+      { requestId: "req-1", type: "tool", id: "compaction:uuid-1:native-compact", step },
+      {
+        requestId: "req-1",
+        type: "toolResult",
+        id: "compaction:uuid-1:native-compact",
+        output: "Context compaction failed",
+      },
+    ]);
+  });
+
+  it("shows what the Otter plugin reports of a compaction before the run", async () => {
+    const { events, ended } = await sending();
+    const plugin = (data: object) =>
+      fixture.onEvent({
+        event: "agent",
+        payload: {
+          runId: "uuid-1:compaction",
+          sessionKey: "s",
+          stream: "otter.compaction",
+          data: { ...data, pluginId: "otter" },
+        },
+      });
+    plugin({ phase: "start" });
+    plugin({ phase: "end", completed: true });
+    event("chat", { runId: "req-1", state: "final" });
+    await ended;
+    expect(steps(events)).toEqual([
+      { requestId: "req-1", type: "tool", id: "compaction:uuid-1:compaction", step },
+      { requestId: "req-1", type: "toolResult", id: "compaction:uuid-1:compaction", output: "" },
+    ]);
+  });
+
+  it("shows one from the row it leaves, once, when it sent no events", async () => {
+    const { events, ended } = await sending();
+    event("session.message", { message: codexRow("c-2") });
+    compaction({
+      runId: "req-1",
+      sessionKey: "s",
+      data: { phase: "end", itemId: "c-2", completed: true },
+    });
+    event("chat", { runId: "req-1", state: "final" });
+    await ended;
+    expect(steps(events)).toEqual([
+      { requestId: "req-1", type: "tool", id: "compaction:c-2", step },
+      { requestId: "req-1", type: "toolResult", id: "compaction:c-2", output: "" },
+      { requestId: "req-1", type: "toolResult", id: "compaction:c-2", output: "" },
+    ]);
+  });
+
+  it("keeps one in the middle of the run in the turn read back from the session", async () => {
+    history = () => ({
+      messages: [
+        sent,
+        row("req-1", [{ type: "text", text: "Looking." }]),
+        {
+          role: "system",
+          content: [{ type: "text", text: "Compaction" }],
+          __openclaw: { kind: "compaction", id: "k-1" },
+        },
+        codexRow("c-3"),
+        row("req-1", [{ type: "text", text: "Done." }]),
+      ],
+      sessionInfo: { activeRunIds: [] },
+    });
+    gateway();
+    const events: ChatEvent[] = [];
+    await openClawProvider.resume!({ requestId: "req-1", sessionId: "s" }, settings, (e) =>
+      events.push(e),
+    );
+    expect(events.find((e) => e.type === "transcript")).toMatchObject({
+      messages: [
+        { role: "assistant", text: "Looking." },
+        { role: "assistant", text: "", toolCalls: [step] },
+        { role: "assistant", text: "", toolCalls: [step] },
+        { role: "assistant", text: "Done." },
+      ],
+    });
+  });
+});

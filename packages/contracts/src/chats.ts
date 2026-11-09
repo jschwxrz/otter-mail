@@ -9,6 +9,8 @@ export interface ChatStep {
   title: string;
   detail?: string;
   source?: string;
+  /** The agent compacting its context: running until its output, which is empty unless it failed. */
+  compaction?: true;
 }
 
 export type ChatTurnItem =

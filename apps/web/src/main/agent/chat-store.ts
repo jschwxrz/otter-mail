@@ -172,7 +172,9 @@ function turnsFromMessages(messages: ChatSessionMessage[]): ChatTurn[] {
       if (m.text) open.items!.push({ kind: "text", text: m.text });
       for (const step of m.toolCalls ?? []) open.items!.push({ kind: "step", step });
     } else if (m.role === "tool" && open) {
-      const pending = open.items!.find((t) => t.kind === "step" && t.output === undefined);
+      const pending = open.items!.find(
+        (t) => t.kind === "step" && t.output === undefined && !t.step.compaction,
+      );
       if (pending?.kind === "step") pending.output = m.text || "(done)";
     }
   }
@@ -1375,6 +1377,7 @@ function onChatEvent(raw: unknown): void {
               (t) =>
                 t.kind === "step" &&
                 t.output === undefined &&
+                !t.step.compaction &&
                 (event.id === undefined || t.id === undefined || t.id === event.id),
             );
       const step = items[index];
