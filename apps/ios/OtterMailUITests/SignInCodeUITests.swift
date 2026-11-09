@@ -1,9 +1,9 @@
 import XCTest
 
 /**
- * The demo's "Your Linden sign-in code" (482913) shows its code on the row's
- * preview line, an ordinary row's height, with Copy & trash; the reader's card
- * has it too. Each copies the code and trashes the conversation, with Undo.
+ * The demo's "Your Linden sign-in code" (482913) shows its code on a card under
+ * the row's subject, with Copy & trash; the reader's card has it too. Each
+ * copies the code and trashes the conversation, with Undo.
  */
 final class SignInCodeUITests: XCTestCase {
     private let subject = "Your Linden sign-in code"
@@ -22,12 +22,15 @@ final class SignInCodeUITests: XCTestCase {
         let app = XCUIApplication()
         let row = rowButton(app, subject)
         XCTAssertTrue(row.waitForExistence(timeout: 8), "code mail missing from the inbox")
-        XCTAssertTrue(row.label.contains(code), "the row doesn't show the code")
-        XCTAssertEqual(cell(app, subject).frame.height, cell(app, "Dinner Saturday?").frame.height, accuracy: 0.5, "the code row isn't an ordinary row's height")
+        let cell = cell(app, subject)
+        XCTAssertTrue(cell.staticTexts[code].exists, "the row doesn't show the code")
 
-        let button = app.buttons["otp-copy"].firstMatch
+        let button = cell.buttons["otp-copy"]
         XCTAssertEqual(button.label, "Copy code and trash")
-        XCTAssertGreaterThanOrEqual(button.frame.height, 44, "Copy & trash is smaller than a 44pt target")
+        XCTAssertTrue(button.isHittable, "Copy & trash can't be tapped")
+        XCTAssertGreaterThanOrEqual(button.frame.width, 44, "Copy & trash is narrower than a 44pt target")
+        XCTAssertGreaterThanOrEqual(button.frame.height, 44, "Copy & trash is shorter than a 44pt target")
+        XCTAssertTrue(cell.frame.contains(button.frame), "Copy & trash overhangs its row")
 
         row.tap()
         XCTAssertTrue(app.staticTexts[subject].waitForExistence(timeout: 5), "tapping the row didn't open the conversation")

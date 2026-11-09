@@ -327,8 +327,35 @@ struct ThreadListView: View {
 
     private func row(_ thread: MailThread) -> some View {
         let code = selecting ? nil : thread.freshVerificationCode()
-        return Group {
-            let content = ThreadRow(thread: thread, mark: mailbox?.mark ?? "star", mine: Set(store.addresses(of: thread.mailbox)), code: code)
+        return VStack(alignment: .leading, spacing: 10) {
+            link(thread, preview: code == nil)
+            if let code {
+                CodeCard(code: code, onTrash: thread.labels.contains("TRASH") ? nil : {
+                    withAnimation(actionAnimation) { store.trash(thread.id) }
+                })
+                .padding(.leading, 48)
+            }
+        }
+        .padding(.leading, 24)
+        .padding(.trailing, 16)
+        .padding(.vertical, 10)
+        .background(rowBackground(unread: thread.unread && !thread.isDraft))
+        .contextMenu {
+            if !selecting { ThreadActions(thread: thread) }
+        }
+        .modifier(MailSwipeActions(
+            leading: selecting ? nil : leadingAction(thread),
+            trailing: selecting ? nil : trailingAction(thread),
+            square: preferences.fullWidthRows
+        ))
+        .listRowBackground(palette.canvas)
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets())
+    }
+
+    private func link(_ thread: MailThread, preview: Bool) -> some View {
+        Group {
+            let content = ThreadRow(thread: thread, mark: mailbox?.mark ?? "star", mine: Set(store.addresses(of: thread.mailbox)), preview: preview)
             if selecting {
                 Button {
                     if selected.contains(thread.id) { selected.remove(thread.id) }
@@ -351,32 +378,6 @@ struct ThreadListView: View {
                     .matchedTransitionSource(id: thread.id, in: messageTransition)
             }
         }
-        .overlay(alignment: .bottomTrailing) {
-            if let code {
-                // Centered on the code's line, outside the link so it takes its own tap; its 44pt target overhangs the line.
-                Text(code).font(.inter(.subheadline)).hidden()
-                    .overlay(alignment: .trailing) {
-                        CodeButton(code: code, onTrash: thread.labels.contains("TRASH") ? nil : {
-                            withAnimation(actionAnimation) { store.trash(thread.id) }
-                        })
-                    }
-            }
-        }
-        .padding(.leading, 24)
-        .padding(.trailing, 16)
-        .padding(.vertical, 10)
-        .background(rowBackground(unread: thread.unread && !thread.isDraft))
-        .contextMenu {
-            if !selecting { ThreadActions(thread: thread) }
-        }
-        .modifier(MailSwipeActions(
-            leading: selecting ? nil : leadingAction(thread),
-            trailing: selecting ? nil : trailingAction(thread),
-            square: preferences.fullWidthRows
-        ))
-        .listRowBackground(palette.canvas)
-        .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets())
     }
 
     /** The desktop's rows (styles.css): unread mail on a raised card, or edge to edge with a hairline between. */

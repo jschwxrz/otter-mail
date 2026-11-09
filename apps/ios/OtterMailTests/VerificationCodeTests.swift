@@ -126,7 +126,7 @@ struct VerificationCodeTests {
     @Test func copyPutsTheCodeOnThePasteboard() throws {
         let pasteboard = try #require(UIPasteboard(name: UIPasteboard.Name("otter-mail-tests.code"), create: true))
         defer { UIPasteboard.remove(withName: pasteboard.name) }
-        CodeButton.copy("482913", to: pasteboard)
+        CodeCard.copy("482913", to: pasteboard)
         #expect(pasteboard.string == "482913")
     }
 
