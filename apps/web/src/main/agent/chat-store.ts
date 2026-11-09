@@ -248,37 +248,61 @@ const FINAL = new Set([
 /** What each run in flight was sent, so a failed one can be sent again. */
 const sent = new Map<string, Outgoing>();
 
+/**
+ * A run picked up after a reload has nothing in `sent`: its message, read back from the chat,
+ * unless it carried what only the original send had: attachments, mail context, quotes, a skill.
+ */
+function resendable(c: Conversation, requestId: string): Outgoing | null {
+  const turn = c.turns.find((t) => t.id === `u-${requestId}`);
+  if (
+    !turn?.text.trim() ||
+    turn.attachments?.length ||
+    turn.context ||
+    turn.citations?.length ||
+    turn.skill
+  )
+    return null;
+  return {
+    id: crypto.randomUUID(),
+    convoId: c.id,
+    provider: c.provider,
+    question: turn.text,
+    input: turn.text,
+    title: clampTitle(turn.text),
+  };
+}
+
 function friendlyError(code: string, provider: ProviderKind): string {
   const name = EXTENSIONS.find((e) => e.manifest.id === provider)?.manifest.name ?? provider;
   switch (code) {
     case "not_configured":
-      return `${name} isn't set up — connect it in Settings → Agents.`;
+      return `${name} isn't set up. Connect it in Settings → Agents.`;
     case "not_installed":
-      return "The Codex CLI wasn't found — check it in Settings → Agents.";
+      return "The Codex CLI wasn't found. Check it in Settings → Agents.";
     case "provider_disabled":
       return `${name} is turned off in Settings → Agents.`;
     case "unauthorized":
       return provider === "openclaw"
-        ? "The OpenClaw gateway refused this device — reconnect it in Settings → OpenClaw."
-        : "The API key was rejected — update it in Settings.";
+        ? "The OpenClaw gateway refused this device. Reconnect it in Settings → OpenClaw."
+        : "The API key was rejected. Update it in Settings.";
     case "unreachable":
       if (provider === "openrouter") return "Can't reach OpenRouter. Try again in a moment.";
       if (provider === "openclaw") return "Can't reach the OpenClaw gateway.";
       return provider === "codex"
         ? "Lost the connection to Codex."
-        : "Can't reach Hermes — are you on Tailscale?";
+        : "Can't reach Hermes. Are you on Tailscale?";
     case "timeout":
-      return `${name} went quiet for too long — the run was stopped.`;
+      return `${name} went quiet for too long, so the run was stopped.`;
     case "cancelled":
       return "Stopped.";
     case "pairing_required":
-      return "Approve this device on the OpenClaw gateway — the command is in Settings → Agents.";
+      return "Approve this device on the OpenClaw gateway. The command is in Settings → Agents.";
     case "origin_not_allowed":
-      return "The OpenClaw gateway doesn't allow this site yet — see Settings → Agents.";
+      return "The OpenClaw gateway doesn't allow this site yet. See Settings → Agents.";
     case "session_not_found":
-      return `This chat's ${name} session no longer exists — send again to start a new one.`;
+      return `This chat's ${name} session no longer exists. Send again to start a new one.`;
     case "not_received":
-      return `${name} never got this message — send it again.`;
+      return `${name} never got this message. Send it again.`;
     default:
       return code.startsWith("agent_error: ")
         ? code.slice("agent_error: ".length)
@@ -1429,7 +1453,7 @@ function onChatEvent(raw: unknown): void {
       } else if (step?.kind === "step") items[index] = { ...step, output: event.output };
     } else if (event.type === "error") {
       updated.error = friendlyError(event.message, s.provider);
-      const msg = sent.get(event.requestId);
+      const msg = sent.get(event.requestId) ?? resendable(c, event.requestId);
       if (msg && updated.id === `a-${event.requestId}` && !FINAL.has(event.message))
         opens.retry = { turnId: updated.id, msg };
     }

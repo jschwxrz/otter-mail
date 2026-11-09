@@ -2057,7 +2057,7 @@ export function MessageList({
               </>
             ) : allJunk ? (
               <>
-                <HintTooltip label="Not Junk — move to Inbox">
+                <HintTooltip label="Not Junk: move to Inbox">
                   <IconBtn label="Not Junk" className="size-7" onClick={bulkNotJunk}>
                     <ShieldCheckIcon className="size-3.5" />
                   </IconBtn>

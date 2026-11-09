@@ -1262,7 +1262,7 @@ describe("Outlook sync", { timeout: 15_000 }, () => {
         false,
       );
       expect(await invoke("gmail:listSchedules", {})).toMatchObject([
-        { state: "failed", error: "May have been sent — check Sent before sending again." },
+        { state: "failed", error: "May have been sent. Check Sent before sending again." },
       ]);
     });
 
@@ -1291,7 +1291,7 @@ describe("Outlook sync", { timeout: 15_000 }, () => {
       expect(writes.some((w) => w.path.endsWith("/permanentDelete"))).toBe(false);
       expect(messages.has(draftId)).toBe(true);
       expect(await invoke("gmail:listSchedules", {})).toMatchObject([
-        { state: "failed", error: "May have been sent — check Sent before sending again." },
+        { state: "failed", error: "May have been sent. Check Sent before sending again." },
       ]);
     });
 

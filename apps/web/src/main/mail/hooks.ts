@@ -40,9 +40,9 @@ function describeWriteError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);
   const message = raw.replace(/^Error invoking remote method '[^']*':\s*/, "");
   if (/unauthorized|oauth|signed out of google/i.test(message)) {
-    return "Google sign-in expired for this account — sign in again in Settings → Accounts.";
+    return "Google sign-in expired for this account. Sign in again in Settings → Accounts.";
   }
-  const reason = message.match(/Gmail API error: \d+[^—]*—\s*(.+)$/s)?.[1];
+  const reason = message.match(/Gmail API error: \d+[^:]*:\s*(.+)$/s)?.[1];
   return `Couldn't save the change: ${reason ?? message}`;
 }
 
@@ -91,7 +91,7 @@ export function useWriteFailureToasts(): void {
         return;
       }
       toast.error(
-        p?.savedToDrafts ? `Couldn't send ${what} — it's back in Drafts` : `Couldn't send ${what}`,
+        p?.savedToDrafts ? `Couldn't send ${what}. It's back in Drafts` : `Couldn't send ${what}`,
       );
       invalidateMailCaches(qc);
     });

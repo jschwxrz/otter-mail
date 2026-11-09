@@ -78,7 +78,7 @@ async function hermesContent(input: string, attachments: ChatAttachment[]): Prom
   const unsupported = attachments.filter((a) => a.kind === "file" && !TEXT_TYPES.test(a.mime));
   if (unsupported.length > 0) {
     throw new Error(
-      `Hermes can't read ${unsupported.map((a) => a.name).join(", ")} — its API takes images and text files only. Try Codex or Claude for PDFs and Office documents.`,
+      `Hermes can't read ${unsupported.map((a) => a.name).join(", ")}: its API takes images and text files only. Try Codex or Claude for PDFs and Office documents.`,
     );
   }
   const images = attachments.filter((a) => a.kind === "image");
@@ -238,7 +238,7 @@ export async function fetchHermesModels(baseUrl: string, key: string): Promise<s
   });
   if (response.status === 401) throw new Error("The API key was rejected (401).");
   if (!response.ok)
-    throw new Error(`The server answered ${response.status} — is that the API server URL?`);
+    throw new Error(`The server answered ${response.status}. Is that the API server URL?`);
   const data = (await response.json()) as { data?: { id?: string }[] };
   return (data.data ?? []).map((m) => m.id ?? "").filter(Boolean);
 }
@@ -461,7 +461,7 @@ export const hermesProvider: ChatProvider<HermesSettings> = {
         installed: rejected,
         status: "error",
         auth: { status: rejected ? "unauthenticated" : "unknown" },
-        message: rejected ? message : `Can't reach Hermes — are you on Tailscale? (${message})`,
+        message: rejected ? message : `Can't reach Hermes. Are you on Tailscale? (${message})`,
       };
     }
   },

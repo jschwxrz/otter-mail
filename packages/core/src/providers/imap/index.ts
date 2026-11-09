@@ -34,11 +34,11 @@ function describeError(err: unknown): string {
     const host = where?.host ?? "the mail server";
     if (err.kind === "auth") return `Wrong password for ${where?.user ?? "this mailbox"}`;
     if (/certificate|self[- ]signed|CERT_|unable to verify/i.test(err.message)) {
-      return `${host}'s certificate isn't trusted — check the server name`;
+      return `${host}'s certificate isn't trusted. Check the server name`;
     }
     if (tooManyConnections(err)) return "Too many connections, retrying shortly";
-    if (err.kind === "network") return `Can't reach ${host} — retrying`;
-    if (err.kind === "timeout") return `${host} isn't answering — retrying`;
+    if (err.kind === "network") return `Can't reach ${host}. Retrying`;
+    if (err.kind === "timeout") return `${host} isn't answering. Retrying`;
     const text = (err as { serverText?: string }).serverText || err.message;
     return `${host}: ${text.slice(0, 200)}`;
   }

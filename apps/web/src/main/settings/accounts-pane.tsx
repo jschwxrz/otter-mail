@@ -602,7 +602,7 @@ function AccountEditor({ account }: { account: MailAccount }) {
       >
         <Text variant="small">
           Otter stops syncing {account.email} and deletes its local copy. Nothing is deleted from{" "}
-          {mailServerName(account)} — you can add the account again any time.
+          {mailServerName(account)}. You can add the account again any time.
         </Text>
       </Dialog>
     </>

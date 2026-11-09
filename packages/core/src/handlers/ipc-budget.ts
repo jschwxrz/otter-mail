@@ -28,7 +28,7 @@ export async function settleWrite(
   } finally {
     clearTimeout(timer);
   }
-  console.log(`[${channel}] still running past the IPC budget — finishing in the background`);
+  console.log(`[${channel}] still running past the IPC budget, finishing in the background`);
   settled.catch((err: unknown) => {
     console.log(`[${channel}] background write failed`, { error: String(err) });
     broadcast("gmail:write-failed", {

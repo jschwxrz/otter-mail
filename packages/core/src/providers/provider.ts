@@ -66,7 +66,7 @@ export class SendUncertain extends Error {
   readonly draftId?: string;
 
   constructor(options?: { cause?: unknown; draftId?: string }) {
-    super("May have been sent — check Sent before sending again.", { cause: options?.cause });
+    super("May have been sent. Check Sent before sending again.", { cause: options?.cause });
     this.name = "SendUncertain";
     this.draftId = options?.draftId;
   }

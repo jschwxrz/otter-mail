@@ -776,7 +776,7 @@ describe("Gmail sync", { timeout: 15_000 }, () => {
       expect([...drafts.keys()]).toEqual([draftId]);
       expect(posted.some((p) => p.startsWith("DELETE"))).toBe(false);
       expect(await invoke("gmail:listSchedules", {})).toMatchObject([
-        { state: "failed", error: "May have been sent — check Sent before sending again." },
+        { state: "failed", error: "May have been sent. Check Sent before sending again." },
       ]);
     });
 

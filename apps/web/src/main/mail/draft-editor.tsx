@@ -378,7 +378,7 @@ export function DraftEditor({
         attachments == null ? (
           attachLoadFailed ? (
             <>
-              Couldn't load attachments —{" "}
+              Couldn't load attachments.{" "}
               <button
                 type="button"
                 onClick={() => void loadAttachments()}

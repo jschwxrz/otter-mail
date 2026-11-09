@@ -1879,7 +1879,7 @@ export const openClawProvider: ChatProvider<OpenClawSettings> = {
             : code === "origin_not_allowed"
               ? "The gateway doesn't allow this site yet."
               : code === "unauthorized"
-                ? "The gateway refused the setup code or token — make a new setup code."
+                ? "The gateway refused the setup code or token. Make a new setup code."
                 : "Can't reach the gateway.",
       };
     }

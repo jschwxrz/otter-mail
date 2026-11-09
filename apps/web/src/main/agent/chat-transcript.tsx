@@ -209,7 +209,7 @@ function DetachedRow({ providerName }: { providerName: string }) {
   return (
     <div className="border-b border-border/40 pb-2 pt-1">
       <div className="flex h-6 min-w-0 items-baseline px-1 text-sm leading-relaxed text-muted-foreground">
-        Lost {providerName} mid-reply — the rest shows here once it's back.
+        Lost {providerName} mid-reply. The rest shows here once it's back.
       </div>
     </div>
   );

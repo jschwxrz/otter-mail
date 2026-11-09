@@ -78,7 +78,7 @@ export class GmailApiError extends Error {
     const reason = isRateLimited(status, body)
       ? "Gmail is limiting requests for this account right now. Try again in a minute."
       : gmailErrorMessage(body);
-    super(`Gmail API error: ${status} ${statusText}${reason ? ` — ${reason}` : ""}`);
+    super(`Gmail API error: ${status} ${statusText}${reason ? `: ${reason}` : ""}`);
     this.name = "GmailApiError";
   }
 
@@ -123,8 +123,8 @@ function isSignInError(err: unknown): boolean {
 }
 
 export function describeError(err: unknown): string {
-  if (isRateLimitError(err)) return "Gmail is limiting requests right now — retrying shortly";
-  if (isNetworkError(err)) return "Can't reach Gmail — retrying when the connection is back";
+  if (isRateLimitError(err)) return "Gmail is limiting requests right now. Retrying shortly";
+  if (isNetworkError(err)) return "Can't reach Gmail. Retrying when the connection is back";
   const text = String(err);
   if (text.includes(SIGNED_OUT_MESSAGE) || text.includes("Google sign-in expired")) {
     return SIGNED_OUT_MESSAGE;
@@ -132,9 +132,9 @@ export function describeError(err: unknown): string {
   if (text.includes(GMAIL_ACCESS_MISSING_MESSAGE)) return GMAIL_ACCESS_MISSING_MESSAGE;
   if (err instanceof GmailApiError) {
     if (err.status === 401) {
-      return "Gmail rejected this account's sign-in — sign in to it again";
+      return "Gmail rejected this account's sign-in. Sign in to it again";
     }
-    if (err.status >= 500) return "Gmail is having trouble right now — retrying shortly";
+    if (err.status >= 500) return "Gmail is having trouble right now. Retrying shortly";
     let detail = "";
     try {
       detail = (JSON.parse(err.body) as { error?: { message?: string } }).error?.message ?? "";
