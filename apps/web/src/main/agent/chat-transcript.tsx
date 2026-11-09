@@ -17,7 +17,7 @@ import {
   TextQuoteIcon,
   XIcon,
 } from "lucide-react";
-import { IconBtn, HintTooltip } from "../mail/ui";
+import { IconBtn, HintTooltip, cn } from "../mail/ui";
 import { CompactionRow, WorkLog, isCompaction, type TurnItem } from "./work-log";
 import type { ChatChange } from "../mail/api";
 import type { ContextKind, ContextMeta } from "./chat-context";
@@ -398,23 +398,30 @@ export function ChatTranscript({
   const runStartedAt = turns.find((turn) => runReplies.has(turn.id))?.startedAt;
   return turns.map((turn, index) => {
     if (turn.role === "user") {
-      // A compaction before the run is drawn above the message, once it's done.
+      // A compaction before the run comes before the message, as in Otter Code: while it runs,
+      // the message waits under it, dashed, not read yet; once done, its divider stays above.
       const reply = turns[index + 1];
       const replyItems = reply?.role === "assistant" ? shownItems(reply) : [];
       const opening = replyItems[openingCompactions(replyItems) - 1];
-      const compaction =
-        opening?.kind === "step" && !(isLive(reply) && opening.output === undefined)
-          ? opening
-          : null;
+      const waiting = opening?.kind === "step" && isLive(reply) && opening.output === undefined;
+      const compaction = opening?.kind === "step" && !waiting ? opening : null;
       return (
         <MessageScroller.Item key={turn.id} messageId={turn.id}>
           {compaction ? <CompactionRow output={compaction.output} live={false} /> : null}
+          {waiting ? <WorkingRow startedAt={runStartedAt} compacting /> : null}
           <div className="group flex flex-col items-end gap-1 py-3">
             {turn.intent === "steer" || turn.intent === "promoted" ? (
               <IntentMarker intent={turn.intent} />
             ) : null}
             {turn.context ? <ContextRecap context={turn.context} onOpen={onOpenContext} /> : null}
-            <div className="relative max-w-[80%] select-text whitespace-pre-wrap rounded-2xl bg-message px-4 py-2.5 text-sm leading-relaxed text-message-foreground wrap-anywhere">
+            <div
+              className={cn(
+                "relative max-w-[80%] select-text whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed wrap-anywhere",
+                waiting
+                  ? "border border-dashed border-muted-foreground/40 text-muted-foreground"
+                  : "bg-message text-message-foreground",
+              )}
+            >
               {turn.skill ? (
                 <span className="mb-1 mr-1.5 inline-flex align-middle">
                   <SkillBadge name={turn.skill} onAccent />
@@ -445,6 +452,7 @@ export function ChatTranscript({
     const all = shownItems(turn);
     const opening = turns[index - 1]?.role === "user" ? openingCompactions(all) : 0;
     const items = all.slice(opening);
+    // Drawn above the message that waits on it.
     const compactingFirst =
       live &&
       all.slice(0, opening).some((item) => item.kind === "step" && item.output === undefined);
@@ -479,8 +487,8 @@ export function ChatTranscript({
       <MessageScroller.Item key={turn.id} messageId={turn.id}>
         <div className="flex flex-col">
           <DeliveryRow turn={turn} />
-          {live && isLast && !compactingMidway ? (
-            <WorkingRow startedAt={runStartedAt} compacting={compactingFirst} />
+          {live && isLast && !compactingMidway && !compactingFirst ? (
+            <WorkingRow startedAt={runStartedAt} compacting={false} />
           ) : null}
           {folded ? (
             <WorkFoldRow
