@@ -291,7 +291,7 @@ describe("persistent mail scheduling", () => {
       {
         kind: "send",
         state: "failed",
-        error: "May have been sent — check Sent before sending again.",
+        error: "May have been sent. Check Sent before sending again.",
       },
     ]);
     vi.setSystemTime(Date.now() + 60_000);

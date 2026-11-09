@@ -3,7 +3,7 @@ import { forgetUndo, registerUndo, type UndoAction } from "./undo";
 
 export const UNDO_SEND_MS = 10_000;
 
-export const MAY_HAVE_BEEN_SENT = "May have been sent — check Sent before sending again.";
+export const MAY_HAVE_BEEN_SENT = "May have been sent. Check Sent before sending again.";
 
 export type SavedDraft = { accountId: string; messageId: string };
 
@@ -70,7 +70,7 @@ export function sendWithUndo({
         }
       },
       () =>
-        toast.update(toastId, "error", `Couldn't send “${description}” — kept in Drafts`, {
+        toast.update(toastId, "error", `Couldn't send “${description}”. It's in Drafts`, {
           timeout: 0,
           action: {
             label: "Open draft",

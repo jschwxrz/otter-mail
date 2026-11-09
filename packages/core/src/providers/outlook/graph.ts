@@ -34,7 +34,7 @@ export class GraphError extends Error {
     detail: string,
   ) {
     super(
-      `Microsoft Graph error: ${status}${code ? ` ${code}` : ""}${detail ? ` — ${detail}` : ""}`,
+      `Microsoft Graph error: ${status}${code ? ` ${code}` : ""}${detail ? `: ${detail}` : ""}`,
     );
     this.name = "GraphError";
   }
@@ -87,15 +87,15 @@ export function errorKind(err: unknown): ErrorKind | null {
 
 export function describeError(err: unknown): string {
   if (err instanceof GraphError) {
-    if (err.throttled) return "Outlook is limiting requests right now — retrying shortly";
+    if (err.throttled) return "Outlook is limiting requests right now. Retrying shortly";
     if (err.status === 401) return OUTLOOK_SIGNED_OUT_MESSAGE;
     if (err.status === 403) {
-      return "Outlook refused access to this mailbox — sign in to it again to allow Otter";
+      return "Outlook refused access to this mailbox. Sign in to it again to allow Otter";
     }
-    if (err.status >= 500) return "Outlook is having trouble right now — retrying shortly";
+    if (err.status >= 500) return "Outlook is having trouble right now. Retrying shortly";
     return err.message.replace(/^Microsoft Graph error: /, "Outlook error ").slice(0, 240);
   }
-  if (isNetworkError(err)) return "Can't reach Outlook — retrying when the connection is back";
+  if (isNetworkError(err)) return "Can't reach Outlook. Retrying when the connection is back";
   const text = String(err);
   if (text.includes(OUTLOOK_SIGNED_OUT_MESSAGE)) return OUTLOOK_SIGNED_OUT_MESSAGE;
   return text.length > 240 ? `${text.slice(0, 240)}…` : text;

@@ -157,7 +157,7 @@ function SuggestionRow({
               <span className="font-medium">{suggestion.message.subject || "(no subject)"}</span>
               <span className="text-muted-foreground">
                 {" "}
-                —{" "}
+                ·{" "}
                 {senderLabel(
                   suggestion.message.fromName,
                   suggestion.message.fromEmail,
@@ -827,7 +827,7 @@ export function SearchHeader({
       {query ? (
         <div className="flex h-7 items-center gap-2 px-5 text-xs text-muted-foreground">
           {offline ? (
-            <span className="text-warning">Offline — showing matches saved on this device</span>
+            <span className="text-warning">Offline: showing matches saved on this device</span>
           ) : loading ? (
             <span>Searching Gmail…</span>
           ) : estimate !== null ? (

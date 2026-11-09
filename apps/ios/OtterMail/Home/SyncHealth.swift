@@ -110,7 +110,7 @@ struct SyncStatusLine: View {
 
     private func status(_ mailbox: Mailbox) -> (String, Bool) {
         let health = store.health[mailbox.email] ?? MailStore.SyncHealth()
-        if let failure = health.failure { return ("\(failure) — will retry", true) }
+        if let failure = health.failure { return ("\(failure). Will retry", true) }
         guard let synced = health.syncedAt else { return ("Syncing…", false) }
         return (Date.now.timeIntervalSince(synced) < 60 ? "Synced just now" : "Synced \(synced.formatted(.relative(presentation: .named)))", false)
     }

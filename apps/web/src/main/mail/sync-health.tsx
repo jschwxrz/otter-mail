@@ -37,7 +37,7 @@ function syncLine(status: SyncStatus | undefined): StatusLine {
     return { text: `Syncing${progress}…`, tone: "active" };
   }
   if (status.error && !status.syncing) {
-    return { text: "Sync failed — will retry", tone: "error", detail: status.error };
+    return { text: "Sync failed. Will retry", tone: "error", detail: status.error };
   }
   const synced = status.lastSyncAt ? `Synced ${timeAgo(status.lastSyncAt)}` : "Not synced yet";
   if (status.download) {
@@ -263,7 +263,7 @@ export function SyncButton({ accountIds }: { accountIds: string[] }) {
   const failed = lines.filter((l) => l.tone === "error");
   const shown: StatusLine =
     failed.length > 1
-      ? { text: `Sync failed for ${failed.length} mailboxes — will retry`, tone: "error" }
+      ? { text: `Sync failed for ${failed.length} mailboxes. Will retry`, tone: "error" }
       : (failed[0] ??
         lines.find((l) => l.tone === "active") ??
         syncLine(
